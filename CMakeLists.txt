@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.5.0)
+project(Vision-based-underwater-pillar-detection VERSION 0.1.0 LANGUAGES C CXX)
+
+find_package( OpenCV REQUIRED)
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+add_executable(Vision-based-underwater-pillar-detection main.cpp )
+target_link_libraries(Vision-based-underwater-pillar-detection ${OpenCV_LIBS})
