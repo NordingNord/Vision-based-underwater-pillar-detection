@@ -5,6 +5,8 @@
 using namespace std;
 using namespace cv;
 
+// -- Constructor --
+
 // -- Methods --
 void image_handler::read_video(string video_name){
     // Initialize the video capturer

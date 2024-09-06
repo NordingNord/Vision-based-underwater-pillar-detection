@@ -3,5 +3,5 @@ project(Vision-based-underwater-pillar-detection VERSION 0.1.0 LANGUAGES C CXX)
 
 find_package( OpenCV REQUIRED)
 include_directories( ${OpenCV_INCLUDE_DIRS} )
-add_executable(Vision-based-underwater-pillar-detection main.cpp Data_Structures.h Image_Handler.cpp Image_Handler.h)
+add_executable(Vision-based-underwater-pillar-detection main.cpp Data_Structures.h Image_Handler.cpp Image_Handler.h Camera_Handler.cpp Camera_Handler.h)
 target_link_libraries(Vision-based-underwater-pillar-detection ${OpenCV_LIBS})
