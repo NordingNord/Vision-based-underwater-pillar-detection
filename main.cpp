@@ -18,12 +18,7 @@ int main(){
     image_data image_1 = {1,1};
 
     image_handler image_handler_1;
-    Mat image = imread("/home/benjamin/Master_Thesis_Workspace/Vision-based-underwater-pillar-detection/Images/jawas.jpg",IMREAD_GRAYSCALE);
-    if(image.empty()){
-        cout << "shit no work" << endl;
-        cin.get();
-        return -1;
-    }
-    imshow("Jawas",image);
+    Mat image = imread("../jawas.jpg");
+    imshow("Jawa", image);
     waitKey(0);
 }
