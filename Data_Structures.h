@@ -3,6 +3,9 @@
 
 // -- Includes --
 #include <iostream>
+#include <vector>
+#include <array>
+#include <opencv2/opencv.hpp>
 
 // -- Data structures --
 
@@ -11,10 +14,20 @@ struct camera_data{
     int camera_id;
 };
 
-// image_data stores all relevant data of a single image, including the related camera ID
-struct image_data{
-    int image_id;
+// frame_data stores all relevant data of a single frame, including the related camera ID
+struct frame_data{
+    int frame_id;
     int camera_id;
+    cv::Mat frame;
+    cv::Mat Feature_frame;
+    std::vector<cv::KeyPoint> keypoints;
+};
+
+// video_data stores the video capturer handling a certain video as well as the video id and camera id
+struct video_data{
+    int camera_id;
+    int video_id;
+    cv::VideoCapture video_capturer;
 };
 
 
