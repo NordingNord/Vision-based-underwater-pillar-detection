@@ -26,6 +26,8 @@ public:
     void view_frame(int cam_num);
     // -- Method for retrieving a frame --
     cv::Mat get_frame(int cam_num);
+    // -- gets frame count in video --
+    int get_frame_count(int cam_num = 0);
 
 
 private:

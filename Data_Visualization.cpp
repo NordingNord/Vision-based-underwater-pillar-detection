@@ -14,7 +14,7 @@ data_visualization::data_visualization(int width, int height){
 // -- Methods --
 
 // Shows all images in a single window
-void data_visualization::show_images(std::vector<cv::Mat> images, std::string window_title){
+void data_visualization::show_images(vector<cv::Mat> images, string window_title){
     // Create black background image
     Mat window_image(window_height, window_width, CV_8UC3, Scalar(0,0,0));
 

@@ -121,3 +121,8 @@ void Camera_Handler::view_frame(int cam_num){
 Mat Camera_Handler::get_frame(int cam_num){
     return current_frames[cam_num].frame;
 }
+
+// -- gets frame count in video --
+int Camera_Handler::get_frame_count(int cam_num){
+    return videos[cam_num].video_capturer.get(CAP_PROP_FRAME_COUNT);
+}

@@ -12,6 +12,7 @@
 class data_visualization{
 public:
     data_visualization(int width = 1800, int height = 1000);
+    // Shows all desired frames in one window. All frames will have the same size
     void show_images(std::vector<cv::Mat> images, std::string window_title = "");
 private:
     int window_width;
