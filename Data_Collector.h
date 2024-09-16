@@ -16,8 +16,13 @@ public:
     data_collector();
     // saves n equally distributed frames from a video.
     void save_n_video_frames(int n, std::string video_path, std::string save_path);
+
+    // creates and saves a video given n number of frames
+    void create_video(std::string path, std::string name, std::vector<frame_data> frames, video_data video_capturer);
 private:
     std::vector<std::string> csv_data;
+    std::string video_format = ".avi";
+    double fps = 10;
 
 };
 

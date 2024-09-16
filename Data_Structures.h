@@ -21,6 +21,9 @@ struct frame_data{
     cv::Mat frame;
     cv::Mat Feature_frame;
     std::vector<cv::KeyPoint> keypoints;
+    std::vector<cv::Point2f> corners;
+    std::vector<cv::Point2f> all_corners;
+    std::vector<uchar> corner_status;
 };
 
 // video_data stores the video capturer handling a certain video as well as the video id and camera id

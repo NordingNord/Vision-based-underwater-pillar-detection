@@ -9,10 +9,10 @@
 #include "Data_Structures.h"
 
 // -- Class --
-class Camera_Handler{
+class camera_handler{
 public:
-    // -- Constructor taking number of cameras in system as input --
-    Camera_Handler(int num_cameras = 1, double width_scale = 1, double height_scale = 1);
+    // -- Constructor taking number of cameras in system as input as well as desired camera scale--
+    camera_handler(int num_cameras = 1, double width_scale = 1, double height_scale = 1);
     // -- Debugging method to check currently stored camera data --
     void display_cam_data();
     // -- Debugging method to check currently stored video data --
@@ -22,12 +22,18 @@ public:
     // -- Method for getting the next frame in either a specific or all video recordings --
     void read_next_video_frame();
     void read_next_video_frame(int cam_num);
+    // -- Reading video frames without storing them --
+    frame_data get_next_frame(int cam_num);
     // -- Debugging method for viewing current frames --
     void view_frame(int cam_num);
     // -- Method for retrieving a frame --
     cv::Mat get_frame(int cam_num);
     // -- gets frame count in video --
     int get_frame_count(int cam_num = 0);
+    // retrieve all frames
+    std::vector<std::vector<frame_data>> get_all_frames();
+    // retrieve camera data
+    std::vector<video_data> get_video_data();
 
 
 private:
@@ -36,6 +42,7 @@ private:
     std::vector<cv::VideoCapture> captures;
     std::vector<video_data> videos;
     std::vector<frame_data> current_frames;
+    std::vector<std::vector<frame_data>> all_frames;
     double scaling_width;
     double scaling_height;
 };
