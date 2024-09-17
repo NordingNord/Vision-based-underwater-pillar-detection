@@ -261,6 +261,36 @@ void continous_test_optical_flow(string data_path){
     video.release();
 }
 
+void continous_test_orb(string data_path){
+    camera_handler cam_handler;
+    feature_finder orb_finder;
+    cam_handler.insert_video(data_path,0,0);
+    // create video writer
+    vector<video_data> video_info = cam_handler.get_video_data();
+    string filename = "../Data/Feature_Videos/Solo_Pillar_Results/orb_on_solo_pilar.avi";
+    int frame_width = video_info[0].video_capturer.get(CAP_PROP_FRAME_WIDTH);
+    int frame_height = video_info[0].video_capturer.get(CAP_PROP_FRAME_HEIGHT);
+    VideoWriter video(filename,cv::VideoWriter::fourcc('M','J','P','G'),10,Size(frame_width,frame_height));
+    bool show_first_frame = true;
+    while(1){
+        frame_data current_frame;
+        current_frame = cam_handler.get_next_frame(0);
+        if(current_frame.frame.empty()){
+            cout << "reached end of video" << endl;
+            break;
+        }
+        // find and display orb features
+        frame_data current_feature_frame = orb_finder.find_orb_features(current_frame);
+        video.write(current_feature_frame.Feature_frame);
+        if(show_first_frame == true){
+            imshow("",current_feature_frame.Feature_frame);
+            waitKey(0);
+            show_first_frame = false;
+        }
+    }
+    video.release();
+}
+
 // -- Main --
 int main(){
     //camera_handler_test();
@@ -271,6 +301,7 @@ int main(){
     //camera_handler cam_handler(2);
     //optical_flow_test();
     //sift_video("Solo_Pillar_Sift_Setting_3","../Data/Video_Data/Solo_Pillar.mkv","../Data/Feature_Videos/Sift/");
-    continous_test("../Data/Video_Data/Solo_Pillar.mkv");
+    //continous_test("../Data/Video_Data/Solo_Pillar.mkv");
     //continous_test_optical_flow("../Data/Video_Data/Solo_Pillar.mkv");
+    continous_test_orb("../Data/Video_Data/Solo_Pillar.mkv");
 }

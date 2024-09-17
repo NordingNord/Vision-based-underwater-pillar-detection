@@ -33,6 +33,17 @@ struct video_data{
     cv::VideoCapture video_capturer;
 };
 
+// Stores all required sift settings
+struct sift_settings{
+    int max_features; // 0 -> as many features as can be found
+    int layers; // Number of layers in each octave. 3 was used in the original paper.
+    double contrast_threshold; // Larger -> less features 0.09 used in the original power(since its devided with layer). Needs to be lower than normal since there is low contrast underwater
+    double edge_threshold; // Larger -> more features (Filters out edge-like features)
+    double sigma; // Gaussian -> smaller number if camera has soft lenses
+    int descriptor_type; // CV_8U or CV_32F
+    bool enable_precise_upscale;
+};
+
 
 
 #endif

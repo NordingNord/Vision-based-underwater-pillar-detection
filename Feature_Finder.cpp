@@ -191,23 +191,22 @@ vector<frame_data> feature_finder::get_frames(){
 }
 
 // find ORB features in working frames
-void feature_finder::find_orb_features(){
+frame_data feature_finder::find_orb_features(frame_data frame){
     // Initialize detector
-    Ptr<ORB> orb_detector = ORB::create(keep_n_features, scale_factor, orb_levels, orb_edge_threshold, first_level, wta_k, ORB::HARRIS_SCORE, patch_size, fast_threshold);
+    Ptr<ORB> orb_detector = ORB::create(keep_n_orb_features, scale_factor, orb_levels, orb_edge_threshold, first_level, wta_k, ORB::HARRIS_SCORE, patch_size, fast_threshold);
     //ORB::ScoreType score_type = ORB::HARRIS_SCORE; // ranking algorithm
-    // Go through every working frame and compute keypoints
-    for(int i = 0; i < working_frames.size(); i++){
-        // Grayscale current frame
-        Mat grayscaled_frame = apply_grayscale(working_frames[i].frame);
-        // Find keypoints
-        vector<KeyPoint> keypoints;
-        orb_detector->detect(grayscaled_frame,keypoints);
-        // Draw and save keypoints
-        Mat keypoint_frame;
-        drawKeypoints(working_frames[i].frame,keypoints,keypoint_frame);
-        working_frames[i].Feature_frame = keypoint_frame;
-        working_frames[i].keypoints = keypoints;
-    }
+    // Grayscale current frame
+    Mat grayscaled_frame = apply_grayscale(frame.frame);
+    // Find keypoints
+    vector<KeyPoint> keypoints;
+    Mat keypoint_frame;
+    orb_detector->detectAndCompute(grayscaled_frame, Mat(), keypoints, keypoint_frame);
+    cout << keypoints.size() << endl;
+    // Draw and save keypoints
+    drawKeypoints(frame.frame,keypoints,keypoint_frame);
+    frame.Feature_frame = keypoint_frame;
+    frame.keypoints = keypoints;
+    return frame;
 }
 
 

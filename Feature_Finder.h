@@ -53,9 +53,8 @@ public:
     // detect corner features using the Shi-Tomasi algorithm
     frame_data get_shi_tomasi_features(frame_data frame);
 
-
-    // find ORB features in working frames
-    void find_orb_features();
+    // find ORB features in frame
+    frame_data find_orb_features(frame_data frame);
 
 private:
     bool single_frame;
@@ -80,13 +79,14 @@ private:
     double k = 0.04; // free parameter for the harris detector.
 
     // orb settings
-    float scale_factor = 1.2; // decimation ratio that must be bigger than 1. 2 = classic pyramid. close to 2 -> degrade feature matching. close to 1 -> more pyramid levels needed -> worse speed.
+    int keep_n_orb_features = 100;
+    float scale_factor = 2; // decimation ratio that must be bigger than 1. 2 = classic pyramid. close to 2 -> degrade feature matching. close to 1 -> more pyramid levels needed -> worse speed.
     int orb_levels = 8; // number of pyramid levels
     int orb_edge_threshold = 31; // size of border where features are not detected.
     int first_level = 0; // level of pyramid where initial frame goes.
     int wta_k = 2; // numbe rof points that produce each element of the BRIEf descriptor.
     int patch_size = 31; // Oriented BRIEF path size.
-    int fast_threshold = 20;
+    int fast_threshold = 4; // Low -> more features
 
 };
 
