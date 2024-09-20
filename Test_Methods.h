@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <fstream>
 #include "Data_Structures.h"
 #include "Obstacle_Detection.h"
 

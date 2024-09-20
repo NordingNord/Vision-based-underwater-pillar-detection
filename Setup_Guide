@@ -1,0 +1,8 @@
+mkdir Pillar_Detection_Workspace
+cd Pillar_Detection_Workspace
+mkdir build
+clone ....
+cd build
+cmake ../Vision-based-underwater-pillar-detection/CMakeLists.txt
+make all
+

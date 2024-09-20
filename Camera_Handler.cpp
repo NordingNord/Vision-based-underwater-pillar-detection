@@ -158,3 +158,9 @@ vector<vector<frame_data>> camera_handler::get_all_frames(){
 vector<video_data> camera_handler::get_video_data(){
     return videos;
 }
+
+// closes capturer
+void camera_handler::close_video_capturer(int cam_num){
+    captures.at(cam_num).release();
+    videos.at(cam_num).video_capturer.release();
+}

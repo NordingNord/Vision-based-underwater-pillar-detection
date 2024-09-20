@@ -15,9 +15,9 @@ public:
     // Shows all desired frames in one window. All frames will have the same size
     void show_images(std::vector<cv::Mat> images, std::string window_title = "");
     // Draws found corners
-    cv::Mat draw_corners(frame_data frame);
+    cv::Mat draw_shi_tomasi_features(shi_tomasi_frame_data);
     // draws line between two points
-    cv::Mat draw_lines(std::vector<cv::Point2f> start_points, std::vector<cv::Point2f> end_points, frame_data frame);
+    cv::Mat draw_shi_tomasi_lines(std::vector<cv::Point2f> start_points, std::vector<cv::Point2f> end_points, shi_tomasi_frame_data frame);
 private:
     int window_width;
     int window_height;

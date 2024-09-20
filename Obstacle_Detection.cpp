@@ -33,8 +33,8 @@ void obstacle_detection::add_video(string path){
 // removes video path using ID
 void obstacle_detection::remove_video_path(int index){
     // remove path at given index
-    string removed_path = video_paths(index);
-    video_paths.erase(index);
+    string removed_path = video_paths.at(index);
+    video_paths.erase(video_paths.begin()+index);
     cout << "The path " << removed_path << " has been removed" << endl;
 }
 
@@ -54,7 +54,7 @@ void obstacle_detection::remove_video_path(string path){
         }
         // Erase path from found locations
         for(int i = 0; i < locations.size(); i++){
-            video_paths.erase(locations[i]);
+            video_paths.erase(video_paths.begin()+locations[i]);
         }
         cout << path << " have been removed from " << locations.size() << " positions." << endl;
     }

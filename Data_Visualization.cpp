@@ -80,14 +80,14 @@ void data_visualization::show_images(vector<cv::Mat> images, string window_title
 }
 
 // Draws found features
-Mat data_visualization::draw_corners(frame_data frame){
-    Mat corner_frame = frame.frame.clone();
+Mat data_visualization::draw_shi_tomasi_features(shi_tomasi_frame_data frame){
+    Mat feature_frame = frame.frame.frame.clone();
     RNG random;
     try{
-        if(frame.corners.size() < 1){
+        if(frame.features.size() < 1){
             throw runtime_error("No corners found.");
         }
-        for(int i = 0; i < frame.corners.size();i++){
+        for(int i = 0; i < frame.features.size();i++){
             if(colours.size() < i || colours.size() ==0){
                 // generate colour
                 int r = random.uniform(0, 256);
@@ -95,18 +95,18 @@ Mat data_visualization::draw_corners(frame_data frame){
                 int b = random.uniform(0, 256);
                 colours.push_back(Scalar(r,g,b));
             }
-            circle(corner_frame,frame.corners[i],circle_diameter,circle_colour,-1);
+            circle(feature_frame,frame.features[i],circle_diameter,circle_colour,-1);
         }
     }
     catch(const exception& error){
         cout << "Error message: " << error.what() << endl;
     }
-    return corner_frame;
+    return feature_frame;
 }
 
 // draws line between two points
-Mat data_visualization::draw_lines(vector<Point2f> start_points, vector<Point2f> end_points, frame_data frame){
-    Mat mask = Mat::zeros(frame.frame.size(), frame.frame.type());
+Mat data_visualization::draw_shi_tomasi_lines(vector<Point2f> start_points, vector<Point2f> end_points, shi_tomasi_frame_data frame){
+    Mat mask = Mat::zeros(frame.frame.frame.size(), frame.frame.frame.type());
     RNG random;
     for(int i = 0; i < end_points.size(); i++){
         if(colours.size() < i || colours.size() ==0){
@@ -116,7 +116,7 @@ Mat data_visualization::draw_lines(vector<Point2f> start_points, vector<Point2f>
             int b = random.uniform(0, 0);
             colours.push_back(Scalar(r,g,b));
         }
-        if(frame.corner_status[i] == 1){
+        if(frame.feature_status[i] == 1){
             line(mask,end_points[i],start_points[i],line_colour,2);
         }
     }

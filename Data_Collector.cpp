@@ -44,17 +44,20 @@ void data_collector::save_n_video_frames(int n, string video_path, string save_p
 }
 
 // creates and saves a video given n number of frames
-void data_collector::create_video(string path, string name, vector<frame_data> frames, video_data video_capturer){
+void data_collector::create_video(string path, string name, video_data video_capturer){
     // create video writer
     string filename = path+name + video_format;
     int frame_width = video_capturer.video_capturer.get(CAP_PROP_FRAME_WIDTH);
     int frame_height = video_capturer.video_capturer.get(CAP_PROP_FRAME_HEIGHT);;
     VideoWriter video(filename,cv::VideoWriter::fourcc('M','J','P','G'),fps,Size(frame_width,frame_height));
-    // write all frames
-    for(int i = 0; i < frames.size(); i++){
-        video.write(frames[i].Feature_frame);
-        waitKey(20);
+    video_writer = video;
+}
+
+// writes frame to video
+void data_collector::write_to_video(feature_frame_data frame, bool final_frame){
+    video_writer.write(frame.frame_with_features);
+    waitKey(10);
+    if(final_frame == true){
+        video_writer.release();
     }
-    video_capturer.video_capturer.release();
-    video.release();
 }

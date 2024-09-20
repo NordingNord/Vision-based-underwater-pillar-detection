@@ -34,6 +34,8 @@ public:
     std::vector<std::vector<frame_data>> get_all_frames();
     // retrieve camera data
     std::vector<video_data> get_video_data();
+    // closes capturer
+    void close_video_capturer(int cam_num);
 
 
 private:
