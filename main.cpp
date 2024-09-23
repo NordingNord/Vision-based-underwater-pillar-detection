@@ -4,6 +4,7 @@
 #include "Data_Structures.h"
 #include "Test_Methods.h"
 #include "Obstacle_Detection.h"
+#include "Data_Collector.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -18,8 +19,16 @@ const int cam_num = 2;
 
 // -- Main --
 int main(){
-    test_methods tests;
-    // Run first sift test
-    tests.run_test(0);
+    data_collector image_collector;
+    image_collector.save_n_video_frames(50,"../Data/Video_Data/Water_Tank_2.mkv","../Data/Water_Tank_2_Images/",9800);
+    //data_collector video_maker;
+    //video_maker.create_video_from_folder("../Data/Sole_Pillar_Images/","../Data/Sole_Pillar_Images/Sole_Pillar_Images_Video.avi");
 
+
+
+    //test_methods tests;
+    // Run first sift edge tests
+    //for(int i = 0; i <= 10; i++){
+    //    tests.run_test(i);
+    //}
 }
