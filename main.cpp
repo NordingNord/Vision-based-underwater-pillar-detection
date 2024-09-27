@@ -20,7 +20,7 @@ const int cam_num = 2;
 // -- Main --
 int main(){
     data_collector image_collector;
-    image_collector.save_n_video_frames(50,"../Data/Video_Data/Water_Tank_2.mkv","../Data/Water_Tank_2_Images/",9800);
+    image_collector.save_n_video_frames(50,"../Data/Video_Data/New_Pillar_Bottom.mkv","../Data/New_Pillar_Bottom_Images/",0,0);
     //data_collector video_maker;
     //video_maker.create_video_from_folder("../Data/Sole_Pillar_Images/","../Data/Sole_Pillar_Images/Sole_Pillar_Images_Video.avi");
 

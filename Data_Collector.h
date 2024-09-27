@@ -15,7 +15,7 @@ class data_collector{
 public:
     data_collector();
     // saves n equally distributed frames from a video.
-    void save_n_video_frames(int n, std::string video_path, std::string save_path, int start_frame = 0);
+    void save_n_video_frames(int n, std::string video_path, std::string save_path, int start_frame = 0, int start_name = 0);
 
     // creates video from folder
     void create_video_from_folder(std::string folder_path, std::string save_path);
