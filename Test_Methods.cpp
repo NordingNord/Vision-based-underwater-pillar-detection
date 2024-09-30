@@ -14,47 +14,47 @@ test_methods::test_methods(){
 void test_methods::run_test(int desired_test){
     if(desired_test == 0){
         sift_settings desired_settings = {1000,3,0.09,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_0");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_0");
     }
     else if(desired_test == 1){
         sift_settings desired_settings = {1000,3,0.08,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_1");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_1");
     }
     else if(desired_test == 2){
         sift_settings desired_settings = {1000,3,0.07,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_2");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_2");
     }
     else if(desired_test == 3){
         sift_settings desired_settings = {1000,3,0.06,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_3");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_3");
     }
     else if(desired_test == 4){
         sift_settings desired_settings = {1000,3,0.05,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_4");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_4");
     }
     else if(desired_test == 5){
         sift_settings desired_settings = {1000,3,0.04,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_5");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_5");
     }
     else if(desired_test == 6){
         sift_settings desired_settings = {1000,3,0.03,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_6");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_6");
     }
     else if(desired_test == 7){
         sift_settings desired_settings = {1000,3,0.02,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_7");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_7");
     }
     else if(desired_test == 8){
         sift_settings desired_settings = {1000,3,0.01,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_8");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_8");
     }
     else if(desired_test == 9){
         sift_settings desired_settings = {1000,3,0.009,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_9");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_9");
     }
     else if(desired_test == 10){
         sift_settings desired_settings = {1000,3,0.008,10,1.6,0,false};
-        test_methods::count_annotation_test_sift(desired_settings,"solo_pillar_contrast_test_10");
+        test_methods::count_annotation_test_sift(desired_settings,"contrast_test_10");
     }
     else{
         cout << "Specified test does not exist." << endl;
@@ -66,8 +66,20 @@ void test_methods::count_annotation_test_sift(sift_settings settings, string fil
     // Create file writer and file
     fstream file_writer;
     string filepath = "../Data/Sift/"+filename+"_results.csv";
+    file_writer.open(filepath);
+    // If file does not exist write parameter line
+    string first_line = "";
+    bool first_line_exists = true;
+    getline(file_writer,first_line);
+    if(first_line == ""){
+        first_line_exists = false;
+    }
+    file_writer.close();
     file_writer.open(filepath,ios::out | ios::app);
-    file_writer << "Frame ID:, Features Found:, Features in pillars:, percentage match:, time taken to find features (ms):\n";
+    if(first_line_exists == false){
+       file_writer << "Video, Frame ID, Features Found, Features in pillars, percentage match, time taken to find features (ms), layers, contradt threshold, edge threshold, sigma, precise upscale\n";
+    }
+
     // Initialize feature detector
     feature_finder sift_detector;
     // setup sift settings
@@ -114,9 +126,20 @@ void test_methods::count_annotation_test_sift(sift_settings settings, string fil
         }
 
         // Write test results
-        file_writer << frames_analyzed << ", " << feature_frame.features.size() << ", " << matches << ", " << match_percentage << ", " << time_to_find.count() << "\n";
+        file_writer << test_methods::video_path << "," << frames_analyzed << ", " << feature_frame.features.size() << ", " << matches << ", " << match_percentage << ", " << time_to_find.count() << ", " << settings.layers << ", " << settings.contrast_threshold << ", " << settings.edge_threshold << ", " << settings.sigma << ", " << settings.enable_precise_upscale << "\n";
         frames_analyzed++;
         cout << "Frames analyzed: " << frames_analyzed << endl;
     }
     file_writer.close();
+}
+
+// Changes video path
+void test_methods::change_video_path(string path){
+    test_methods::video_path = path;
+
+}
+
+// Changes annotation path
+void test_methods::change_annotation_path(string path){
+    test_methods::annotation_path = path;
 }

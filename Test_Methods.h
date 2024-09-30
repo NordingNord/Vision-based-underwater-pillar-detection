@@ -23,6 +23,12 @@ public:
     //  Test 0: Sift with settings 500,3,0.05,100,1.6,0,false
     void count_annotation_test_sift(sift_settings settings, std::string filename);
 
+    // Changes video path
+    void change_video_path(std::string path);
+
+    // Changes annotation path
+    void change_annotation_path(std::string path);
+
 private:
     cv::Vec3b annotation_colour = {0,0,254};
     std::string video_path = "../Data/Sole_Pillar_Images/Sole_Pillar_Images_Video.avi";
