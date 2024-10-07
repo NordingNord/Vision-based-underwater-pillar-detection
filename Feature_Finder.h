@@ -39,6 +39,12 @@ public:
     // determines optical flow using the Lucas Kanade mehtod
     shi_tomasi_frame_data optical_flow_luke_kanade(frame_data frame, shi_tomasi_frame_data last_frame);
 
+    // compute describtors
+    feature_frame_data determine_descriptors(feature_frame_data frame, std::string method);
+
+    // find matches between frames
+    std::vector<cv::DMatch> find_matches(feature_frame_data last_frame, feature_frame_data new_frame, std::string method);
+
 
 
 private:

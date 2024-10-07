@@ -147,4 +147,54 @@ shi_tomasi_frame_data feature_finder::optical_flow_luke_kanade(frame_data frame,
     return feature_frame;
 }
 
+// compute describtors
+feature_frame_data feature_finder::determine_descriptors(feature_frame_data frame, string method){
+    // Initialize new frame
+    feature_frame_data descriptor_frame;
+    descriptor_frame.frame = frame.frame;
+    descriptor_frame.features = frame.features;
+    descriptor_frame.frame_with_features = frame.frame_with_features;
+    // Initialize describtor frame
+    Mat describtor_matrix; //
+    if(method == "sift" || method == "Sift" || method == "SIFT"){
+        // Initialize detector
+        Ptr<SIFT> sift_detector = SIFT::create(settings_sift.max_features, settings_sift.layers, settings_sift.contrast_threshold, settings_sift.edge_threshold, settings_sift.sigma, settings_sift.descriptor_type, settings_sift.enable_precise_upscale);
+        sift_detector->compute(frame.frame.frame,frame.features,describtor_matrix);
+        sift_detector.release();
+        descriptor_frame.frame_with_describtors = describtor_matrix;
+    }
+    else if(method == "orb" || method == "Orb" || method == "ORB"){
+        // Initialize detector
+        Ptr<ORB> orb_detector = ORB::create(settings_orb.max_features, settings_orb.scale_factor, settings_orb.levels, settings_orb.edge_threshold, settings_orb.first_level, settings_orb.wta_k, ORB::HARRIS_SCORE, settings_orb.patch_size, settings_orb.fast_threshold);
+        orb_detector->compute(frame.frame.frame,frame.features,describtor_matrix);
+        orb_detector.release();
+        descriptor_frame.frame_with_describtors = describtor_matrix;
+    }
+    else{
+        cout << "Method " << method << " is unknown." << endl;
+    }
+    return descriptor_frame;
+}
 
+// find matches between frames
+std::vector<cv::DMatch> feature_finder::find_matches(feature_frame_data last_frame, feature_frame_data new_frame, string method){
+    // Create brute force matcher
+    Ptr<BFMatcher> brute_force;
+    if(method == "sift" || method == "Sift" || method == "SIFT"){
+        brute_force = BFMatcher::create(NORM_L2,true); // NORM_HAMMING for ORB and NORM_L2 for SIFT. Cross check provides best quality results but fewer matches
+    }
+    else if(method == "orb" || method == "Orb" || method == "ORB"){
+        brute_force = BFMatcher::create(NORM_HAMMING,true); // NORM_HAMMING for ORB and NORM_L2 for SIFT. Cross check provides best quality results but fewer matches
+    }
+    // Create match output
+    vector<DMatch> matches;
+    // Find best matches
+    brute_force->match(last_frame.frame_with_describtors,new_frame.frame_with_describtors,matches);
+    // Draw matches for testing purposes
+    //Mat img_matches;
+    //drawMatches(last_frame.frame.frame,last_frame.features,new_frame.frame.frame,new_frame.features,matches,img_matches,Scalar::all(-1),Scalar::all(-1),vector<char>(),DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    //imshow("test",img_matches);
+    //waitKey(0);
+    //destroyAllWindows();
+    return matches;
+}

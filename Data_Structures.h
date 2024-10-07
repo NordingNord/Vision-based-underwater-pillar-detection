@@ -25,6 +25,7 @@ struct frame_data{
 struct feature_frame_data{
     frame_data frame;
     cv::Mat frame_with_features;
+    cv::Mat frame_with_describtors;
     std::vector<cv::KeyPoint> features;
 };
 

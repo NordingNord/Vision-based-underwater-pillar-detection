@@ -56,12 +56,73 @@ void test_methods::run_test(int desired_test){
         sift_settings desired_settings = {1000,3,0.008,10,1.6,0,false};
         test_methods::count_annotation_test_sift(desired_settings,"contrast_test_10");
     }
+    else if(desired_test == 11){
+        sift_settings desired_settings = {1000,3,0.008,10,1.6,0,false};
+        test_methods::check_matcher(desired_settings);
+    }
+    else if(desired_test == 12){
+        vector<sift_settings> settings;
+        sift_settings desired_settings = {1000,3,0.09,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.08,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.07,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.06,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.05,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.04,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.03,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.01,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.009,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.008,10,1.6,0,false};
+        for(int i = 0; i < settings.size(); i++){
+            string title = to_string(i)+"_contrast_match";
+            test_methods::count_matches(settings.at(i),title);
+        }
+    }
+    else if(desired_test == 13){
+        // Testing edge threshold from 0 to 20 in intervals of 2
+        vector<sift_settings> settings;
+        sift_settings desired_settings = {1000,3,0.02,0,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,2,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,4,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,6,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,8,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,10,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,12,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,14,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,16,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,18,1.6,0,false};
+        settings.push_back(desired_settings);
+        desired_settings = {1000,3,0.02,20,1.6,0,false};
+        for(int i = 0; i < settings.size();i++){
+            title = "edge_test_"+to_string(i);
+            test_methods::count_annotation_test_sift(desired_settings,title);
+        }
+    }
     else{
         cout << "Specified test does not exist." << endl;
     }
 }
 
-//  Test 0: Sift with settings 500,3,0.09,10,1.6,0,false
+//  Test sift against annotation with desired settings
 void test_methods::count_annotation_test_sift(sift_settings settings, string filename){
     // Create file writer and file
     fstream file_writer;
@@ -133,6 +194,104 @@ void test_methods::count_annotation_test_sift(sift_settings settings, string fil
     file_writer.close();
 }
 
+// Test feature matcher on the first two frames of an image.
+void test_methods::check_matcher(sift_settings settings){
+    // Initialize feature detector
+    feature_finder sift_detector;
+    // setup sift settings
+    sift_detector.change_sift_settings(settings);
+    // Load video using camera handler
+    camera_handler video_manager;
+    video_manager.insert_video(video_path, 0, 0);
+    // Go through first two frames
+    vector<feature_frame_data> frames;
+    for(int i = 0; i < 2; i++){
+        // read frame
+        frame_data frame = video_manager.get_next_frame(0);
+        // detect sift features
+        feature_frame_data feature_frame = sift_detector.get_sift_features(frame);
+        // find describtors
+        feature_frame = sift_detector.determine_descriptors(feature_frame, "Sift");
+        frames.push_back(feature_frame);
+    };
+    // Find matches
+    std::vector<cv::DMatch> matches = sift_detector.find_matches(frames.at(0), frames.at(1), "Sift");
+}
+
+// Record matching data
+void test_methods::count_matches(sift_settings settings, string filename){
+    // Create file writer and file
+    fstream file_writer;
+    string filepath = "../Data/Sift/"+filename+"_results.csv";
+    file_writer.open(filepath);
+    // If file does not exist write parameter line
+    string first_line = "";
+    bool first_line_exists = true;
+    getline(file_writer,first_line);
+    if(first_line == ""){
+        first_line_exists = false;
+    }
+    file_writer.close();
+    file_writer.open(filepath,ios::out | ios::app);
+    if(first_line_exists == false){
+       file_writer << "Video, Frame ID, matches, match percent, layers, contradt threshold, edge threshold, sigma, precise upscale\n";
+    }
+
+    // Initialize feature detector
+    feature_finder sift_detector;
+    // setup sift settings
+    sift_detector.change_sift_settings(settings);
+    // Load video using camera handler
+    camera_handler video_manager;
+    video_manager.insert_video(video_path, 0, 0);
+    // Go through all frames
+    bool first_frame = true;
+    vector<feature_frame_data> frames;
+    int frame_distance = 2;
+    int frame_count = 0;
+    while(1){
+        // read frame
+        frame_data current_frame = video_manager.get_next_frame(0);
+        // Check for end of video
+        if(current_frame.frame.empty()){
+            cout << "reached the end of the video" << endl;
+            //video_manager.close_video_capturer(0);
+            break;
+        }
+        // detect sift features
+        feature_frame_data feature_frame = sift_detector.get_sift_features(current_frame);
+        // find descriptors
+        feature_frame = sift_detector.determine_descriptors(feature_frame, "Sift");
+        if(frame_count < frame_distance){
+            frames.push_back(feature_frame);
+        }
+        else{
+            frames.at(0) = frames.at(1);
+            frames.at(1) = feature_frame;
+        }
+
+        if(first_frame == true){
+            first_frame = false;
+            file_writer << test_methods::video_path << ", "<< frame_count << ", " << -1 <<", " << -1 << ", " << settings.layers << ", " << settings.contrast_threshold << ", " << settings.edge_threshold << ", " << settings.sigma << ", " << settings.enable_precise_upscale << "\n";
+        }
+        else if(frames.at(0).features.size() <= 0 || frames.at(1).features.size() <= 0){
+            //cout << "No features to match" << endl;
+            file_writer << test_methods::video_path << ", "<< frame_count << ", " << -1 <<", " << -1 << ", " << settings.layers << ", " << settings.contrast_threshold << ", " << settings.edge_threshold << ", " << settings.sigma << ", " << settings.enable_precise_upscale << "\n";
+        }
+        else{
+            // Find matches
+            //cout << "Number features in first frame: " << frames.at(0).features.size() << endl;
+            //cout << "Number features in second frame: " << frames.at(1).features.size() << endl;
+            std::vector<cv::DMatch> matches = sift_detector.find_matches(frames.at(0), frames.at(1), "Sift");
+            file_writer << test_methods::video_path << ", "<< frame_count << ", " << matches.size() << ", " << frames.at(1).features.size()/matches.size() << ", " << settings.layers << ", " << settings.contrast_threshold << ", " << settings.edge_threshold << ", " << settings.sigma << ", " << settings.enable_precise_upscale << "\n";
+        }
+        frame_count = frame_count+1;
+        cout << frame_count << endl;
+    }
+    file_writer.close();
+}
+
+
 // Changes video path
 void test_methods::change_video_path(string path){
     test_methods::video_path = path;
@@ -142,4 +301,15 @@ void test_methods::change_video_path(string path){
 // Changes annotation path
 void test_methods::change_annotation_path(string path){
     test_methods::annotation_path = path;
+}
+
+// Records videos of feature detection (Work in progress)
+void test_methods::record_feature_video(sift_settings settings,std::string filename){
+    // Initialize feature detector
+    feature_finder sift_detector;
+    // setup sift settings
+    sift_detector.change_sift_settings(settings);
+    // Load video using camera handler
+    camera_handler video_manager;
+    video_manager.insert_video(video_path, 0, 0);
 }
