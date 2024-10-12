@@ -60,6 +60,7 @@ void test_methods::run_test(int desired_test){
         sift_settings desired_settings = {1000,3,0.008,10,1.6,0,false};
         test_methods::check_matcher(desired_settings);
     }
+    // Contrast match test
     else if(desired_test == 12){
         vector<sift_settings> settings;
         sift_settings desired_settings = {1000,3,0.09,10,1.6,0,false};
@@ -83,12 +84,30 @@ void test_methods::run_test(int desired_test){
         desired_settings = {1000,3,0.009,10,1.6,0,false};
         settings.push_back(desired_settings);
         desired_settings = {1000,3,0.008,10,1.6,0,false};
-        for(int i = 0; i < settings.size(); i++){
+        settings.push_back(desired_settings);
+        for(int i = 2; i < settings.size(); i++){
             string title = to_string(i)+"_contrast_match";
             test_methods::count_matches(settings.at(i),title);
+            cout << "Test " << i << " done" << endl;
         }
     }
+    // Edge annotation test
     else if(desired_test == 13){
+        // Testing edge threshold from 1 to 40 in intervals of 1 (0 doesnt reject anything)
+        vector<sift_settings> settings;
+        sift_settings desired_settings;
+        for(int i = 1; i <= 40;i++){
+            desired_settings = {1000,3,0.02,i*1.0,1.6,0,false};
+            settings.push_back(desired_settings);
+        }
+        for(int i = 0; i < settings.size();i++){
+            string title = "edge_test_"+to_string(i);
+            test_methods::count_annotation_test_sift(settings.at(i),title);
+            cout << "Test " << i << " done" << endl;
+        }
+    }
+    // Edge match test
+    else if(desired_test == 14){
         // Testing edge threshold from 0 to 20 in intervals of 2
         vector<sift_settings> settings;
         sift_settings desired_settings = {1000,3,0.02,0,1.6,0,false};
@@ -112,9 +131,11 @@ void test_methods::run_test(int desired_test){
         desired_settings = {1000,3,0.02,18,1.6,0,false};
         settings.push_back(desired_settings);
         desired_settings = {1000,3,0.02,20,1.6,0,false};
+        settings.push_back(desired_settings);
         for(int i = 0; i < settings.size();i++){
-            title = "edge_test_"+to_string(i);
-            test_methods::count_annotation_test_sift(desired_settings,title);
+            string title = to_string(i)+"_edge_match";
+            test_methods::count_matches(settings.at(i),title);
+            cout << "Test " << i << " done" << endl;
         }
     }
     else{
@@ -283,10 +304,9 @@ void test_methods::count_matches(sift_settings settings, string filename){
             //cout << "Number features in first frame: " << frames.at(0).features.size() << endl;
             //cout << "Number features in second frame: " << frames.at(1).features.size() << endl;
             std::vector<cv::DMatch> matches = sift_detector.find_matches(frames.at(0), frames.at(1), "Sift");
-            file_writer << test_methods::video_path << ", "<< frame_count << ", " << matches.size() << ", " << frames.at(1).features.size()/matches.size() << ", " << settings.layers << ", " << settings.contrast_threshold << ", " << settings.edge_threshold << ", " << settings.sigma << ", " << settings.enable_precise_upscale << "\n";
+            file_writer << test_methods::video_path << ", "<< frame_count << ", " << matches.size() << ", " << (matches.size()*1.0)/(frames.at(0).features.size()*1.0)*100.0 << ", " << settings.layers << ", " << settings.contrast_threshold << ", " << settings.edge_threshold << ", " << settings.sigma << ", " << settings.enable_precise_upscale << "\n";
         }
         frame_count = frame_count+1;
-        cout << frame_count << endl;
     }
     file_writer.close();
 }
@@ -295,7 +315,6 @@ void test_methods::count_matches(sift_settings settings, string filename){
 // Changes video path
 void test_methods::change_video_path(string path){
     test_methods::video_path = path;
-
 }
 
 // Changes annotation path

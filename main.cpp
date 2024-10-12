@@ -94,7 +94,7 @@ int main(){
     //for(int j = 0; j < video_paths.size();j++){
     //    tests.change_video_path(video_paths.at(j));
     //    tests.change_annotation_path(annotation_paths.at(j));
-    //    tests.run_test(i);
+    //    tests.run_test(13);
     //}
 
 }
