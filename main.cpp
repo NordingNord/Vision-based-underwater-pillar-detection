@@ -64,11 +64,17 @@ int main(){
     //tests.run_test(11);
 
     //vector<string> video_paths = {"../Data/Video_Data/Solo_Pillar.mkv","../Data/Video_Data/New_Pillar_Top.mkv","../Data/Video_Data/New_Pillar_Bottom.mkv"};
-    vector<string> video_paths = {"../Data/Video_Data/New_Pillar_Top.mkv"};
-    for(int j = 0; j < video_paths.size();j++){
-        tests.change_video_path(video_paths.at(j));
-        tests.run_test(12);
-    }
+    //vector<string> video_paths = {"../Data/Video_Data/New_Pillar_Top.mkv"};
+    //for(int j = 0; j < video_paths.size();j++){
+    //    tests.change_video_path(video_paths.at(j));
+    //    tests.run_test(12);
+    //}
+
+    //vector<string> video_paths = {"../Data/Video_Data/Wall_Indents_Top.mkv"};
+    //for(int j = 0; j < video_paths.size();j++){
+    //    tests.change_video_path(video_paths.at(j));
+    //    tests.run_test(12);
+    //}
 
     // Run first sift edge tests on clear videos
     //vector<string> video_paths = {"../Data/Sole_Pillar_Images/Sole_Pillar_Images_Video.avi","../Data/New_Pillar_Top_Images/New_Pillar_Top_Images_Video.avi","../Data/New_Pillar_Bottom_Images/New_Pillar_Bottom_Images_Video.avi"};
@@ -96,5 +102,7 @@ int main(){
     //    tests.change_annotation_path(annotation_paths.at(j));
     //    tests.run_test(13);
     //}
+    sift_settings desired_settings = {1000,3,0.02,10,1.6,0,false};
+    tests.get_feature_video(desired_settings, "../Data/feature_images/frame_crowded","../Data/Wall_Indents_Top_Images/Wall_Indents_Top_Images_Video.avi","../Data/Wall_Indents_Top_Annotated/Wall_Indents_Top_Annotated_Video.avi");
 
 }

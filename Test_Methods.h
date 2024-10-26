@@ -41,6 +41,9 @@ public:
     // Changes test result title
     void change_csv_title(std::string title);
 
+    // Get feature video
+    void get_feature_video(sift_settings settings, std::string filename, std::string video_path,std::string segmentation_path);
+
 private:
     cv::Vec3b annotation_colour = {0,0,254};
     std::string video_path = "../Data/Sole_Pillar_Images/Sole_Pillar_Images_Video.avi";

@@ -85,7 +85,7 @@ void test_methods::run_test(int desired_test){
         settings.push_back(desired_settings);
         desired_settings = {1000,3,0.008,10,1.6,0,false};
         settings.push_back(desired_settings);
-        for(int i = 2; i < settings.size(); i++){
+        for(int i = 0; i < settings.size(); i++){
             string title = to_string(i)+"_contrast_match";
             test_methods::count_matches(settings.at(i),title);
             cout << "Test " << i << " done" << endl;
@@ -311,7 +311,6 @@ void test_methods::count_matches(sift_settings settings, string filename){
     file_writer.close();
 }
 
-
 // Changes video path
 void test_methods::change_video_path(string path){
     test_methods::video_path = path;
@@ -322,8 +321,8 @@ void test_methods::change_annotation_path(string path){
     test_methods::annotation_path = path;
 }
 
-// Records videos of feature detection (Work in progress)
-void test_methods::record_feature_video(sift_settings settings,std::string filename){
+// Get feature video
+void test_methods::get_feature_video(sift_settings settings, std::string filename, std::string video_path,std::string segmentation_path){
     // Initialize feature detector
     feature_finder sift_detector;
     // setup sift settings
@@ -331,4 +330,27 @@ void test_methods::record_feature_video(sift_settings settings,std::string filen
     // Load video using camera handler
     camera_handler video_manager;
     video_manager.insert_video(video_path, 0, 0);
+    // Prepare annotation video capturer
+    camera_handler segmentation_manager;
+    segmentation_manager.insert_video(segmentation_path, 0, 0);
+    // Go through all frames
+    int frame_num = 0;
+    while(1){
+        // read frame
+        frame_data current_frame = video_manager.get_next_frame(0);
+        frame_data segmentation_frame = segmentation_manager.get_next_frame(0);
+        // Check for end of video
+        if(current_frame.frame.empty()){
+            cout << "reached the end of the video" << endl;
+            //video_manager.close_video_capturer(0);
+            break;
+        }
+        // detect sift feature
+        feature_frame_data feature_frame = sift_detector.get_sift_features(current_frame);
+        // draw in segmented image
+        cv::Mat output;
+        cv::drawKeypoints(segmentation_frame.frame, feature_frame.features, output);
+        cv::imwrite(filename+"_"+to_string(frame_num)+".jpg", output);
+        frame_num++;
+    }
 }
