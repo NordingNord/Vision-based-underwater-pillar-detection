@@ -69,6 +69,11 @@ void feature_finder::change_sift_settings(sift_settings settings){
     settings_sift = settings;
 }
 
+// changes orb settings
+void feature_finder::change_orb_settings(orb_settings settings){
+    settings_orb = settings;
+}
+
 // detect corner features using the Shi-Tomasi algorithm
 shi_tomasi_frame_data feature_finder::get_shi_tomasi_features(frame_data frame){
     // Initialize shi tomasi frame

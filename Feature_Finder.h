@@ -27,6 +27,9 @@ public:
     // changes sift settings
     void change_sift_settings(sift_settings settings);
 
+    // changes sift settings
+    void change_orb_settings(orb_settings settings);
+
     // detect corner features using the Shi-Tomasi algorithm
     shi_tomasi_frame_data get_shi_tomasi_features(frame_data frame);
 

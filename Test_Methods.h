@@ -23,6 +23,9 @@ public:
     //  Test 0: Sift with settings 500,3,0.05,100,1.6,0,false
     void count_annotation_test_sift(sift_settings settings, std::string filename);
 
+    //  Classic test with orb
+    void count_annotation_test_orb(orb_settings settings, std::string filename);
+
     // Test feature matcher on the first two frames of an image.
     void check_matcher(sift_settings settings);
 
@@ -44,6 +47,7 @@ public:
     // Get feature video
     void get_feature_video(sift_settings settings, std::string filename, std::string video_path,std::string segmentation_path);
 
+    void get_feature_video_orb(orb_settings settings, std::string filename, std::string video_path,std::string segmentation_path);
 private:
     cv::Vec3b annotation_colour = {0,0,254};
     std::string video_path = "../Data/Sole_Pillar_Images/Sole_Pillar_Images_Video.avi";
