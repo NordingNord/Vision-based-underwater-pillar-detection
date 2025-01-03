@@ -182,7 +182,7 @@ feature_frame_data feature_finder::determine_descriptors(feature_frame_data fram
 }
 
 // find matches between frames
-std::vector<cv::DMatch> feature_finder::find_matches(feature_frame_data last_frame, feature_frame_data new_frame, string method){
+vector<cv::DMatch> feature_finder::find_matches(feature_frame_data last_frame, feature_frame_data new_frame, string method){
     // Create brute force matcher
     Ptr<BFMatcher> brute_force;
     if(method == "sift" || method == "Sift" || method == "SIFT"){
@@ -202,4 +202,63 @@ std::vector<cv::DMatch> feature_finder::find_matches(feature_frame_data last_fra
     //waitKey(0);
     //destroyAllWindows();
     return matches;
+}
+
+
+// Create uniformly distributed features
+feature_frame_data feature_finder::find_uniform_features(frame_data frame, int gap, int keypoint_size){
+    // Determine frame dimensions
+    int cols = frame.frame.cols;
+    int rows = frame.frame.rows;
+    int gap_incremented = gap+1;
+
+    // Determine x and y coordinates
+    int x_steps = cols/gap_incremented;
+    int y_steps = rows/gap_incremented;
+    vector<int> x_coordinates;
+    vector<int> y_coordinates;
+
+    for(int i = 0; i <= x_steps; i++){
+        int coordinate = i*gap_incremented;
+        if(coordinate >! cols){
+            x_coordinates.push_back(coordinate);
+        }
+    }
+
+    for(int i = 0; i <= y_steps; i++){
+        int coordinate = i*gap_incremented;
+        if(coordinate >! rows){
+            y_coordinates.push_back(coordinate);
+        }
+    }
+
+    // Determine keypoints
+    vector<KeyPoint> keypoints;
+    for(int i = 0; i < x_coordinates.size(); i++){
+        for(int j = 0; j < y_coordinates.size(); j++){
+            KeyPoint keypoint = KeyPoint(x_coordinates[i],y_coordinates[j],keypoint_size);
+            keypoints.push_back(keypoint);
+        }
+    }
+
+    // Initialize detector
+    Ptr<ORB> orb_detector = ORB::create(settings_orb.max_features, settings_orb.scale_factor, settings_orb.levels, settings_orb.edge_threshold, settings_orb.first_level, settings_orb.wta_k, ORB::HARRIS_SCORE, settings_orb.patch_size, settings_orb.fast_threshold);
+
+    // Compute features
+    Mat descriptors;
+    orb_detector->compute(frame.frame, keypoints, descriptors);
+
+    feature_frame_data results;
+    results.frame = frame.frame;
+    results.features = keypoints;
+    results.frame_with_describtors = descriptors;
+
+    // Test if uniformly distributed
+    //Mat output_img;
+    //drawKeypoints(frame.frame,keypoints,output_img,cv::Scalar::all(-1),cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    //imwrite("../Data/blob.jpg", output_img);
+    //imshow("ORB", output_img);
+    //waitKey(0);
+
+    return results;
 }

@@ -48,6 +48,7 @@ public:
     // find matches between frames
     std::vector<cv::DMatch> find_matches(feature_frame_data last_frame, feature_frame_data new_frame, std::string method);
 
+    feature_frame_data find_uniform_features(frame_data frame, int gap, int keypoint_size);
 
 
 private:

@@ -31,6 +31,7 @@ public:
 
     // Record matching data
     void count_matches(sift_settings settings,std::string filename);
+    void count_matches_orb(orb_settings settings, std::string filename);
 
     // Records videos of feature detection
     void record_feature_video(sift_settings settings,std::string filename);

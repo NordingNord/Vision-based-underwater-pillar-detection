@@ -198,3 +198,4 @@ void obstacle_detection::load_sift_settings(sift_settings desired_settings){
     cout << "Descriptor type: " << desired_settings.descriptor_type << "." << endl;
     cout << "Precise upscaling: " << desired_settings.enable_precise_upscale << "." << endl;
 }
+

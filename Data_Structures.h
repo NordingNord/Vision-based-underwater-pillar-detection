@@ -6,6 +6,8 @@
 #include <vector>
 #include <array>
 #include <opencv2/opencv.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d.hpp>
 
 // -- Data structures --
 
@@ -76,6 +78,13 @@ struct orb_settings{
     int wta_k; // numbe rof points that produce each element of the BRIEf descriptor.
     int patch_size; // Oriented BRIEF path size.
     int fast_threshold; // Low -> more features
+};
+
+struct optical_flow_results{
+    vector<Point2f> points;
+    vector<Point2f> cleaned_points;
+    vector<uchar> status;
+    vector<float> error;
 };
 
 
