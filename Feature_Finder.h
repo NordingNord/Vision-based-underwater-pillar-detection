@@ -60,7 +60,7 @@ private:
     shi_tomasi_settings settings_shi_tomasi = {10,0.01,10,3,3,false,0.04};
 
     // orb settings
-    orb_settings settings_orb = {100,2,8,31,0,2,31,4};
+    orb_settings settings_orb = {100,1.6,6,34,0,2,34,13}; // Values based on results from tests
 
 };
 

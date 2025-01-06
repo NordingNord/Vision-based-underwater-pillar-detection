@@ -81,10 +81,11 @@ struct orb_settings{
 };
 
 struct optical_flow_results{
-    vector<Point2f> points;
-    vector<Point2f> cleaned_points;
-    vector<uchar> status;
-    vector<float> error;
+    std::vector<cv::Point2f> points;
+    std::vector<cv::Point2f> cleaned_points;
+    std::vector<uchar> status;
+    std::vector<float> error;
+    std::vector<int> indexes;
 };
 
 

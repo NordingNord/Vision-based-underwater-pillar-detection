@@ -199,3 +199,159 @@ void obstacle_detection::load_sift_settings(sift_settings desired_settings){
     cout << "Precise upscaling: " << desired_settings.enable_precise_upscale << "." << endl;
 }
 
+// Perform optical flow
+void obstacle_detection::perform_optical_flow(string video_path, int feature_type, bool record){
+
+    // Setup camera handler with desired videos
+    camera_handler cam_handler;
+    cam_handler.insert_video(video_path);
+
+    // Initialize feature finder
+    feature_finder finder;
+
+    // Initialize feature analyzer
+    feature_analyzer analyzer;
+
+    // Initialize data visualizer
+    data_visualization visualizer;
+
+    // Initialize video writer
+    vector<video_data> video_captureres =  cam_handler.get_video_data();
+    int frame_width = video_captureres[0].video_capturer.get(CAP_PROP_FRAME_WIDTH);
+    int frame_height = video_captureres[0].video_capturer.get(CAP_PROP_FRAME_HEIGHT);
+
+    VideoWriter video_writer("optical_flow_orb.avi",CV_FOURCC('M','J','P','G'),20, Size(frame_width,frame_height));
+
+    // Go through all frames
+    bool first_frame = true;
+    bool second_frame = false;
+    frame_data old_data[buffer_size]; // Create buffer of data points
+    frame_data last_frame; // Variable for storing the last frame
+    int index = 0;
+    feature_frame_data feature_frame; // frame with features
+    optical_flow_results old_flow;
+    Mat sum_lines;
+    vector<int> point_indexes;
+    vector<int> start_indexes;
+    vector<KeyPoint> initial_keypoints;
+
+
+    while(true){
+        // Get frame
+        frame_data frame = cam_handler.get_next_frame(0); // 0 indicates capturere ID, since only one is present 0 will be its ID
+        cout << "Read new frame" << endl;
+        // check if empty
+        if(frame.frame.empty()){
+            cout << "Reached end of video stream." << endl;
+            break;
+        }
+
+        // If frame is not the first perform optical flow
+        if(first_frame == false){
+            // Perform optical flow
+            cout << "Performing optical flow" << endl;
+            optical_flow_results flow = analyzer.optical_flow(feature_frame, frame.frame);
+            cout << "Number of optical flow points: " << flow.points.size() << endl;
+            cout << "Number of good optical flow points: " << flow.cleaned_points.size() << endl;
+
+            // Fix indexing
+            vector<int> temp_indexes;
+            for(int i = 0; i < flow.status.size(); i++){
+                if(flow.status[i] == 1){
+                    temp_indexes.push_back(point_indexes[i]);
+                }
+            }
+
+            point_indexes = temp_indexes;
+
+            // Visualize if record setting is true
+            if(record == true){
+                cout << "visualizing" << endl;
+                // Prepare old points
+                vector<Point2f> old_points = analyzer.keypoints_to_points(feature_frame.features);
+
+                if(second_frame == true){
+                    sum_lines = Mat::zeros(frame.frame.size(), frame.frame.type());
+                    cout << "second frame" << endl;
+                    second_frame = false;
+
+                    // Save initial keypoint image
+                    vector<Point2f> initial_points = analyzer.keypoints_to_points(initial_keypoints);
+                    Mat circle_frame = visualizer.draw_points(initial_points, frame.frame, start_indexes);
+                    video_writer.write(circle_frame);
+                }
+
+                Mat line_frame = visualizer.draw_optical_lines(old_points,flow,frame.frame, point_indexes);
+                add(line_frame,sum_lines,sum_lines);
+                Mat circle_frame = visualizer.draw_points(flow.cleaned_points, frame.frame, point_indexes);
+                Mat final_frame;
+                add(sum_lines,circle_frame,final_frame);
+                video_writer.write(final_frame);
+            }
+
+            // Convert points to keypoints
+            vector<KeyPoint> keypoints = analyzer.points_to_keypoints(flow.cleaned_points);
+            // Update frame data
+            feature_frame.features = keypoints;
+            feature_frame.frame.frame = frame.frame;
+
+            old_flow = flow;
+
+            // Reset if too few points
+            cout << "points left:" << flow.cleaned_points.size() << endl;
+            if(flow.cleaned_points.size() < min_points){
+                cout << "Not enough points left. Finding new keypoints" << endl;
+                first_frame = true;
+                second_frame = false;
+            }
+        }
+        else{
+            // Find features
+            cout << "first frame" << endl;
+            if(feature_type == 0){ // Uniform
+                int gap = 100;
+                int size = 31;
+                feature_frame = finder.find_uniform_features(frame, gap, size);
+                cout << "uniform features found" << endl;
+            }
+            else if(feature_type == 1){ // Orb
+                feature_frame = finder.find_orb_features(frame);
+                cout << "ORB features found" << endl;
+            }
+
+            first_frame = false;
+            second_frame = true;
+
+            initial_keypoints = feature_frame.features;
+
+            // Reset point indexes
+            point_indexes = {};
+            for(int i = 0; i < feature_frame.features.size(); i++){
+                point_indexes.push_back(i);
+            }
+            start_indexes = point_indexes;
+
+            // Safeguard against ORB lacking features
+            if(feature_frame.features.size() == 0){
+                cout << "No features in current frame. Finding features in next frame" << endl;
+                first_frame = true;
+                second_frame = false;
+            }
+        }
+
+        // Save frame as old frame
+        last_frame = frame;
+
+        // Store in buffer
+        cout << "Index: " << index << endl;
+        old_data[index] = frame;
+
+        if(index+1 >= buffer_size){
+            index = 0;
+        }
+        else{
+            index += 1;
+        }
+    }
+    video_writer.release();
+}

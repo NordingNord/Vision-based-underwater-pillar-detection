@@ -122,3 +122,45 @@ Mat data_visualization::draw_shi_tomasi_lines(vector<Point2f> start_points, vect
     }
     return mask;
 }
+
+// Draw optical flow lines
+Mat data_visualization::draw_optical_lines(vector<Point2f> points_old, optical_flow_results data, Mat frame, vector<int> colour_indexes){
+    // Create mask
+    Mat mask = Mat::zeros(frame.size(), frame.type());
+    RNG random;
+    int colour_count = 0;
+    // Go through points
+    for(int i = 0; i < data.points.size(); i++){
+        // Make random colours
+        if(colours.size() < i || colours.size() == 0){
+            // generate colour
+            int r = random.uniform(0, 256); // Red because rare colour under water
+            int g = random.uniform(0, 256); // Kept if future colour choice is needed
+            int b = random.uniform(0, 256); // Kept if future colour choice is needed
+            colours.push_back(Scalar(r,g,b));
+        }
+        // Make line if point is kept
+        if(data.status[i] == 1){
+            int colour_index = colour_indexes[colour_count];
+            colour_count++;
+            line(mask,data.points[i],points_old[i],colours[colour_index],2);
+        }
+    }
+    return mask;
+}
+
+Mat data_visualization::draw_points(vector<Point2f> points, Mat frame, vector<int> colour_indexes){
+    Mat mask = frame.clone();
+    RNG random;
+    for(int i = 0; i < points.size(); i++){
+        if(colours.size() < i+1 || colours.size() == 0){
+            // generate colour
+            int r = random.uniform(0, 256);
+            int g = random.uniform(0, 256);
+            int b = random.uniform(0, 256);
+            colours.push_back(Scalar(r,g,b));
+        }
+        circle(mask,points[i],circle_diameter,colours[colour_indexes[i]],-1);
+    }
+    return mask;
+}

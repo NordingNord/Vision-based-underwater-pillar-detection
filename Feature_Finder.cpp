@@ -207,6 +207,9 @@ vector<cv::DMatch> feature_finder::find_matches(feature_frame_data last_frame, f
 
 // Create uniformly distributed features
 feature_frame_data feature_finder::find_uniform_features(frame_data frame, int gap, int keypoint_size){
+    // Grayscale frame
+    Mat grayscale_frame = apply_grayscale(frame.frame);
+
     // Determine frame dimensions
     int cols = frame.frame.cols;
     int rows = frame.frame.rows;
@@ -246,10 +249,10 @@ feature_frame_data feature_finder::find_uniform_features(frame_data frame, int g
 
     // Compute features
     Mat descriptors;
-    orb_detector->compute(frame.frame, keypoints, descriptors);
+    orb_detector->compute(grayscale_frame, keypoints, descriptors);
 
     feature_frame_data results;
-    results.frame = frame.frame;
+    results.frame = frame;
     results.features = keypoints;
     results.frame_with_describtors = descriptors;
 

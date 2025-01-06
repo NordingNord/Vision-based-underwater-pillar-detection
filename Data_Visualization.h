@@ -18,6 +18,10 @@ public:
     cv::Mat draw_shi_tomasi_features(shi_tomasi_frame_data);
     // draws line between two points
     cv::Mat draw_shi_tomasi_lines(std::vector<cv::Point2f> start_points, std::vector<cv::Point2f> end_points, shi_tomasi_frame_data frame);
+    // Draw optical flow lines
+    cv::Mat draw_optical_lines(std::vector<cv::Point2f> points_old, optical_flow_results data, cv::Mat frame, std::vector<int> colour_indexes);
+    // Draws points
+    cv::Mat draw_points(std::vector<cv::Point2f> points, cv::Mat frame, std::vector<int> colour_indexes);
 private:
     int window_width;
     int window_height;

@@ -13,6 +13,7 @@
 #include "Data_Collector.h"
 #include "Data_Visualization.h"
 #include "Feature_Finder.h"
+#include "Feature_Analyzer.h"
 
 // -- Class --
 class obstacle_detection
@@ -47,9 +48,8 @@ public:
     // loads sift settings
     void load_sift_settings(sift_settings desired_settings);
 
-
-
-
+    // Performs optical flow on video paths
+    void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false);
 
 private:
     // data variables:
@@ -66,6 +66,9 @@ private:
     std::vector<std::string> obstacle_types = {"pillar","pertruding edges"};
     // method settings
     sift_settings settings_sift = {500,3,0.05,100,1.6,0,false};
+    // Optical flow variables
+    int buffer_size = 5;
+    int min_points = 5;
 
 };
 

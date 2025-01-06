@@ -488,3 +488,8 @@
 //        tests.change_video_path(video_paths.at(j));
 //        tests.run_test(26);
 //    }
+
+
+//Mat grayscaled_last_frame, grayscaled_frame;
+//last_frame.frame = cvtColor(last_frame.frame, grayscaled_last_frame, CV_BGR2GRAY);
+//frame.frame = cvtColor(frame.frame, grayscaled_frame, CV_BGR2GRAY);

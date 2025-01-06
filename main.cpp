@@ -20,11 +20,18 @@ const int cam_num = 2;
 
 // -- Main --
 int main(){
-    feature_finder test;
-    Mat img = imread("../Data/Crowded_Sea_Floor_Images/0.jpg", IMREAD_COLOR);
-    frame_data frame;
-    frame.frame = img;
 
-    test.find_uniform_features(frame, 20,31);
+    // Testing uniform distribution
+    //feature_finder test;
+    //Mat img = imread("../Data/Crowded_Sea_Floor_Images/0.jpg", IMREAD_COLOR);
+    //frame_data frame;
+    //frame.frame = img;
 
+    //test.find_uniform_features(frame, 20,31);
+
+    // Testing optical flow //
+
+    // Prepare detection object
+    obstacle_detection detection;
+    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",1, true);
 }
