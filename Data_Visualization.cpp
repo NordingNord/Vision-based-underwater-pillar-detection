@@ -164,3 +164,87 @@ Mat data_visualization::draw_points(vector<Point2f> points, Mat frame, vector<in
     }
     return mask;
 }
+
+Mat data_visualization::write_text(vector<Point2f> points, Mat frame, vector<string> text, vector<int> colour_indexes){
+    Mat mask = frame.clone();
+    RNG random;
+    for(int i = 0; i < text.size(); i++){
+        if(colours.size() < i+1 || colours.size() == 0){
+            // generate colour
+            int r = random.uniform(0, 256);
+            int g = random.uniform(0, 256);
+            int b = random.uniform(0, 256);
+            colours.push_back(Scalar(r,g,b));
+        }
+        cout << "time to write" << endl;
+        cout << points.size() << endl;
+        cout << text.size() << endl;
+        cout << i << endl;
+        cout << text[i] << endl;
+        cout << points[i] << endl;
+        cout << colour_indexes.size() << endl;
+        cout << colour_indexes[i] << endl;
+        cout << colours[colour_indexes[i]] << endl;
+        putText(mask,text[i],points[i],FONT_HERSHEY_SCRIPT_COMPLEX,1.0,colours[colour_indexes[i]],1,LINE_AA);
+    }
+    return mask;
+}
+
+// -- Generates vector of random colours --
+vector<Scalar> data_visualization::generate_random_colours(int number){
+    try{
+        RNG random;
+        vector<Scalar> generated_colours;
+        for(int i = 0; i < number; i++){
+            // generate colour
+            int r = random.uniform(0, 256);
+            int g = random.uniform(0, 256);
+            int b = random.uniform(0, 256);
+            generated_colours.push_back(Scalar(r,g,b));
+        }
+        return generated_colours;
+    }
+    catch(){
+        cout << "Error: Could not generate colours" << endl;
+        return;
+    }
+}
+
+
+// -- Draws points based on keypoint data --
+Mat data_visualization::mark_keypoints(vector<keypoint_data> data, Mat frame){
+    try{
+        // go through each point and mark them on frame
+        Mat result = frame.clone();
+        for(int i = 0; i < data.size(); i++){
+           circle(result,data[i].point,circle_diameter,data[i].colour,-1);
+        }
+        return result;
+    }
+    catch(){
+        cout << "Error: Failed to mark keypoints." << endl;
+        return frame;
+    }
+}
+
+// -- Mark lines based on keypoint data --
+Mat data_visualization::mark_lines(vector<keypoint_data> data, Mat frame){
+    try{
+        // go through each point and mark them on frame
+        Mat result = Mat::zeros(frame.size(), frame.type());;
+        for(int i = 0; i < data.size(); i++){
+            int positions = data[i].positions.size();
+            line(result,data[i].point,data[i].positions[positions-1],data[i].colour,2);
+        }
+        return result;
+    }
+    catch(){
+        cout << "Error: Failed to mark line." << endl;
+        return frame;
+    }
+}
+
+// -- Mark velocity based on keypoint data -- (Make)
+Mat data_visualization::mark_velocity(vector<keypoint_data> data, Mat frame){
+
+}

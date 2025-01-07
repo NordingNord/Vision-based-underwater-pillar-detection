@@ -7,6 +7,7 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 #include "Data_Structures.h"
+#include "Feature_Analyzer.h"
 
 // -- Class --
 class data_visualization{
@@ -22,6 +23,21 @@ public:
     cv::Mat draw_optical_lines(std::vector<cv::Point2f> points_old, optical_flow_results data, cv::Mat frame, std::vector<int> colour_indexes);
     // Draws points
     cv::Mat draw_points(std::vector<cv::Point2f> points, cv::Mat frame, std::vector<int> colour_indexes);
+    // Draws text next to points
+    cv::Mat write_text(std::vector<cv::Point2f> points, cv::Mat frame, std::vector<std::string> text, std::vector<int> colour_indexes);
+
+    // -- Generates vector of random colours --
+    std::vector<cv::Scalar> generate_random_colours(int number);
+
+    // -- Draws points based on keypoint data --
+    cv::Mat mark_keypoints(std::vector<keypoint_data> data, cv::Mat frame);
+
+    // -- Mark lines based on keypoint data --
+    cv::Mat mark_lines(std::vector<keypoint_data> data, cv::Mat frame);
+
+    // -- Mark velocity based on keypoint data --
+    cv::Mat mark_velocity(std::vector<keypoint_data> data, cv::Mat frame);
+
 private:
     int window_width;
     int window_height;

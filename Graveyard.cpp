@@ -493,3 +493,5 @@
 //Mat grayscaled_last_frame, grayscaled_frame;
 //last_frame.frame = cvtColor(last_frame.frame, grayscaled_last_frame, CV_BGR2GRAY);
 //frame.frame = cvtColor(frame.frame, grayscaled_frame, CV_BGR2GRAY);
+
+//optical_flow_results old_data[buffer_size];
