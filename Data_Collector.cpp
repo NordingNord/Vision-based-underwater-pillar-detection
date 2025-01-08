@@ -14,35 +14,35 @@ data_collector::data_collector(){
 
 // saves n equally distributed frames from a video.
 void data_collector::save_n_video_frames(int n, string video_path, string save_path, int start_frame, int start_name){
-    // Get video
-    camera_handler cam_handler(1,1,1);
-    cam_handler.insert_video(video_path,0,0);
-    // get total frames and find equal gap
-    int frame_num = cam_handler.get_frame_count(0);
-    cout << "Frames in video: " << frame_num << endl;
-    int gap = (frame_num-start_frame)/n;
-    int frames_read = 0;
-    string path;
-    int count = 0;
-    int total_frame_count = 0;
-    // get desired frames and save them
-    while(frames_read < n){
-        frame_data frame = cam_handler.get_next_frame(0);
-        total_frame_count++;
-        cout << "Total frames read: " << total_frame_count << endl;
-        if(count == 0 && total_frame_count >= start_frame){
-            path = save_path + to_string(frames_read+start_name) +".jpg";
-            imwrite(path,frame.frame);
-            frames_read++;
-            cout << "Frames kept: " << frames_read << endl;
-        }
-        if(count >= gap-1){
-            count = 0;
-        }
-        else if(total_frame_count >= start_frame){
-            count++;
-        }
-    }
+//    // Get video
+//    camera_handler cam_handler(1,1,1);
+//    cam_handler.insert_video(video_path,0,0);
+//    // get total frames and find equal gap
+//    int frame_num = cam_handler.get_frame_count(0);
+//    cout << "Frames in video: " << frame_num << endl;
+//    int gap = (frame_num-start_frame)/n;
+//    int frames_read = 0;
+//    string path;
+//    int count = 0;
+//    int total_frame_count = 0;
+//    // get desired frames and save them
+//    while(frames_read < n){
+//        frame_data frame = cam_handler.get_next_frame(0);
+//        total_frame_count++;
+//        cout << "Total frames read: " << total_frame_count << endl;
+//        if(count == 0 && total_frame_count >= start_frame){
+//            path = save_path + to_string(frames_read+start_name) +".jpg";
+//            imwrite(path,frame.frame);
+//            frames_read++;
+//            cout << "Frames kept: " << frames_read << endl;
+//        }
+//        if(count >= gap-1){
+//            count = 0;
+//        }
+//        else if(total_frame_count >= start_frame){
+//            count++;
+//        }
+//    }
 }
 
 // creates and saves a video given n number of frames

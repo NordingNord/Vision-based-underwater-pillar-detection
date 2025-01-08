@@ -94,11 +94,11 @@ struct optical_flow_results{
 //};
 
 // video_data stores the video capturer handling a certain video as well as the video id and camera id
-//struct video_data{
-//    int camera_id;
-//    int video_id;
-//    cv::VideoCapture video_capturer;
-//};
+struct video_data{
+    int camera_id;
+    int video_id;
+    cv::VideoCapture video_capturer;
+};
 
 // Stores all required sift settings
 //struct sift_settings{

@@ -34,50 +34,66 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
         int width = frame_size.width;
         int height = frame_size.height;
 
+        // Determine fps
+        int fps = cam_handler.get_fps();
+
         // Create recording titel
         string titel = recording_name + ".avi";
 
         // Create video writer
-        VideoWriter video_writer(titel,CV_FOURCC('M','J','P','G'),20, Size(width,height));
+        VideoWriter video_writer(titel,CV_FOURCC('M','J','P','G'),10, Size(width,height));
 
         // Initialize loop variables
         bool find_features = true;
         vector<KeyPoint> current_features;
         vector<keypoint_data> current_data;
         Mat last_frame;
-        Mat line_mask;
 
         // Go through all frames
         while(true){
+            //cout << "New frame" << endl;
             // Find features if begining of video or most features are lost
             if(find_features == true){
-                if(feature_type = METHOD_UNIFORM){
-                    int gap = 100;
-                    int size = 31;
-                    current_features = finder.make_uniform_keypoints(frame,gap,size); // Make uniform keypoints
+                if(feature_type == METHOD_UNIFORM){
+                    //cout << "Uniform features are found" << endl;
+                    current_features = finder.make_uniform_keypoints(frame); // Make uniform keypoints using base values
                 }
                 else{
+                    //cout << "ORB or SIFT features are found" << endl;
                     current_features = finder.find_features(frame); // Find features using initialized detector
                 }
-                // Prepare keypoint data
-                current_data = analyzer.convert_to_data(current_features);
-                // Assign colors if recording is desired
-                if(record == true){
-                    vector<Scalar> colours = visualizer.generate_random_colours(current_features.size());
-                    current_data = analyzer.insert_data(current_data, colours);
-                    // record initial frame
-                    Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
-                    video_writer.write(circle_frame);
+                // Only continue if more than min keypoints
+                if(current_features.size() >= min_points){
+                    //cout << "Enough keypoints found" << endl;
+                    // Prepare keypoint data
+                    current_data = analyzer.convert_to_data(current_features);
+                    // Assign colors if recording is desired
+                    if(record == true){
+                        vector<Scalar> colours = visualizer.generate_random_colours(current_features.size());
+                        current_data = analyzer.insert_data(current_data, colours);
+                        // record initial frame
+                        Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
+                        video_writer.write(circle_frame);
+                    }
+                    find_features = false;
+                }
+                else{
+                    //cout << "Lacking keypoints. Using next frame for keypoint detection" << endl;
+                    if(record == true){
+                        video_writer.write(frame);
+                    }
                 }
             }
             // Else statement since two frames are needed for optical flow
             else{
+                //cout << "Performing optical flow" << endl;
                 // Perform optical flow
-                optical_flow_results flow_results = analyzer.optical_flow(current_features, last_frame, frame);
+                optical_flow_results flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_features), last_frame, frame);
 
                 // Fix keypoint data
                 current_data = analyzer.remove_invalid_data(current_data,flow_results);
 
+                //cout << "Determining distances" << endl;
                 // Update distance traveled and points (currently double work since also done when determining velocity)
                 for(int i = 0; i < current_data.size(); i++){
                     current_data[i].distance += analyzer.determine_distance(current_data[i].point, flow_results.cleaned_points[i]);
@@ -85,112 +101,65 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                     current_data[i].positions.push_back(flow_results.cleaned_points[i]);
                 }
 
+                //cout << "Determining velocities" << endl;
                 // Update velocities
                 for(int i = 0; i < current_data.size(); i++){
-                    int fps = 30;
-                    current_data[i].velocity = analyzer.determine_velocity(current_data[i].positions, fps);
+                    vector<Point2f> velocity_positions = current_data[i].positions;
+                     // Take newest data points if many are present
+                    if(current_data[i].positions.size() > max_velocity_positions){
+                        vector<Point2f> temp(current_data[i].positions.end()-max_velocity_positions,current_data[i].positions.end());
+                        velocity_positions = temp;
+                    }
+
+                    current_data[i].velocity = analyzer.determine_velocity(velocity_positions, fps);
                 }
 
                 // Record if desired
                 if(record == true){
+                    //cout << "Recording results" << endl;
                     // Mark points
                     Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
-                    video_writer.write(circle_frame);
-                    // Update lines
+                    // Draw lines for alive features
                     Mat line_frame = visualizer.mark_lines(current_data,frame);
-                    add(line_frame,line_mask,line_mask);
                     // Combine mask and frame
                     Mat final_frame;
-                    add(line_mask,circle_frame,final_frame);
+                    add(line_frame,circle_frame,final_frame);
                     // Add velocity text
-
-
+                    final_frame = visualizer.mark_velocity(current_data,final_frame);
+                    // Write frame
+                    video_writer.write(final_frame);
 
                 }
 
                 // Update features
                 current_features = analyzer.points_to_keypoints(flow_results.cleaned_points);
 
+                // Restart if too few points
+                if(current_features.size() < min_points){
+                    //cout << "Limited points left. Reseting." << endl;
+                    find_features = true;
+                    current_features.clear();
+                    current_data.clear();
+                }
             }
+            //cout << "Updating frame" << endl;
             // Update frames
             last_frame = frame;
             frame = cam_handler.get_frame();
+
+            // Break if no more frames
+            if(frame.empty()){
+                cout << "Reached end of video stream" << endl;
+                break;
+            }
         }
-
-
+        // Release video writer
+        video_writer.release();
     }
-
-
-                Mat line_frame = visualizer.draw_optical_lines(old_points,flow,frame.frame, point_indexes);
-                add(line_frame,sum_lines,sum_lines);
-                Mat circle_frame = visualizer.draw_points(flow.cleaned_points, frame.frame, point_indexes);
-                Mat final_frame;
-                add(sum_lines,circle_frame,final_frame);
-                cout << "Made it to text write" << endl;
-                final_frame = visualizer.write_text(flow.points, final_frame, velocities_string ,point_indexes);
-                cout << "made it out of text write" << endl;
-                video_writer.write(final_frame);
-            }
-            cout << "survived visualization" << endl;
-
-            // Convert points to keypoints
-            vector<KeyPoint> keypoints = analyzer.points_to_keypoints(flow.cleaned_points);
-            // Update frame data
-            feature_frame.features = keypoints;
-            feature_frame.frame.frame = frame.frame;
-
-            old_flow = flow;
-
-            // Reset if too few points
-            cout << "points left:" << flow.cleaned_points.size() << endl;
-            if(flow.cleaned_points.size() < min_points){
-                cout << "Not enough points left. Finding new keypoints" << endl;
-                first_frame = true;
-                second_frame = false;
-                old_data.clear();
-            }
-        }
-        else{
-            // Find features
-            cout << "first frame" << endl;
-            if(feature_type == 0){ // Uniform
-                int gap = 100;
-                int size = 31;
-                feature_frame = finder.find_uniform_features(frame, gap, size);
-                cout << "uniform features found" << endl;
-            }
-            else if(feature_type == 1){ // Orb
-                feature_frame = finder.find_orb_features(frame);
-                cout << "ORB features found" << endl;
-            }
-
-            first_frame = false;
-            second_frame = true;
-
-            initial_keypoints = feature_frame.features;
-
-            // Reset point indexes
-            point_indexes = {};
-            for(int i = 0; i < feature_frame.features.size(); i++){
-                point_indexes.push_back(i);
-            }
-            start_indexes = point_indexes;
-
-            // Safeguard against ORB lacking features
-            if(feature_frame.features.size() == 0){
-                cout << "No features in current frame. Finding features in next frame" << endl;
-                first_frame = true;
-                second_frame = false;
-            }
-        }
-
-        // Save frame as old frame
-        last_frame = frame;
+    catch(const exception& error){
+        cout << "Error: Could not finish optical flow on video feed" << endl;
     }
-    video_writer.release();
 }
-
-
 
 
 
@@ -384,180 +353,180 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
 //}
 
 // Perform optical flow
-void obstacle_detection::perform_optical_flow(string video_path, int feature_type, bool record){
+//void obstacle_detection::perform_optical_flow(string video_path, int feature_type, bool record){
 
-    // Setup camera handler with desired videos
-    camera_handler cam_handler;
-    cam_handler.insert_video(video_path);
+//    // Setup camera handler with desired videos
+//    camera_handler cam_handler;
+//    cam_handler.insert_video(video_path);
 
-    // Initialize feature finder
-    feature_finder finder;
+//    // Initialize feature finder
+//    feature_finder finder;
 
-    // Initialize feature analyzer
-    feature_analyzer analyzer;
+//    // Initialize feature analyzer
+//    feature_analyzer analyzer;
 
-    // Initialize data visualizer
-    data_visualization visualizer;
+//    // Initialize data visualizer
+//    data_visualization visualizer;
 
-    // Initialize video writer
-    vector<video_data> video_captureres =  cam_handler.get_video_data();
-    int frame_width = video_captureres[0].video_capturer.get(CAP_PROP_FRAME_WIDTH);
-    int frame_height = video_captureres[0].video_capturer.get(CAP_PROP_FRAME_HEIGHT);
+//    // Initialize video writer
+//    vector<video_data> video_captureres =  cam_handler.get_video_data();
+//    int frame_width = video_captureres[0].video_capturer.get(CAP_PROP_FRAME_WIDTH);
+//    int frame_height = video_captureres[0].video_capturer.get(CAP_PROP_FRAME_HEIGHT);
 
-    VideoWriter video_writer("optical_flow_orb.avi",CV_FOURCC('M','J','P','G'),20, Size(frame_width,frame_height));
+//    VideoWriter video_writer("optical_flow_orb.avi",CV_FOURCC('M','J','P','G'),20, Size(frame_width,frame_height));
 
-    // Go through all frames
-    bool first_frame = true;
-    bool second_frame = false;
-    vector<optical_flow_results> old_data; // Create buffer of previous flow results
-    frame_data last_frame; // Variable for storing the last frame
-    int index = 0;
-    feature_frame_data feature_frame; // frame with features
-    optical_flow_results old_flow;
-    Mat sum_lines;
-    vector<int> point_indexes;
-    vector<int> start_indexes;
-    vector<KeyPoint> initial_keypoints;
-
-
-    while(true){
-        // Get frame
-        frame_data frame = cam_handler.get_next_frame(0); // 0 indicates capturere ID, since only one is present 0 will be its ID
-        cout << "Read new frame" << endl;
-        // check if empty
-        if(frame.frame.empty()){
-            cout << "Reached end of video stream." << endl;
-            break;
-        }
-
-        // If frame is not the first perform optical flow
-        if(first_frame == false){
-            // Perform optical flow
-            cout << "Performing optical flow" << endl;
-            optical_flow_results flow = analyzer.optical_flow(feature_frame, frame.frame);
-            cout << "Number of optical flow points: " << flow.points.size() << endl;
-            cout << "Number of good optical flow points: " << flow.cleaned_points.size() << endl;
-
-            // Fix indexing
-            vector<int> temp_indexes;
-            for(int i = 0; i < flow.status.size(); i++){
-                if(flow.status[i] == 1){
-                    temp_indexes.push_back(point_indexes[i]);
-                }
-            }
-            vector<int> point_indexes_old = point_indexes;
-            point_indexes = temp_indexes;
-
-            // Store in buffer
-            cout << "Index: " << index << endl;
-            if(old_data.size() < buffer_size){
-                old_data.push_back(flow);
-            }
-            else{
-                old_data[index] = flow;
-            }
-
-            if(index+1 >= buffer_size){
-                index = 0;
-            }
-            else{
-                index += 1;
-            }
-
-            // Determine velocities
-            vector<float> velocities;
-            if(old_data.size() >= 2){
-                velocities = analyzer.determine_velocities(old_data,30); // Video is 30 fps
-            }
-            // Convert velocities to string
-            vector<string> velocities_string;
-            for(int i = 0; i < velocities.size(); i++){
-                velocities_string.push_back(to_string(velocities[i]));
-            }
+//    // Go through all frames
+//    bool first_frame = true;
+//    bool second_frame = false;
+//    vector<optical_flow_results> old_data; // Create buffer of previous flow results
+//    frame_data last_frame; // Variable for storing the last frame
+//    int index = 0;
+//    feature_frame_data feature_frame; // frame with features
+//    optical_flow_results old_flow;
+//    Mat sum_lines;
+//    vector<int> point_indexes;
+//    vector<int> start_indexes;
+//    vector<KeyPoint> initial_keypoints;
 
 
-            // Visualize if record setting is true
-            if(record == true){
-                cout << "visualizing" << endl;
-                // Prepare old points
-                vector<Point2f> old_points = analyzer.keypoints_to_points(feature_frame.features);
+//    while(true){
+//        // Get frame
+//        frame_data frame = cam_handler.get_next_frame(0); // 0 indicates capturere ID, since only one is present 0 will be its ID
+//        cout << "Read new frame" << endl;
+//        // check if empty
+//        if(frame.frame.empty()){
+//            cout << "Reached end of video stream." << endl;
+//            break;
+//        }
 
-                if(second_frame == true){
-                    sum_lines = Mat::zeros(frame.frame.size(), frame.frame.type());
-                    cout << "second frame" << endl;
-                    second_frame = false;
+//        // If frame is not the first perform optical flow
+//        if(first_frame == false){
+//            // Perform optical flow
+//            cout << "Performing optical flow" << endl;
+//            optical_flow_results flow = analyzer.optical_flow(feature_frame, frame.frame);
+//            cout << "Number of optical flow points: " << flow.points.size() << endl;
+//            cout << "Number of good optical flow points: " << flow.cleaned_points.size() << endl;
 
-                    // Save initial keypoint image
-                    vector<Point2f> initial_points = analyzer.keypoints_to_points(initial_keypoints);
-                    Mat circle_frame = visualizer.draw_points(initial_points, frame.frame, start_indexes);
-                    video_writer.write(circle_frame);
-                }
+//            // Fix indexing
+//            vector<int> temp_indexes;
+//            for(int i = 0; i < flow.status.size(); i++){
+//                if(flow.status[i] == 1){
+//                    temp_indexes.push_back(point_indexes[i]);
+//                }
+//            }
+//            vector<int> point_indexes_old = point_indexes;
+//            point_indexes = temp_indexes;
 
-                Mat line_frame = visualizer.draw_optical_lines(old_points,flow,frame.frame, point_indexes);
-                add(line_frame,sum_lines,sum_lines);
-                Mat circle_frame = visualizer.draw_points(flow.cleaned_points, frame.frame, point_indexes);
-                Mat final_frame;
-                add(sum_lines,circle_frame,final_frame);
-                cout << "Made it to text write" << endl;
-                final_frame = visualizer.write_text(flow.points, final_frame, velocities_string ,point_indexes);
-                cout << "made it out of text write" << endl;
-                video_writer.write(final_frame);
-            }
-            cout << "survived visualization" << endl;
+//            // Store in buffer
+//            cout << "Index: " << index << endl;
+//            if(old_data.size() < buffer_size){
+//                old_data.push_back(flow);
+//            }
+//            else{
+//                old_data[index] = flow;
+//            }
 
-            // Convert points to keypoints
-            vector<KeyPoint> keypoints = analyzer.points_to_keypoints(flow.cleaned_points);
-            // Update frame data
-            feature_frame.features = keypoints;
-            feature_frame.frame.frame = frame.frame;
+//            if(index+1 >= buffer_size){
+//                index = 0;
+//            }
+//            else{
+//                index += 1;
+//            }
 
-            old_flow = flow;
+//            // Determine velocities
+//            vector<float> velocities;
+//            if(old_data.size() >= 2){
+//                velocities = analyzer.determine_velocities(old_data,30); // Video is 30 fps
+//            }
+//            // Convert velocities to string
+//            vector<string> velocities_string;
+//            for(int i = 0; i < velocities.size(); i++){
+//                velocities_string.push_back(to_string(velocities[i]));
+//            }
 
-            // Reset if too few points
-            cout << "points left:" << flow.cleaned_points.size() << endl;
-            if(flow.cleaned_points.size() < min_points){
-                cout << "Not enough points left. Finding new keypoints" << endl;
-                first_frame = true;
-                second_frame = false;
-                old_data.clear();
-            }
-        }
-        else{
-            // Find features
-            cout << "first frame" << endl;
-            if(feature_type == 0){ // Uniform
-                int gap = 100;
-                int size = 31;
-                feature_frame = finder.find_uniform_features(frame, gap, size);
-                cout << "uniform features found" << endl;
-            }
-            else if(feature_type == 1){ // Orb
-                feature_frame = finder.find_orb_features(frame);
-                cout << "ORB features found" << endl;
-            }
 
-            first_frame = false;
-            second_frame = true;
+//            // Visualize if record setting is true
+//            if(record == true){
+//                cout << "visualizing" << endl;
+//                // Prepare old points
+//                vector<Point2f> old_points = analyzer.keypoints_to_points(feature_frame.features);
 
-            initial_keypoints = feature_frame.features;
+//                if(second_frame == true){
+//                    sum_lines = Mat::zeros(frame.frame.size(), frame.frame.type());
+//                    cout << "second frame" << endl;
+//                    second_frame = false;
 
-            // Reset point indexes
-            point_indexes = {};
-            for(int i = 0; i < feature_frame.features.size(); i++){
-                point_indexes.push_back(i);
-            }
-            start_indexes = point_indexes;
+//                    // Save initial keypoint image
+//                    vector<Point2f> initial_points = analyzer.keypoints_to_points(initial_keypoints);
+//                    Mat circle_frame = visualizer.draw_points(initial_points, frame.frame, start_indexes);
+//                    video_writer.write(circle_frame);
+//                }
 
-            // Safeguard against ORB lacking features
-            if(feature_frame.features.size() == 0){
-                cout << "No features in current frame. Finding features in next frame" << endl;
-                first_frame = true;
-                second_frame = false;
-            }
-        }
+//                Mat line_frame = visualizer.draw_optical_lines(old_points,flow,frame.frame, point_indexes);
+//                add(line_frame,sum_lines,sum_lines);
+//                Mat circle_frame = visualizer.draw_points(flow.cleaned_points, frame.frame, point_indexes);
+//                Mat final_frame;
+//                add(sum_lines,circle_frame,final_frame);
+//                cout << "Made it to text write" << endl;
+//                final_frame = visualizer.write_text(flow.points, final_frame, velocities_string ,point_indexes);
+//                cout << "made it out of text write" << endl;
+//                video_writer.write(final_frame);
+//            }
+//            cout << "survived visualization" << endl;
 
-        // Save frame as old frame
-        last_frame = frame;
-    }
-    video_writer.release();
-}
+//            // Convert points to keypoints
+//            vector<KeyPoint> keypoints = analyzer.points_to_keypoints(flow.cleaned_points);
+//            // Update frame data
+//            feature_frame.features = keypoints;
+//            feature_frame.frame.frame = frame.frame;
+
+//            old_flow = flow;
+
+//            // Reset if too few points
+//            cout << "points left:" << flow.cleaned_points.size() << endl;
+//            if(flow.cleaned_points.size() < min_points){
+//                cout << "Not enough points left. Finding new keypoints" << endl;
+//                first_frame = true;
+//                second_frame = false;
+//                old_data.clear();
+//            }
+//        }
+//        else{
+//            // Find features
+//            cout << "first frame" << endl;
+//            if(feature_type == 0){ // Uniform
+//                int gap = 100;
+//                int size = 31;
+//                feature_frame = finder.find_uniform_features(frame, gap, size);
+//                cout << "uniform features found" << endl;
+//            }
+//            else if(feature_type == 1){ // Orb
+//                feature_frame = finder.find_orb_features(frame);
+//                cout << "ORB features found" << endl;
+//            }
+
+//            first_frame = false;
+//            second_frame = true;
+
+//            initial_keypoints = feature_frame.features;
+
+//            // Reset point indexes
+//            point_indexes = {};
+//            for(int i = 0; i < feature_frame.features.size(); i++){
+//                point_indexes.push_back(i);
+//            }
+//            start_indexes = point_indexes;
+
+//            // Safeguard against ORB lacking features
+//            if(feature_frame.features.size() == 0){
+//                cout << "No features in current frame. Finding features in next frame" << endl;
+//                first_frame = true;
+//                second_frame = false;
+//            }
+//        }
+
+//        // Save frame as old frame
+//        last_frame = frame;
+//    }
+//    video_writer.release();
+//}

@@ -29,9 +29,20 @@ int main(){
 
     //test.find_uniform_features(frame, 20,31);
 
+    // Testing distance calculation
+//    feature_analyzer analyzer;
+//    Point2f old(213,62);
+//    Point2f new_point(242,100);
+//    vector<Point2f> points = {old,new_point};
+//    cout << analyzer.determine_distance(old,new_point) << endl;
+//    cout << analyzer.determine_velocity(points,30) << endl;
+
+
     // Testing optical flow //
 
     // Prepare detection object
-    obstacle_detection detection;
-    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",1, true);
+//    obstacle_detection detection;
+//    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",1, true, "sift_test");
+
+
 }

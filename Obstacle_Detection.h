@@ -56,6 +56,12 @@ public:
 //    void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false);
 
 private:
+    // -- Minimum number of features required for optical flow to continue --
+    int min_points = 5;
+
+    // -- Maximum number of positions used for velocity calculations
+    int max_velocity_positions = 5;
+
 //    // data variables:
 //    std::vector<std::string> video_paths;
 //    int max_video_count = 8;

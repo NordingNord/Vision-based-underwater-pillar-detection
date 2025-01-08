@@ -10,10 +10,11 @@
 #include <opencv2/features2d.hpp>
 #include "Data_Structures.h"
 
-// -- Defines --
-int METHOD_ORB = 0;
-int METHOD_SIFT = 1;
-int METHOD_UNIFORM = 2;
+
+// -- Defined methods --
+static const int METHOD_ORB = 0;
+static const int METHOD_SIFT = 1;
+static const int METHOD_UNIFORM = 2;
 
 // -- Class --
 class feature_finder{
@@ -33,14 +34,13 @@ public:
     void change_settings(orb_settings settings);
 
     // -- Uniformly spreads keypoints in frame --
-    std::vector<cv::KeyPoint> make_uniform_keypoints(cv::Mat frame, int gap, int keypoint_size);
+    std::vector<cv::KeyPoint> make_uniform_keypoints(cv::Mat frame, int gap = 100, int keypoint_size = 31);
 
     // -- Simple method for applying grayscale --
     cv::Mat apply_grayscale(cv::Mat frame);
 
     // -- Method for changing base method --
     void change_method(int method);  // 0 -> ORB, 1 -> SIFT
-
 
     // -- Find SIFT features in specific frames --
     //std::vector<feature_frame_data> get_sift_features(std::vector<frame_data> frames);
@@ -86,8 +86,6 @@ private:
 
     // -- Base method if none is given --
     int base_method = METHOD_ORB;
-
-
 
     // Sift settings
     //sift_settings settings_sift = {0,3,0.008,100,1.6,0,false};

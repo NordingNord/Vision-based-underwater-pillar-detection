@@ -41,6 +41,9 @@ public:
     // -- Updates scaling --
     void update_scaling(double width_scale = 1, double height_scale = 1);
 
+    // -- gets fps of video --
+    int get_fps();
+
     // -- Constructor taking number of cameras in system as input as well as desired camera scale--
     //camera_handler(int num_cameras = 1, double width_scale = 1, double height_scale = 1);
     // -- Debugging method to check currently stored camera data --
