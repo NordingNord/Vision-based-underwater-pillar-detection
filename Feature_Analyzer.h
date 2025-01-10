@@ -6,11 +6,13 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <random>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
 #include "Data_Structures.h"
 #include "Feature_Finder.h"
+#include "Data_Visualization.h"
 
 // -- Some name definitions --
 static const int VELOCITY = 0;
@@ -51,8 +53,33 @@ public:
     std::vector<keypoint_data> insert_data(std::vector<keypoint_data> list, std::vector<cv::Scalar> colours);
 
     // -- Method for clustering keypoints based on velocity --
-    std::vector<std::vector<keypoint_data>> k_mean_cluster_keypoints_vel(std::vector<keypoint_data> keypoints, int initial_cluster_count = 3); // Settings defines what data is used for clustering
+    std::vector<cluster> k_mean_cluster_keypoints(std::vector<keypoint_data> keypoints, int initial_cluster_count = 3, int setting = VELOCITY); // Settings defines what data is used for clustering
+    //std::vector<std::vector<keypoint_data>> k_mean_cluster_keypoints_vel(std::vector<keypoint_data> keypoints, int initial_cluster_count = 3, bool allow_more_clusters = false); // Settings defines what data is used for clustering
 
+    // -- Method that calculates "Euclidean" distance based on n values --
+    float calc_euclidean(std::vector<float> values, std::vector<float> compare_values);
+
+    // -- Mehtod that initializes n clusters with random centers --
+    std::vector<cluster> initialize_clusters(std::vector<keypoint_data> keypoints, int initial_cluster_count = 3, int setting = VELOCITY);
+
+    // -- Method that updates center in a cluster --
+    cluster update_center(cluster input_cluster);
+
+    // -- Method that runs k-means clustering at different k-values up to a max, keeping the best results --
+    std::vector<cluster> find_best_k_mean(std::vector<keypoint_data> keypoints, int max_clusters = 10, int setting = VELOCITY);
+
+
+
+
+//    // -- Update cluster means --
+//    std::vector<float> update_centers(std::vector<std::vector<keypoint_data>> clusters);
+
+//    // -- Method that finds index of closest cluster
+//    int find_closest_cluster(std::vector<float> values, std::vector<float> centers);
+
+
+
+    // -- Method that determines the best number of clusters based on the
 
 //    // -- Updates velocities --
 //    std::vector<keypoint_data> insert_data(std::vector<keypoint_data> list, std::vector<cv::Point2f> new_pos);
@@ -65,6 +92,9 @@ private:
     cv::Size window_size = cv::Size(15,15); // search window at each level
     int max_pyramid_layers = 2;  // 2 -> 3 layers max, since 1 -> 2 layers and 0 -> 1 layers = no pyramid
     cv::TermCriteria termination_criteria = cv::TermCriteria((cv::TermCriteria::COUNT) + (cv::TermCriteria::EPS), 10, 0.03); //  count is the maximum number of iterations while eps is epsilon is a limit for how little the window is allowed to be moved before stopping the proecess
+
+    // Clustering variables
+    float max_allowed_distance = 50.0;
 };
 
 #endif // FEATURE_ANALYZER_H

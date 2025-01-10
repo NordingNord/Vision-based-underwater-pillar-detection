@@ -57,7 +57,7 @@ Mat data_visualization::mark_keypoints(vector<keypoint_data> data, Mat frame){
 Mat data_visualization::mark_lines(vector<keypoint_data> data, Mat frame){
     try{
         // go through each point and and draw lines between all its past positions
-        Mat result = Mat::zeros(frame.size(), frame.type());;
+        Mat result = Mat::zeros(frame.size(), frame.type());
         for(int i = 0; i < data.size(); i++){
             for(int j = 0; j < data[i].positions.size()-1;j++){
                 line(result,data[i].positions[j],data[i].positions[j+1],data[i].colour,2);
@@ -77,7 +77,7 @@ Mat data_visualization::mark_velocity(vector<keypoint_data> data, Mat frame){
         // go through each point and mark them on frame
         Mat result = frame.clone();
         for(int i = 0; i < data.size(); i++){
-            string vel_text = to_string(data[i].velocity);
+            string vel_text = to_string(int(data[i].velocity));
             putText(result,vel_text,data[i].point,FONT_HERSHEY_SCRIPT_COMPLEX,1.0,data[i].colour,1,LINE_AA);
         }
         return result;

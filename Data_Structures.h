@@ -43,6 +43,7 @@ struct keypoint_data{
     cv::Scalar colour;
     int distance;
     float velocity;
+
 };
 
 // -- Stores results from optical flow --
@@ -51,6 +52,13 @@ struct optical_flow_results{
     std::vector<cv::Point2f> cleaned_points;
     std::vector<uchar> status; // 1 -> point found again with high confidence, 0 -> point have low confidence
     std::vector<float> error;
+};
+
+// -- Stores cluster information --
+struct cluster{
+    int id;
+    std::vector<float> center;
+    std::vector<keypoint_data> keypoints;
 };
 
 

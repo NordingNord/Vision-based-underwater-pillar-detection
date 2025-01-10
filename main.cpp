@@ -41,8 +41,8 @@ int main(){
     // Testing optical flow //
 
     // Prepare detection object
-//    obstacle_detection detection;
-//    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",1, true, "sift_test");
+    obstacle_detection detection;
+    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_VEL_LIMIT, "test");
 
 
 }

@@ -249,47 +249,69 @@ vector<keypoint_data> feature_analyzer::insert_data(vector<keypoint_data> list, 
     return result_data;
 }
 
-// -- Method for clustering keypoints based on velocity and position --
-vector<vector<keypoint_data>> feature_analyzer::vel_k_mean_cluster_keypoints(vector<keypoint_data> keypoints, int initial_cluster_count){
-    vector<vector<keypoint_data>> clusters;
-    try{
-        // Initialize centers and indexes for initial center creation
-        vector<float> centers;
-        vector<int> indexes;
-        RNG random;
 
-        // Choose random starting centers
-        for(int i = 0; i < initial_cluster_count; i++){
-            int index = random.uniform(0, keypoints.size());
-            if(count(indexes.begin(), indexes.end(), index) == 0){
-                indexes.push_back(index);
-                centers.push_back(keypoints[index].velocity);
-            }
+// -- Method for clustering keypoints based on velocity and position --
+vector<cluster> feature_analyzer::k_mean_cluster_keypoints(vector<keypoint_data> keypoints, int initial_cluster_count, int setting){
+    vector<cluster> clusters;
+    try{
+        // Initialize clusters using random keypoints
+        if(keypoints.size() < initial_cluster_count){
+            throw runtime_error("Not enough data points compared to clusters");
         }
+        clusters = initialize_clusters(keypoints,initial_cluster_count, setting);
+        //cout << "Initialize clusters done" << endl;
 
         // Initialize variable that keeps track of changes in clusters
         bool changes = false;
 
         // Assign clusters until all keypoints at at the closest cluster
         while(true){
-            // Go through all keypoints and assign calcualte closest distance.
+            // Go through all keypoints and calcualte closest distance.
             for(int i = 0; i < keypoints.size(); i++){
-                // Calculate euclidean distance to each cluster center (Just difference since 1D)
+
+                // Calculate euclidean distance to each cluster center
                 vector<float> distances;
-                for(int j = 0; j < centers.size(); j++){
-                    float distance = abs(keypoints[i].velocity-centers[j]);
+                for(int j = 0; j < clusters.size(); j++){
+                    // Values based on setting
+                    vector<float> values = {keypoints[i].velocity};
+
+                    if(setting == VELOCITY_AND_POS){
+                        values = {keypoints[i].point.x,keypoints[i].point.y, keypoints[i].velocity};
+                    }
+                    else if(setting == POSITION){
+                        values = {keypoints[i].point.x,keypoints[i].point.y};
+                    }
+
+                    // Remember distance
+                    float distance = calc_euclidean(values,clusters[j].center);
                     distances.push_back(distance);
                 }
-                // Find closest cluster
-                int min_index = min_element(distances.begin(),distances.end()-distances.begin());
-                // Check all cluster for keypoint
-                for(int j = 0; j < initial_cluster_count; j++){
+
+                // Assign cluster based on distances
+                auto closest_cluster = min_element(distances.begin(), distances.end());
+                int closest_cluster_index = closest_cluster - distances.begin();
+                // Go through cluster to add / remove keypoint where needed
+                for(int j = 0; j < clusters.size(); j++){
+                    // Count occurences of feature
+                    int id = keypoints[i].id;
+                    int occurences = count_if(clusters[j].keypoints.begin(),clusters[j].keypoints.end(),[&id](const keypoint_data& data_point) { return data_point.id == id;});
                     // Remove if not correct index
-                    if(count(clusters[j].begin(),clusters[j].end(),keypoints[i]) == 1 & j !=min_index){
+                    if(occurences > 0 && j != closest_cluster_index){
+                        clusters[j].keypoints.erase(remove_if(clusters[j].keypoints.begin(),clusters[j].keypoints.end(),[&id](const keypoint_data& data_point) { return data_point.id == id;}), clusters[j].keypoints.end());
+                        // Find keypoint locations
+//                        auto iterator = find_if(clusters[j].keypoints.begin(), clusters[j].keypoints.end(), [&id](const keypoint_data& data_point) { return data_point.id == id;});
+//                        while(iterator != clusters[j].keypoints.end()){
+//                            iterator = find_if(clusters[j].keypoints.begin(), clusters[j].keypoints.end(), [&id](const keypoint_data& data_point) { return data_point.id == id;});
+//                            int index = iterator-clusters[j].keypoints.begin();
+//                            //cout << "Keypoint id at index = " << clusters[j].keypoints.at(clusters[j].keypoints.begin()+index).id << endl;
+//                            // Remove datapoint
+//                            clusters[j].keypoints.erase(clusters[j].keypoints.begin() + index);
+//                        }
                         changes = true;
                     }
-                    // Add if not in correct index
-                    if(count(clusters[j].begin(),clusters[j].end(),keypoints[i]) == 0 & j == min_index){
+                    // Add if correct index
+                    else if(occurences == 0 && j == closest_cluster_index){
+                        clusters[j].keypoints.push_back(keypoints[i]);
                         changes = true;
                     }
                 }
@@ -297,16 +319,314 @@ vector<vector<keypoint_data>> feature_analyzer::vel_k_mean_cluster_keypoints(vec
 
             // Break if nothing was changed
             if(changes == false){
+                // Assign random colours to each cluster
+                data_visualization visualizer;
+                vector<Scalar> colours = visualizer.generate_random_colours(clusters.size());
+                for(int i = 0; i < clusters.size(); i++){
+                    for(int j = 0; j < clusters[i].keypoints.size(); j++){
+                        clusters[i].keypoints.at(j).colour = colours[i];
+                    }
+                }
                 break;
             }
+            // Update centers before next iteration
             else{
+                cout << "change" << endl;
+                for(int i = 0; i < clusters.size(); i++){
+                    clusters[i] = update_center(clusters[i]);
+                }
+
                 changes = false;
             }
         }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return clusters;
+}
+
+
+// -- Method that calculates "Euclidean" distance based on n values --
+float feature_analyzer::calc_euclidean(vector<float> values, vector<float> compare_values){
+    float distance = 0;
+    try{
+        if(values.size() != compare_values.size()){
+            throw runtime_error("Vectors are of unequal size.");
+        }
+
+        // Calculate the sum of squares based on all values
+        float sum_of_square = 0;
+        for(int i = 0; i < values.size(); i++){
+            sum_of_square += pow(compare_values[i]-values[i],2);
+        }
+        // Take square root
+        distance = sqrt(sum_of_square);
 
     }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return distance;
+}
+
+
+// -- Mehtod that initializes n clusters with random centers --
+vector<cluster> feature_analyzer::initialize_clusters(vector<keypoint_data> keypoints, int initial_cluster_count, int setting){
+    vector<cluster> initial_clusters;
+    try{
+        // Prepare random distribution for random keypoint selection
+        random_device ran_dev;
+        mt19937 gen(ran_dev());// Generate seed
+        uniform_int_distribution<> distribution(0,keypoints.size()-1);// Get random uniformly distributed number
+
+        // Select random keypoints
+        vector<int> keypoint_indexes; // keypoints used as centers
+        for(int i = 0; i < initial_cluster_count; i++){
+            int index = distribution(gen); // Generate random index
+            if(keypoint_indexes.size() == 0){
+                keypoint_indexes.push_back(index);
+            }
+            else{
+                // Ensure that it is not already used
+                //cout << keypoints.size() << endl;
+                while(count(keypoint_indexes.begin(), keypoint_indexes.end(), index) != 0){
+                    index = distribution(gen);
+                }
+                keypoint_indexes.push_back(index);
+            }
+            // Prepare cluster
+            cluster new_cluster;
+            new_cluster.id = i;
+            new_cluster.keypoints.push_back(keypoints[index]);
+            if(setting == VELOCITY_AND_POS){
+                new_cluster.center = {keypoints[index].point.x,keypoints[index].point.y, keypoints[index].velocity};
+            }
+            else if(setting == POSITION){
+                new_cluster.center = {keypoints[index].point.x,keypoints[index].point.y};
+            }
+            else{
+                new_cluster.center = {keypoints[index].velocity};
+            }
+            initial_clusters.push_back(new_cluster);
+        }
+        if(setting != VELOCITY && setting != VELOCITY_AND_POS && setting != POSITION){
+            throw runtime_error("Not a valid setting. Using velocity as default center variable.");
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return initial_clusters;
+}
+
+
+// -- Method that updates center in a cluster --
+cluster feature_analyzer::update_center(cluster input_cluster){
+    cluster output_cluster = input_cluster;
+    try{
+        // Reset current center
+        for(int i = 0; i < input_cluster.center.size();i++){
+            input_cluster.center[i] = 0;
+        }
+
+        // Go through every keypoint in cluster and sum center
+        for(int i = 0; i < input_cluster.keypoints.size(); i++){
+            if(input_cluster.center.size() == 1){
+                input_cluster.center[0] += input_cluster.keypoints[i].velocity;
+            }
+            else if(input_cluster.center.size() == 2){
+                input_cluster.center[0] += input_cluster.keypoints[i].point.x;
+                input_cluster.center[1] += input_cluster.keypoints[i].point.y;
+            }
+            else if(input_cluster.center.size() == 3){
+                input_cluster.center[0] += input_cluster.keypoints[i].point.x;
+                input_cluster.center[1] += input_cluster.keypoints[i].point.y;
+                input_cluster.center[2] += input_cluster.keypoints[i].velocity;
+            }
+            else{
+                throw runtime_error("Center is not defined yet. Returning input cluster.");
+            }
+        }
+
+        // Go through center and calculate mean
+        for(int i = 0; i < input_cluster.center.size();i++){
+            output_cluster.center[i] = input_cluster.center[i]/input_cluster.keypoints.size();
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return output_cluster;
+}
+
+
+// -- Method that runs k-means clustering at different k-values up to a max, keeping the best results --
+vector<cluster> feature_analyzer::find_best_k_mean(vector<keypoint_data> keypoints, int max_clusters, int setting){
+    vector<cluster> best_clusters;
+    try{
+        vector<double> sum_of_squares;
+        vector<vector<cluster>> cluster_results;
+        // Go through all k values
+        for(int k = 1; k <= max_clusters; k++){
+            // if not enough data break here
+            if(keypoints.size() < k){
+                cout << "Not enough keypoints for more clusters. Stopping and k = " << k-1 << endl;
+                break;
+            }
+            // Get clusters
+            cout << "check " << k << " clusters" << endl;
+            vector<cluster> clusters = k_mean_cluster_keypoints(keypoints,k,setting);
+            cluster_results.push_back(clusters);
+            // Calculate within cluster sum of squares
+            double total_sum_of_squares = 0;
+            for(int i = 0; i < k; i++){
+                double cluster_sum_of_squares = 0;
+                for(int j = 0; j < clusters[i].keypoints.size(); j++){
+                    // Values based on setting
+                    vector<float> values = {clusters[i].keypoints[j].velocity};
+
+                    if(setting == VELOCITY_AND_POS){
+                        values = {clusters[i].keypoints[j].point.x,clusters[i].keypoints[j].point.y, clusters[i].keypoints[j].velocity};
+                    }
+                    else if(setting == POSITION){
+                        values = {clusters[i].keypoints[j].point.x,clusters[i].keypoints[j].point.y};
+                    }
+                    // calc dist
+                    float dist = calc_euclidean(values, clusters[i].center);
+                    // increment total with square
+                    cluster_sum_of_squares += pow(abs(dist),2);
+                }
+                cout << "Cluster " << i << "sum of squares = " << cluster_sum_of_squares << endl;
+                total_sum_of_squares += cluster_sum_of_squares;
+            }
+            cout << "Error: " << total_sum_of_squares << endl;
+            sum_of_squares.push_back(total_sum_of_squares);
+        }
+
+        // With all within cluster sum of squares found it is time to find the elbow (Change that sees the biggest difference in error)
+        double biggest_diff = 0;
+
+        int best_k = 1;
+
+        for(int k = 0; k < sum_of_squares.size(); k++){
+            double diff;
+            if(k == 0){
+                diff = 0; //abs(sum_of_squares[k]-0);
+            }
+            else{
+                diff = abs(sum_of_squares[k-1]-sum_of_squares[k]);
+            }
+            if(diff > biggest_diff){
+                biggest_diff = diff;
+                best_k = (k); // +1 since clusters are from 1 -> max while sum of squares are from 0 -> max-1
+            }
+        }
+
+        // Assign best results as output
+        best_clusters = cluster_results[best_k];
+        cout << (best_k+1) << " clusters used" << endl;
+        cout << sum_of_squares[0] << endl;
+
+        // Test visualization (change to 0 -> 1000 since sometimes image is too big (NORMALIZE IT))
+        Mat blank_image = Mat::zeros((int)(*max_element(sum_of_squares.begin(), sum_of_squares.end())), (int)((sum_of_squares.size()-1)*100), CV_8UC3);
+        cout << sum_of_squares[0] << endl;
+        for(int k = 0; k < sum_of_squares.size(); k++){
+            Point point;
+            point.y = ((int)(*max_element(sum_of_squares.begin(), sum_of_squares.end()))-((int)sum_of_squares[k]));
+            point.x = (int)k*100;
+            if(k == best_k){
+                circle(blank_image,point,2, Scalar(0,255,0),-1);
+            }
+            else{
+                cout << k << endl;
+                cout << point.y << endl;
+                circle(blank_image,point,2, Scalar(0,0,255),-1);
+            }
+        }
+        imshow("sum of squares",blank_image);
+        waitKey(0);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return best_clusters;
 
 }
+
+
+
+//// -- Update cluster means --
+//vector<vector<float>> feature_analyzer::update_centers(vector<vector<keypoint_data>> clusters, int setting){
+//    vector<vector<float>> centers;
+//    try{
+//        // Go through each cluster
+//        for(int i = 0; i < clusters.size(); i++){
+//            vector<float> new_center;
+
+//            // For each keypoint determine sum of all chosen variables
+//            for(int j = 0; j < clusters[i].size(); j++){
+
+//                if(setting == VELOCITY_AND_POS || setting == POSITION){
+//                    if(new_center.size() == 0){
+//                        new_center.push_back(clusters[i].at(j).point.x);
+//                        new_center.push_back(clusters[i].at(j).point.y);
+//                    }
+//                    else{
+//                        new_center[0] += clusters[i].at(j).point.x;
+//                        new_center[1] += clusters[i].at(j).point.y;
+//                    }
+//                }
+
+//                else if(setting == VELOCITY){
+//                    if(new_center.size() == 0){
+//                        new_center.push_back(clusters[i].at(j).velocity);
+//                    }
+//                    else{
+//                        new_center[0] += clusters[i].at(j).velocity;
+//                    }
+
+//                }
+
+//                if(setting == VELOCITY_AND_POS){
+//                    if(new_center.size() < 3){
+//                        new_center.push_back(clusters[i].at(j).velocity);
+//                    }
+//                    else{
+//                        new_center[2] += clusters[i].at(j).velocity;
+//                    }
+//                }
+
+//            }
+//            // Find center (mean)
+//            for(int j = 0; j < new_center.size(); j++){
+
+//            }
+//            new_center = new_center/clusters[i].size();
+//            centers[i] = new_center;
+//        }
+
+//    }
+//    catch(const exception& error){
+//        cout << "Error: " << error.what() << endl;
+//    }
+//    return centers;
+//}
+
+
+
+//// -- Method that finds index of closest value
+//int feature_analyzer::find_closest_cluster(std::vector<float> values, std::vector<float> centers){
+//    int index = 0;
+//    try{
+//    }
+//    catch(const exception& error){
+//        cout << "Error: " << error.what() << endl;
+//    }
+//    return index;
+//}
+
 
 
 
@@ -415,4 +735,111 @@ vector<vector<keypoint_data>> feature_analyzer::vel_k_mean_cluster_keypoints(vec
 //        result.push_back(point);
 //    }
 //    return result;
+//}
+
+
+//vector<vector<keypoint_data>> feature_analyzer::k_mean_cluster_keypoints_vel(vector<keypoint_data> keypoints, int initial_cluster_count, bool allow_more_clusters){
+//    vector<vector<keypoint_data>> clusters;
+//    try{
+//        // Initialize centers and indexes for initial center creation
+//        vector<float> centers;
+//        vector<int> indexes;
+//        RNG random;
+
+//        // Choose random starting centers
+//        for(int i = 0; i < initial_cluster_count; i++){
+//            int index = random.uniform(0, keypoints.size());
+//            if(count(indexes.begin(), indexes.end(), index) == 0){
+//                indexes.push_back(index);
+//                centers.push_back(keypoints[index].velocity);
+//                vector<keypoint_data> cluster;
+//                cluster.push_back(keypoints[index]);
+//                clusters.push_back(cluster);
+//            }
+//        }
+
+//        // Initialize variable that keeps track of changes in clusters
+//        bool changes = false;
+
+//        // Assign clusters until all keypoints at at the closest cluster
+//        while(true){
+//            // Go through all keypoints and assign calcualte closest distance.
+//            for(int i = 0; i < keypoints.size(); i++){
+//                // Calculate euclidean distance to each cluster center (Just difference since 1D)
+//                vector<float> distances;
+//                for(int j = 0; j < centers.size(); j++){
+//                    vector<float> values = {keypoints[i].velocity};
+//                    vector<float> compares = {centers[j]};
+//                    float distance = calc_euclidean(values,compares);
+//                    distances.push_back(distance);
+//                }
+//                // Find closest cluster
+//                auto closest_cluster = min_element(distances.begin(), distances.end());
+//                int min_index = closest_cluster - distances.begin();
+
+//                // If clusters can be added, check for max distance
+//                if(distances[min_index] > max_allowed_distance & allow_more_clusters == true){
+//                    // Create new cluster
+//                    vector<keypoint_data> new_cluster;
+//                    new_cluster.push_back(keypoints[i]);
+//                    changes = true;
+//                    // Assign its center
+//                    centers.push_back(keypoints[i].velocity);
+//                    clusters.push_back(new_cluster);
+//                }
+//                else{
+//                    // Check all cluster for keypoint
+//                    for(int j = 0; j < clusters.size(); j++){
+//                        // Remove if not correct index
+//                        int id = keypoints[i].id;
+//                        if(count_if(clusters[j].begin(),clusters[j].end(),[&id](const keypoint_data& data_point) { return data_point.id == id;}) > 0 & j !=min_index){
+//                            // Determine index
+//                            auto iterator = find_if(clusters[j].begin(), clusters[j].end(), [&id](const keypoint_data& data_point) { return data_point.id == id;});
+//                            int index = iterator-clusters[j].begin();
+//                            // Remove datapoint
+//                            clusters[j].erase(clusters[j].begin() + index);
+
+//                            changes = true;
+//                        }
+//                        // Add if not in correct index
+//                        if(count_if(clusters[j].begin(),clusters[j].end(),[&id](const keypoint_data& data_point) { return data_point.id == id;}) == 0 & j == min_index){
+//                            clusters[j].push_back(keypoints[i]);
+//                            changes = true;
+//                        }
+//                    }
+//                }
+//            }
+
+//            // Break if nothing was changed
+//            if(changes == false){
+//                // Assign random colours to each cluster
+//                data_visualization visualizer;
+//                vector<Scalar> colours = visualizer.generate_random_colours(clusters.size());
+//                for(int i = 0; i < clusters.size(); i++){
+//                    for(int j = 0; j < clusters[i].size(); j++){
+//                        clusters[i].at(j).colour = colours[i];
+//                    }
+//                }
+//                break;
+//            }
+//            else{
+//                changes = false;
+//                // Update centers
+//                for(int i = 0; i < clusters.size(); i++){
+//                    float new_center = 0;
+//                    for(int j = 0; j < clusters[i].size(); j++){
+//                        // sum up all velocities
+//                        new_center += clusters[i].at(j).velocity;
+//                    }
+//                    // Find center (average velocity)
+//                    new_center = new_center/clusters[i].size();
+//                    centers[i] = new_center;
+//                }
+//            }
+//        }
+//    }
+//    catch(const exception& error){
+//        cout << "Error: " << error.what() << endl;
+//    }
+//    return clusters;
 //}

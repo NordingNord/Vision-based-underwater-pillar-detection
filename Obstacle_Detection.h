@@ -15,6 +15,11 @@
 #include "Feature_Finder.h"
 #include "Feature_Analyzer.h"
 
+// -- Define like variables --
+static const int ON_FRAME = 0;
+static const int ON_FIRST_VEL = 1;
+static const int ON_VEL_LIMIT = 2;
+
 // -- Class --
 class obstacle_detection
 {
@@ -23,7 +28,7 @@ public:
     obstacle_detection();
 
     // -- Performs optical flow on video --
-    void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false, std::string recording_name = "Unnamed_optical_flow_recording");
+    void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false, int cluster_setting = ON_FRAME, std::string recording_name = "Unnamed_optical_flow_recording");
 
 //    // adds video path to vector of all used video paths
 //    void add_video(std::string path);

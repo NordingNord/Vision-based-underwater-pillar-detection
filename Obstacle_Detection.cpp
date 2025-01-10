@@ -11,7 +11,7 @@ obstacle_detection::obstacle_detection(){
 }
 
 // -- Performs optical flow on video --
-void obstacle_detection::perform_optical_flow(string video_path, int feature_type, bool record, std::string recording_name){
+void obstacle_detection::perform_optical_flow(string video_path, int feature_type, bool record, int cluster_setting, std::string recording_name){
     try{
         // Prepare video
         camera_handler cam_handler(video_path);
@@ -49,22 +49,25 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
         vector<keypoint_data> current_data;
         Mat last_frame;
 
+        int test_int = 0;
+
         // Go through all frames
         while(true){
-            //cout << "New frame" << endl;
+            cout << "New frame: " << test_int << endl;
+            test_int++;
             // Find features if begining of video or most features are lost
             if(find_features == true){
                 if(feature_type == METHOD_UNIFORM){
-                    //cout << "Uniform features are found" << endl;
+                    cout << "Uniform features are found" << endl;
                     current_features = finder.make_uniform_keypoints(frame); // Make uniform keypoints using base values
                 }
                 else{
-                    //cout << "ORB or SIFT features are found" << endl;
+                    cout << "ORB or SIFT features are found" << endl;
                     current_features = finder.find_features(frame); // Find features using initialized detector
                 }
                 // Only continue if more than min keypoints
                 if(current_features.size() >= min_points){
-                    //cout << "Enough keypoints found" << endl;
+                    cout << "Enough keypoints found" << endl;
                     // Prepare keypoint data
                     current_data = analyzer.convert_to_data(current_features);
                     // Assign colors if recording is desired
@@ -114,21 +117,86 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                     current_data[i].velocity = analyzer.determine_velocity(velocity_positions, fps);
                 }
 
+                // Perform clustering based on setting
+                vector<cluster> clusters;
+                bool new_cluster = false;
+
+                if(cluster_setting == ON_FIRST_VEL && current_data[0].positions.size() == 2){
+                    if(current_features.size() > 0){
+                        cout << "Find on fist velocity clusters" << endl;
+                        //clusters = analyzer.k_mean_cluster_keypoints(current_data,2,true);
+                        clusters = analyzer.find_best_k_mean(current_data, int(current_data.size()/2), VELOCITY); // set max clusters as half the total keypoints
+                        //clusters = analyzer.k_mean_cluster_keypoints(current_data,2,VELOCITY);
+                        new_cluster = true;
+                    }
+                }
+                else if(cluster_setting == ON_VEL_LIMIT && current_data[0].positions.size() == max_velocity_positions){
+                    if(current_features.size() > 0){
+                        cout << "Find on velocity limit clusters" << endl;
+                        //clusters = analyzer.k_mean_cluster_keypoints(current_data,2,true);
+                        clusters = analyzer.find_best_k_mean(current_data, int(current_data.size()/2), VELOCITY); // set max clusters as half the total keypoints
+                        //clusters = analyzer.k_mean_cluster_keypoints(current_data,2,VELOCITY);
+                        new_cluster = true;
+                    }
+                }
+                else if(cluster_setting == ON_FRAME){
+                    if(current_features.size() > 0){
+                        cout << "Find on frame clusters" << endl;
+                        //clusters = analyzer.k_mean_cluster_keypoints(current_data,2,true);
+                        clusters = analyzer.find_best_k_mean(current_data, int(current_data.size()/2), VELOCITY); // set max clusters as half the total keypoints
+                        //clusters = analyzer.k_mean_cluster_keypoints(current_data,2,VELOCITY);
+                        new_cluster = true;
+                    }
+                }
+                //vector<vector<keypoint_data>> clusters;
+
+                // If clusters found colour keypoints
+                if(new_cluster == true){
+                    for(int i = 0; i < current_data.size(); i++){
+                        int id = current_data[i].id;
+                        for(int j = 0; j < clusters.size(); j++){
+                            // count if feaute is in cluster
+                            int occurences = count_if(clusters[j].keypoints.begin(),clusters[j].keypoints.end(),[&id](const keypoint_data& data_point) { return data_point.id == id;});
+                            if(occurences > 0){
+                                current_data[i].colour = clusters[j].keypoints[0].colour;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 // Record if desired
                 if(record == true){
-                    //cout << "Recording results" << endl;
-                    // Mark points
-                    Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
-                    // Draw lines for alive features
-                    Mat line_frame = visualizer.mark_lines(current_data,frame);
-                    // Combine mask and frame
-                    Mat final_frame;
-                    add(line_frame,circle_frame,final_frame);
-                    // Add velocity text
-                    final_frame = visualizer.mark_velocity(current_data,final_frame);
+                    //cout << "Begin record" << endl;
+                    Mat final_frame = frame.clone();
+                    if(clusters.size() > 0){
+                        //cout << "in cluster viz" << endl;
+                        for(int i = 0; i < clusters.size(); i++){
+                            // Mark points
+                            Mat circle_frame = visualizer.mark_keypoints(clusters[i].keypoints,final_frame);
+                            //cout << "draw circle" << endl;
+                            // Draw lines for alive features
+                            Mat line_frame = visualizer.mark_lines(clusters[i].keypoints,frame);
+                            //cout << "draw line" << endl;
+                            // Combine mask and frame
+                            add(line_frame,circle_frame,final_frame);
+                            // Add velocity text
+                            final_frame = visualizer.mark_velocity(clusters[i].keypoints,final_frame);
+                        }
+                    }
+                    else{
+                        // Mark points
+                        Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
+                        // Draw lines for alive features
+                        Mat line_frame = visualizer.mark_lines(current_data,frame);
+                        // Combine mask and frame
+                        add(line_frame,circle_frame,final_frame);
+                        // Add velocity text
+                        final_frame = visualizer.mark_velocity(current_data,final_frame);
+                    }
                     // Write frame
                     video_writer.write(final_frame);
-
+                    //cout << "Recorded frame" << endl;
                 }
 
                 // Update features
@@ -136,7 +204,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
 
                 // Restart if too few points
                 if(current_features.size() < min_points){
-                    //cout << "Limited points left. Reseting." << endl;
+                    cout << "Limited points left. Reseting." << endl;
                     find_features = true;
                     current_features.clear();
                     current_data.clear();
