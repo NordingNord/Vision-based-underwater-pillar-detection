@@ -41,8 +41,33 @@ int main(){
     // Testing optical flow //
 
     // Prepare detection object
-    obstacle_detection detection;
-    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_VEL_LIMIT, "test");
+//    obstacle_detection detection;
+//    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_VEL_LIMIT, "test");
+
+//    vector<int> sorted_keypoints = {1,2,3,4,5};
+//    int cluster_count = 2;
+
+//    for(int i = 0; i <= sorted_keypoints.size()-cluster_count; i++){
+//        int index = sorted_keypoints.size()-cluster_count-i+1;
+
+//        vector<int> outer_front;
+//        copy(sorted_keypoints.begin(), sorted_keypoints.begin()+index, back_inserter(outer_front));
+//        vector<int> outer_back;
+//        copy(sorted_keypoints.end() - index, sorted_keypoints.end(), back_inserter(outer_back));
+
+//        cout << "vector: ";
+//        for(int j = 0; j < outer_front.size(); j++){
+//            cout << outer_front[j] << " ";
+//        }
+//        cout << endl;
+
+
+//        cout << "vector back: ";
+//        for(int j = 0; j < outer_back.size(); j++){
+//            cout << outer_back[j] << " ";
+//        }
+//        cout << endl;
+//    }
 
 
 }

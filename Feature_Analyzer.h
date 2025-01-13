@@ -7,6 +7,7 @@
 #include <string>
 #include <cmath>
 #include <random>
+#include <algorithm>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
@@ -68,8 +69,11 @@ public:
     // -- Method that runs k-means clustering at different k-values up to a max, keeping the best results --
     std::vector<cluster> find_best_k_mean(std::vector<keypoint_data> keypoints, int max_clusters = 10, int setting = VELOCITY);
 
+    // -- Method that calculates silhouette value --
+    float get_silhouette_score(std::vector<cluster> input_clusters,int setting);
 
-
+    // -- Method that clusters 1D data based on Jenk Natural Breaks --
+    std::vector<cluster> Jenks_Natural_Breaks_Clustering(std::vector<keypoint_data> keypoints, int cluster_count = 3);
 
 //    // -- Update cluster means --
 //    std::vector<float> update_centers(std::vector<std::vector<keypoint_data>> clusters);

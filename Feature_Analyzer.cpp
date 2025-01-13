@@ -466,6 +466,7 @@ cluster feature_analyzer::update_center(cluster input_cluster){
 vector<cluster> feature_analyzer::find_best_k_mean(vector<keypoint_data> keypoints, int max_clusters, int setting){
     vector<cluster> best_clusters;
     try{
+        vector<float> silhouette_scores;
         vector<double> sum_of_squares;
         vector<vector<cluster>> cluster_results;
         // Go through all k values
@@ -476,7 +477,7 @@ vector<cluster> feature_analyzer::find_best_k_mean(vector<keypoint_data> keypoin
                 break;
             }
             // Get clusters
-            cout << "check " << k << " clusters" << endl;
+            //cout << "check " << k << " clusters" << endl;
             vector<cluster> clusters = k_mean_cluster_keypoints(keypoints,k,setting);
             cluster_results.push_back(clusters);
             // Calculate within cluster sum of squares
@@ -498,11 +499,15 @@ vector<cluster> feature_analyzer::find_best_k_mean(vector<keypoint_data> keypoin
                     // increment total with square
                     cluster_sum_of_squares += pow(abs(dist),2);
                 }
-                cout << "Cluster " << i << "sum of squares = " << cluster_sum_of_squares << endl;
+               //out << "Cluster " << i << "sum of squares = " << cluster_sum_of_squares << endl;
                 total_sum_of_squares += cluster_sum_of_squares;
             }
             cout << "Error: " << total_sum_of_squares << endl;
             sum_of_squares.push_back(total_sum_of_squares);
+
+            // Try with silhouette score
+            float silhouette_score = get_silhouette_score(clusters,setting);
+            silhouette_scores.push_back(silhouette_score);
         }
 
         // With all within cluster sum of squares found it is time to find the elbow (Change that sees the biggest difference in error)
@@ -524,29 +529,40 @@ vector<cluster> feature_analyzer::find_best_k_mean(vector<keypoint_data> keypoin
             }
         }
 
-        // Assign best results as output
-        best_clusters = cluster_results[best_k];
-        cout << (best_k+1) << " clusters used" << endl;
-        cout << sum_of_squares[0] << endl;
+        // Check what would have the best silhouette score. (-1 to 1 with 1 being best possible score)
+        int best_silhouette_k  = max_element(silhouette_scores.begin(), silhouette_scores.end()) - silhouette_scores.begin();
+        cout << "Silhouette score depicts " << (best_silhouette_k+1) << " to be the best number of clusters with a score of " << silhouette_scores[best_silhouette_k] << endl;
+
+        // printing all scores for testing purposes
+        cout << "All silhouette scores: ";
+        for(int i = 0; i < silhouette_scores.size(); i++){
+            cout << silhouette_scores[i] << " ";
+        }
+        cout << endl;
+
+        // Assign best results as output based on int average between elbow and silhuette method.
+        int chosen_k = (int)(best_k+best_silhouette_k)/2;
+        best_clusters = cluster_results[chosen_k];
+        cout << (chosen_k+1) << " clusters used" << endl;
+
 
         // Test visualization (change to 0 -> 1000 since sometimes image is too big (NORMALIZE IT))
-        Mat blank_image = Mat::zeros((int)(*max_element(sum_of_squares.begin(), sum_of_squares.end())), (int)((sum_of_squares.size()-1)*100), CV_8UC3);
-        cout << sum_of_squares[0] << endl;
-        for(int k = 0; k < sum_of_squares.size(); k++){
-            Point point;
-            point.y = ((int)(*max_element(sum_of_squares.begin(), sum_of_squares.end()))-((int)sum_of_squares[k]));
-            point.x = (int)k*100;
-            if(k == best_k){
-                circle(blank_image,point,2, Scalar(0,255,0),-1);
-            }
-            else{
-                cout << k << endl;
-                cout << point.y << endl;
-                circle(blank_image,point,2, Scalar(0,0,255),-1);
-            }
-        }
-        imshow("sum of squares",blank_image);
-        waitKey(0);
+//        Mat blank_image = Mat::zeros((int)(*max_element(sum_of_squares.begin(), sum_of_squares.end())), (int)((sum_of_squares.size()-1)*100), CV_8UC3);
+//        for(int k = 0; k < sum_of_squares.size(); k++){
+//            Point point;
+//            point.y = ((int)(*max_element(sum_of_squares.begin(), sum_of_squares.end()))-((int)sum_of_squares[k]));
+//            point.x = (int)k*100;
+//            if(k == best_k){
+//                circle(blank_image,point,2, Scalar(0,255,0),-1);
+//            }
+//            else{
+//                cout << k << endl;
+//                cout << point.y << endl;
+//                circle(blank_image,point,2, Scalar(0,0,255),-1);
+//            }
+//        }
+//        imshow("sum of squares",blank_image);
+//        waitKey(0);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -556,6 +572,213 @@ vector<cluster> feature_analyzer::find_best_k_mean(vector<keypoint_data> keypoin
 }
 
 
+// -- Method that calculates silhouette value --
+float feature_analyzer::get_silhouette_score(vector<cluster> input_clusters, int setting){
+    float silhouette_score = 0; // average silhouette_coefficient of keypoints in cluster
+    try{
+        for(int cluster = 0; cluster < input_clusters.size(); cluster++){
+            float silhouette_coefficient_sum = 0;
+            for(int i = 0; i < input_clusters[cluster].keypoints.size(); i++){
+                // Calcluate intra cluster average distance
+                float intra_cluster_avg_dist = 0;
+                for(int j = 0; j < input_clusters[cluster].keypoints.size(); j++){
+                    if(i != j){
+                        if(setting == VELOCITY_AND_POS){
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].point.x,input_clusters[cluster].keypoints[i].point.y, input_clusters[cluster].keypoints[i].velocity};
+                            vector<float> data_j = {input_clusters[cluster].keypoints[j].point.x,input_clusters[cluster].keypoints[j].point.y, input_clusters[cluster].keypoints[j].velocity};
+                            intra_cluster_avg_dist += calc_euclidean(data_i,data_j);
+                        }
+                        else if(setting == POSITION){
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].point.x,input_clusters[cluster].keypoints[i].point.y};
+                            vector<float> data_j = {input_clusters[cluster].keypoints[j].point.x,input_clusters[cluster].keypoints[j].point.y};
+                            intra_cluster_avg_dist += calc_euclidean(data_i,data_j);
+                        }
+                        else{
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].velocity};
+                            vector<float> data_j = {input_clusters[cluster].keypoints[j].velocity};
+                            intra_cluster_avg_dist += calc_euclidean(data_i,data_j);
+                        }
+                    }
+                }
+                //cout << "intra dist: " << intra_cluster_avg_dist << endl;
+                if(input_clusters[cluster].keypoints.size() < 2){
+                    intra_cluster_avg_dist = 0;
+                }
+                else{
+                    intra_cluster_avg_dist = intra_cluster_avg_dist/(input_clusters[cluster].keypoints.size()-1);
+                }
+                //cout << "intra dist after: " << intra_cluster_avg_dist << endl;
+
+                // Find nearest cluster
+                float min_dist = 0;
+                int closest_cluster = 0;
+                bool first_cluster = true;
+
+                for(int other_cluster = 0; other_cluster < input_clusters.size(); other_cluster++){
+                    float dist = 0;
+                    if(cluster != other_cluster){
+                        if(setting == VELOCITY_AND_POS){
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].point.x,input_clusters[cluster].keypoints[i].point.y, input_clusters[cluster].keypoints[i].velocity};
+                            dist = calc_euclidean(data_i,input_clusters[other_cluster].center);
+                        }
+                        else if(setting == POSITION){
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].point.x,input_clusters[cluster].keypoints[i].point.y};
+                            dist = calc_euclidean(data_i,input_clusters[other_cluster].center);
+                        }
+                        else{
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].velocity};
+                            dist += calc_euclidean(data_i,input_clusters[other_cluster].center);
+                        }
+                        if(dist < min_dist || first_cluster == true){
+                            min_dist = dist;
+                            closest_cluster = other_cluster;
+                            first_cluster = false;
+                        }
+                    }
+                }
+
+                // Find inter cluster distance
+                float inter_cluster_avg_dist = 0;
+
+                for(int j = 0; j < input_clusters[closest_cluster].keypoints.size(); j++){
+                        if(setting == VELOCITY_AND_POS){
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].point.x,input_clusters[cluster].keypoints[i].point.y, input_clusters[cluster].keypoints[i].velocity};
+                            vector<float> data_j = {input_clusters[closest_cluster].keypoints[j].point.x,input_clusters[closest_cluster].keypoints[j].point.y, input_clusters[closest_cluster].keypoints[j].velocity};
+                            inter_cluster_avg_dist += calc_euclidean(data_i,data_j);
+                        }
+                        else if(setting == POSITION){
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].point.x,input_clusters[cluster].keypoints[i].point.y};
+                            vector<float> data_j = {input_clusters[closest_cluster].keypoints[j].point.x,input_clusters[closest_cluster].keypoints[j].point.y};
+                            inter_cluster_avg_dist += calc_euclidean(data_i,data_j);
+                        }
+                        else{
+                            vector<float> data_i = {input_clusters[cluster].keypoints[i].velocity};
+                            vector<float> data_j = {input_clusters[closest_cluster].keypoints[j].velocity};
+                            inter_cluster_avg_dist += calc_euclidean(data_i,data_j);
+                        }
+                        //cout << "building: " << inter_cluster_avg_dist << endl;
+
+                }
+                //cout << "inter: " << inter_cluster_avg_dist << endl;
+                inter_cluster_avg_dist = inter_cluster_avg_dist/input_clusters[closest_cluster].keypoints.size();
+                //cout << "inter after: " << inter_cluster_avg_dist << endl;
+
+                // Calculate silhouette coefficient
+                if(intra_cluster_avg_dist == 0){
+                    silhouette_coefficient_sum += 0.0; // 1 since it fits perfect in its group. This however suports having many small clusters which is undesired. I use 0.0 to discourage this.
+                    //cout << 1 << endl;
+                }
+                else{
+                    silhouette_coefficient_sum += (inter_cluster_avg_dist-intra_cluster_avg_dist)/(max(inter_cluster_avg_dist,intra_cluster_avg_dist));
+                    //cout << (inter_cluster_avg_dist-intra_cluster_avg_dist)/(max(inter_cluster_avg_dist,intra_cluster_avg_dist)) << endl;
+                }
+            }
+//            cout << "average sum: " << silhouette_coefficient_sum/input_clusters[cluster].keypoints.size() << endl;
+//            cout << "num: " << input_clusters[cluster].keypoints.size() << endl;
+
+            silhouette_score += silhouette_coefficient_sum/input_clusters[cluster].keypoints.size();
+        }
+        silhouette_score = silhouette_score/input_clusters.size();
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return silhouette_score;
+}
+
+// -- Method that clusters 1D data based on Jenk Natural Breaks --
+vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoint_data> keypoints, int cluster_count){
+    vector<cluster> clusters;
+    try{
+        if(cluster_count == 1){
+            throw runtime_error("Only one cluster selected. Returning input points as cluster.");
+        }
+        if(cluster_count > keypoints.size()){
+            throw runtime_error("Cannot return more clusters than there are keypoints. Returning input points as cluster.");
+        }
+
+        // Sort velocities
+        vector<keypoint_data> sorted_keypoints = keypoints;
+        sort(sorted_keypoints.begin(),sorted_keypoints.end(), [](keypoint_data a, keypoint_data b){
+            return a.velocity < b.velocity;
+        });
+        vector<keypoint_data> sorted_keypoints_stored = sorted_keypoints;
+
+        // Calculate vector mean
+        float vel_sum = 0;
+        for(int i = 0; i < sorted_keypoints .size(); i++){
+            vel_sum += sorted_keypoints [i].velocity;
+        }
+        float vel_avg = vel_sum/sorted_keypoints .size();
+
+        // Determining the sum of squared devians for the vector mean
+        float sum_of_squares = 0;
+        for(int i = 0; i <= sorted_keypoints .size(); i++){
+            sum_of_squares += pow((sorted_keypoints [i].velocity-vel_avg),2);
+        }
+
+        vector<vector<vector<keypoint_data>>> possible_clusters_front;
+        vector<vector<vector<keypoint_data>>> possible_clusters_back;
+        for(int clusters_remaining = cluster_count; clusters_remaining > 1; clusters_remaining-2){
+            // Find possible outer clusters
+            vector<vector<keypoint_data>> current_front_ranges;
+            vector<vector<keypoint_data>> current_back_ranges;
+
+            for(int i = 0; i <= sorted_keypoints.size()-cluster_count; i++){
+                int index = sorted_keypoints.size()-cluster_count-i+1;
+                vector<keypoint_data> outer_front;
+                copy(sorted_keypoints.begin(), sorted_keypoints.begin()+index, back_inserter(outer_front));
+                vector<keypoint_data> outer_back;
+                copy(sorted_keypoints.end() - index, sorted_keypoints.end(), back_inserter(outer_back));
+                current_front_ranges.push_back(outer_front);
+                current_back_ranges.push_back(outer_back);
+            }
+            possible_clusters_front.push_back(current_front_ranges);
+            possible_clusters_back.push_back(current_back_ranges);
+
+            // remove outer values since they are not needed
+            sorted_keypoints.erase(sorted_keypoints.begin());
+            sorted_keypoints.erase(sorted_keypoints.end());
+        }
+
+        // Add middle range if number of clusters are unewen
+        vector<vector<keypoint_data>> middle_ranges;
+        if(cluster_count % 2 != 0){
+            for(int i = 0; i <= sorted_keypoints.size()-cluster_count; i++){
+                int index = sorted_keypoints.size()-cluster_count-i+1;
+
+                vector<keypoint_data> front;
+                copy(sorted_keypoints.begin(), sorted_keypoints.begin()+index, back_inserter(front));
+                vector<keypoint_data> back;
+                copy(sorted_keypoints.end() - index, sorted_keypoints.end(), back_inserter(back));
+
+                middle_ranges.push_back(front);
+                middle_ranges.push_back(back);
+            }
+        }
+
+        // Reset sorted_keypoints
+        sorted_keypoints = sorted_keypoints_stored;
+
+        // Calculate sum of squared deviations for range means and deviations
+
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+        cluster error_cluster;
+        error_cluster.keypoints = keypoints;
+        clusters.push_back(error_cluster);
+    }
+    return clusters;
+}
+
+
+//// -- velocity sorter --
+//bool feature_analyzer::velocity_sorter(const keypoint_data &last, const keypoint_data &next){
+//    return last.velocity < next.velocity;
+//}
 
 //// -- Update cluster means --
 //vector<vector<float>> feature_analyzer::update_centers(vector<vector<keypoint_data>> clusters, int setting){
