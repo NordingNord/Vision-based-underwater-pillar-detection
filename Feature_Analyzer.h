@@ -75,6 +75,9 @@ public:
     // -- Method that clusters 1D data based on Jenk Natural Breaks --
     std::vector<cluster> Jenks_Natural_Breaks_Clustering(std::vector<keypoint_data> keypoints, int cluster_count = 3);
 
+    // -- Recurrence algorithm for partioning a vector
+    void partition_vector(std::vector<keypoint_data> data, int index, int subset_count, int subset_num, std::vector<std::vector<keypoint_data>>& subsets, std::vector<std::vector<std::vector<keypoint_data>>>& results);
+
 //    // -- Update cluster means --
 //    std::vector<float> update_centers(std::vector<std::vector<keypoint_data>> clusters);
 

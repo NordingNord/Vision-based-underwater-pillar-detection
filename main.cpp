@@ -69,5 +69,16 @@ int main(){
 //        cout << endl;
 //    }
 
+    feature_analyzer test;
+    vector<keypoint_data> keypoints;
+    for(int i = 1; i <= 5; i++){
+        keypoint_data keypoint;
+        keypoint.velocity = (float)(i);
+        keypoints.push_back(keypoint);
+    }
+    test.Jenks_Natural_Breaks_Clustering(keypoints, 3);
+
+
+
 
 }
