@@ -749,122 +749,78 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
         }
 
         // Test print
-        for(int i = 0; i < kept_results.size(); i++){
-            for(int x = 0; x < kept_results[i].size(); x++){
-                cout << "{ ";
-                for(int y = 0; y < kept_results[i][x].size();y++){
-                    cout << kept_results[i][x][y].velocity;
-                    if(y == kept_results[i][x].size()-1){
-                        cout << " ";
-                    }
-                    else{
-                        cout << ", ";
-                    }
-                }
-                if(x == kept_results[i].size()-1){
-                    cout << "}";
-                }
-                else{
-                    cout << "}, ";
-                }
-            }
-            cout << endl;
-        }
-
-
-
-
-
-//        vector<vector<vector<keypoint_data>>> possible_clusters_front;
-//        vector<vector<vector<keypoint_data>>> possible_clusters_back;
-//        int temp_cluster_count = cluster_count;
-//        for(int clusters_remaining = cluster_count; clusters_remaining > 1; clusters_remaining--){
-//            cout << "Clusters remaining: " << clusters_remaining << endl;
-//            // Find possible outer clusters
-//            vector<vector<keypoint_data>> current_front_ranges;
-//            vector<vector<keypoint_data>> current_back_ranges;
-//            cout << "Creating possibility" << endl;
-//            for(int i = 0; i <= sorted_keypoints.size()-temp_cluster_count; i++){
-//                int index = sorted_keypoints.size()-temp_cluster_count-i+1;
-//                vector<keypoint_data> outer_front;
-//                copy(sorted_keypoints.begin(), sorted_keypoints.begin()+index, back_inserter(outer_front));
-//                vector<keypoint_data> outer_back;
-//                copy(sorted_keypoints.end() - index, sorted_keypoints.end(), back_inserter(outer_back));
-//                current_front_ranges.push_back(outer_front);
-//                current_back_ranges.push_back(outer_back);
-//            }
-//            cout << "All posibilities created" << endl;
-//            possible_clusters_front.push_back(current_front_ranges);
-//            possible_clusters_back.push_back(current_back_ranges);
-
-//            // remove outer values since they are not needed
-//            sorted_keypoints.erase(sorted_keypoints.begin());
-//            sorted_keypoints.erase(sorted_keypoints.end());
-
-//            clusters_remaining--;
-//            temp_cluster_count -= 2;
-//        }
-
-//        cout << "Outer clusters found" << endl;
-//        cout << sorted_keypoints.size() << " remaining datapoints" << endl;
-
-//        // Add middle range if number of clusters are unewen
-//        vector<vector<keypoint_data>> middle_ranges;
-//        if(cluster_count % 2 != 0){
-//            for(int i = 0; i <= sorted_keypoints.size()-cluster_count; i++){
-//                int index = sorted_keypoints.size()-cluster_count-i+1;
-
-//                vector<keypoint_data> front;
-//                copy(sorted_keypoints.begin(), sorted_keypoints.begin()+index, back_inserter(front));
-//                vector<keypoint_data> back;
-//                copy(sorted_keypoints.end() - index, sorted_keypoints.end(), back_inserter(back));
-
-//                middle_ranges.push_back(front);
-//                middle_ranges.push_back(back);
-//            }
-//        }
-//        cout << "Middle clusters found" << endl;
-
-//        // Reset sorted_keypoints
-//        sorted_keypoints = sorted_keypoints_stored;
-
-//        // Test print of data
-//        for(int i = 0; i < possible_clusters_front.size(); i++){
-//            cout << "Cluster " << i << " possibilities" << endl;
-//            for(int j = 0; j < possible_clusters_front[i].size(); j++){
-//                cout << "[";
-//                for(int k = 0; k < possible_clusters_front[i].at(j).size(); k++){
-//                    cout << possible_clusters_front[i].at(j).at(k).velocity << " ";
+//        for(int i = 0; i < kept_results.size(); i++){
+//            for(int x = 0; x < kept_results[i].size(); x++){
+//                cout << "{ ";
+//                for(int y = 0; y < kept_results[i][x].size();y++){
+//                    cout << kept_results[i][x][y].velocity;
+//                    if(y == kept_results[i][x].size()-1){
+//                        cout << " ";
+//                    }
+//                    else{
+//                        cout << ", ";
+//                    }
 //                }
-//                cout << "]" << endl;
-//            }
-//        }
-
-//        // Test print of data
-//        for(int i = 0; i < possible_clusters_back.size(); i++){
-//            cout << "Cluster " << (cluster_count-i) << " possibilities" << endl;
-//            for(int j = 0; j < possible_clusters_back[i].size(); j++){
-//                cout << "[";
-//                for(int k = 0; k < possible_clusters_back[i].at(j).size(); k++){
-//                    cout << possible_clusters_back[i].at(j).at(k).velocity << " ";
+//                if(x == kept_results[i].size()-1){
+//                    cout << "}";
 //                }
-//                cout << "]" << endl;
+//                else{
+//                    cout << "}, ";
+//                }
 //            }
+//            cout << endl;
 //        }
-
-//        // Test print of data
-//        cout << "Cluster " << (possible_clusters_front.size()+1) << " possibilities" << endl;
-//        for(int j = 0; j < middle_ranges.size(); j++){
-//            cout << "[";
-//            for(int k = 0; k < middle_ranges[j].size(); k++){
-//                cout << middle_ranges[j].at(k).velocity << " ";
-//            }
-//            cout << "]" << endl;
-//        }
-
 
         // Calculate sum of squared deviations for range means and deviations
+        vector<float> sum_of_squared_results;
+        for(int i = 0; i < kept_results.size(); i++){
+            float sum_of_squared = 0;
+            for(int j = 0; j < kept_results[i].size();j++){
+                // Calculate mean
+                float mean = 0;
+                for(int k = 0; k < kept_results[i][j].size();k++){
+                    mean += kept_results[i][j][k].velocity;
+                }
+                mean = mean/kept_results[i][j].size();
+                // Now find differences squared
+                for(int k = 0; k < kept_results[i][j].size();k++){
+                    sum_of_squared += pow(kept_results[i][j][k].velocity-mean,2);
+                }
+            }
+            cout << "Version " << i << " result: " << sum_of_squared << endl;
+            sum_of_squared_results.push_back(sum_of_squared);
+        }
 
+        // Lowest result -> minimum variance
+
+        // Calculate goodness of variance fit on the ranges
+        vector<float> goodness_of_fits;
+        for(int i = 0; i < sum_of_squared_results.size(); i++){
+            float goodness_of_fit = (sum_of_squares-sum_of_squared_results[i]);
+            goodness_of_fits.push_back(goodness_of_fit);
+        }
+
+        // Take clustering that have the highest goodness of fit
+        float best_goodness_of_fit = *max_element(goodness_of_fits.begin(),goodness_of_fits.end());
+        int best_cluster_index =  find(goodness_of_fits.begin(), goodness_of_fits.end(), best_goodness_of_fit)-goodness_of_fits.begin();
+        vector<vector<keypoint_data>> best_clusters = kept_results[best_cluster_index];
+
+        // Convert to clusters
+        for(int i = 0; i < best_clusters.size(); i++){
+            cluster current_cluster;
+            current_cluster.keypoints = best_clusters[i];
+            current_cluster.id = i;
+            clusters.push_back(current_cluster);
+        }
+
+        // Assign random colours to each cluster
+        data_visualization visualizer;
+        vector<Scalar> colours = visualizer.generate_random_colours(clusters.size());
+        for(int i = 0; i < clusters.size(); i++){
+            for(int j = 0; j < clusters[i].keypoints.size(); j++){
+                clusters[i].keypoints.at(j).colour = colours[i];
+            }
+        }
 
     }
     catch(const exception& error){
@@ -885,27 +841,27 @@ void feature_analyzer::partition_vector(vector<keypoint_data> data, int index, i
             vector<vector<keypoint_data>> current_combination;
             for(int x = 0; x < subsets.size(); x++){
                 vector<keypoint_data> current_subset;
-                cout << "{ ";
+                //cout << "{ ";
                 for(int y = 0; y < subsets[x].size();y++){
-                    cout << subsets[x][y].velocity;
+                    //cout << subsets[x][y].velocity;
                     current_subset.push_back(subsets[x][y]);
-                    if(y == subsets[x].size()-1){
-                        cout << " ";
-                    }
-                    else{
-                        cout << ", ";
-                    }
+//                    if(y == subsets[x].size()-1){
+//                        cout << " ";
+//                    }
+//                    else{
+//                        cout << ", ";
+//                    }
                 }
-                if(x == subsets.size()-1){
-                    cout << "}";
-                }
-                else{
-                    cout << "}, ";
-                }
+//                if(x == subsets.size()-1){
+//                    cout << "}";
+//                }
+//                else{
+//                    cout << "}, ";
+//                }
                 current_combination.push_back(current_subset);
             }
             results.push_back(current_combination);
-            cout <<  endl;
+            //cout <<  endl;
         }
         return;
     }

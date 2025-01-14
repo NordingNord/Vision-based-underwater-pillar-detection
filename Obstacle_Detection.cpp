@@ -148,7 +148,9 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                         new_cluster = true;
                     }
                 }
-                //vector<vector<keypoint_data>> clusters;
+
+                // Test Jenks natural breaks
+                clusters = analyzer.Jenks_Natural_Breaks_Clustering(current_data,3);
 
                 // If clusters found colour keypoints
                 if(new_cluster == true){
@@ -197,6 +199,8 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                     // Write frame
                     video_writer.write(final_frame);
                     //cout << "Recorded frame" << endl;
+//                    imshow("frame clustered", final_frame);
+//                    waitKey(0);
                 }
 
                 // Update features

@@ -41,8 +41,8 @@ int main(){
     // Testing optical flow //
 
     // Prepare detection object
-//    obstacle_detection detection;
-//    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_VEL_LIMIT, "test");
+    obstacle_detection detection;
+    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_VEL_LIMIT, "Jenkstest");
 
 //    vector<int> sorted_keypoints = {1,2,3,4,5};
 //    int cluster_count = 2;
@@ -69,14 +69,15 @@ int main(){
 //        cout << endl;
 //    }
 
-    feature_analyzer test;
-    vector<keypoint_data> keypoints;
-    for(int i = 1; i <= 5; i++){
-        keypoint_data keypoint;
-        keypoint.velocity = (float)(i);
-        keypoints.push_back(keypoint);
-    }
-    test.Jenks_Natural_Breaks_Clustering(keypoints, 3);
+//    feature_analyzer test;
+//    vector<keypoint_data> keypoints;
+//    vector<float> velocities = {4,5,9,10};
+//    for(int i = 0; i < velocities.size(); i++){
+//        keypoint_data keypoint;
+//        keypoint.velocity = velocities[i];
+//        keypoints.push_back(keypoint);
+//    }
+//    test.Jenks_Natural_Breaks_Clustering(keypoints, 2);
 
 
 

@@ -495,3 +495,92 @@
 //frame.frame = cvtColor(frame.frame, grayscaled_frame, CV_BGR2GRAY);
 
 //optical_flow_results old_data[buffer_size];
+
+
+
+//        vector<vector<vector<keypoint_data>>> possible_clusters_front;
+//        vector<vector<vector<keypoint_data>>> possible_clusters_back;
+//        int temp_cluster_count = cluster_count;
+//        for(int clusters_remaining = cluster_count; clusters_remaining > 1; clusters_remaining--){
+//            cout << "Clusters remaining: " << clusters_remaining << endl;
+//            // Find possible outer clusters
+//            vector<vector<keypoint_data>> current_front_ranges;
+//            vector<vector<keypoint_data>> current_back_ranges;
+//            cout << "Creating possibility" << endl;
+//            for(int i = 0; i <= sorted_keypoints.size()-temp_cluster_count; i++){
+//                int index = sorted_keypoints.size()-temp_cluster_count-i+1;
+//                vector<keypoint_data> outer_front;
+//                copy(sorted_keypoints.begin(), sorted_keypoints.begin()+index, back_inserter(outer_front));
+//                vector<keypoint_data> outer_back;
+//                copy(sorted_keypoints.end() - index, sorted_keypoints.end(), back_inserter(outer_back));
+//                current_front_ranges.push_back(outer_front);
+//                current_back_ranges.push_back(outer_back);
+//            }
+//            cout << "All posibilities created" << endl;
+//            possible_clusters_front.push_back(current_front_ranges);
+//            possible_clusters_back.push_back(current_back_ranges);
+
+//            // remove outer values since they are not needed
+//            sorted_keypoints.erase(sorted_keypoints.begin());
+//            sorted_keypoints.erase(sorted_keypoints.end());
+
+//            clusters_remaining--;
+//            temp_cluster_count -= 2;
+//        }
+
+//        cout << "Outer clusters found" << endl;
+//        cout << sorted_keypoints.size() << " remaining datapoints" << endl;
+
+//        // Add middle range if number of clusters are unewen
+//        vector<vector<keypoint_data>> middle_ranges;
+//        if(cluster_count % 2 != 0){
+//            for(int i = 0; i <= sorted_keypoints.size()-cluster_count; i++){
+//                int index = sorted_keypoints.size()-cluster_count-i+1;
+
+//                vector<keypoint_data> front;
+//                copy(sorted_keypoints.begin(), sorted_keypoints.begin()+index, back_inserter(front));
+//                vector<keypoint_data> back;
+//                copy(sorted_keypoints.end() - index, sorted_keypoints.end(), back_inserter(back));
+
+//                middle_ranges.push_back(front);
+//                middle_ranges.push_back(back);
+//            }
+//        }
+//        cout << "Middle clusters found" << endl;
+
+//        // Reset sorted_keypoints
+//        sorted_keypoints = sorted_keypoints_stored;
+
+//        // Test print of data
+//        for(int i = 0; i < possible_clusters_front.size(); i++){
+//            cout << "Cluster " << i << " possibilities" << endl;
+//            for(int j = 0; j < possible_clusters_front[i].size(); j++){
+//                cout << "[";
+//                for(int k = 0; k < possible_clusters_front[i].at(j).size(); k++){
+//                    cout << possible_clusters_front[i].at(j).at(k).velocity << " ";
+//                }
+//                cout << "]" << endl;
+//            }
+//        }
+
+//        // Test print of data
+//        for(int i = 0; i < possible_clusters_back.size(); i++){
+//            cout << "Cluster " << (cluster_count-i) << " possibilities" << endl;
+//            for(int j = 0; j < possible_clusters_back[i].size(); j++){
+//                cout << "[";
+//                for(int k = 0; k < possible_clusters_back[i].at(j).size(); k++){
+//                    cout << possible_clusters_back[i].at(j).at(k).velocity << " ";
+//                }
+//                cout << "]" << endl;
+//            }
+//        }
+
+//        // Test print of data
+//        cout << "Cluster " << (possible_clusters_front.size()+1) << " possibilities" << endl;
+//        for(int j = 0; j < middle_ranges.size(); j++){
+//            cout << "[";
+//            for(int k = 0; k < middle_ranges[j].size(); k++){
+//                cout << middle_ranges[j].at(k).velocity << " ";
+//            }
+//            cout << "]" << endl;
+//        }
