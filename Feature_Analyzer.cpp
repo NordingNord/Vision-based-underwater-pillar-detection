@@ -162,11 +162,12 @@ optical_flow_results feature_analyzer::optical_flow(std::vector<cv::Point2f> poi
 }
 
 // -- Method for determining velocity of a point
-float feature_analyzer::determine_velocity(vector<Point2f> positions, float fps){
+float feature_analyzer::determine_velocity(vector<Point2f> positions, float fps, int frames){
     float velocity;
     try{
         // Determine the time that has passed, based on the number of positions
-        int steps = positions.size();
+        //int steps = positions.size();
+        int steps = frames;
         float time = steps/fps;
 
         // Determine total distance between all positions
@@ -331,7 +332,7 @@ vector<cluster> feature_analyzer::k_mean_cluster_keypoints(vector<keypoint_data>
             }
             // Update centers before next iteration
             else{
-                cout << "change" << endl;
+                //cout << "change" << endl;
                 for(int i = 0; i < clusters.size(); i++){
                     clusters[i] = update_center(clusters[i]);
                 }
@@ -502,7 +503,7 @@ vector<cluster> feature_analyzer::find_best_k_mean(vector<keypoint_data> keypoin
                //out << "Cluster " << i << "sum of squares = " << cluster_sum_of_squares << endl;
                 total_sum_of_squares += cluster_sum_of_squares;
             }
-            cout << "Error: " << total_sum_of_squares << endl;
+            //cout << "Error: " << total_sum_of_squares << endl;
             sum_of_squares.push_back(total_sum_of_squares);
 
             // Try with silhouette score
@@ -534,16 +535,16 @@ vector<cluster> feature_analyzer::find_best_k_mean(vector<keypoint_data> keypoin
         cout << "Silhouette score depicts " << (best_silhouette_k+1) << " to be the best number of clusters with a score of " << silhouette_scores[best_silhouette_k] << endl;
 
         // printing all scores for testing purposes
-        cout << "All silhouette scores: ";
-        for(int i = 0; i < silhouette_scores.size(); i++){
-            cout << silhouette_scores[i] << " ";
-        }
-        cout << endl;
+//        cout << "All silhouette scores: ";
+//        for(int i = 0; i < silhouette_scores.size(); i++){
+//            cout << silhouette_scores[i] << " ";
+//        }
+//        cout << endl;
 
         // Assign best results as output based on int average between elbow and silhuette method.
         int chosen_k = (int)(best_k+best_silhouette_k)/2;
         best_clusters = cluster_results[chosen_k];
-        cout << (chosen_k+1) << " clusters used" << endl;
+        //cout << (chosen_k+1) << " clusters used" << endl;
 
 
         // Test visualization (change to 0 -> 1000 since sometimes image is too big (NORMALIZE IT))
@@ -845,19 +846,7 @@ void feature_analyzer::partition_vector(vector<keypoint_data> data, int index, i
                 for(int y = 0; y < subsets[x].size();y++){
                     //cout << subsets[x][y].velocity;
                     current_subset.push_back(subsets[x][y]);
-//                    if(y == subsets[x].size()-1){
-//                        cout << " ";
-//                    }
-//                    else{
-//                        cout << ", ";
-//                    }
-                }
-//                if(x == subsets.size()-1){
-//                    cout << "}";
-//                }
-//                else{
-//                    cout << "}, ";
-//                }
+
                 current_combination.push_back(current_subset);
             }
             results.push_back(current_combination);

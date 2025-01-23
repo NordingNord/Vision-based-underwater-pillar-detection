@@ -26,13 +26,11 @@ public:
     // Writes frame to video
     void write_to_video(cv::Mat frame, bool final_frame = false);
 
-
 private:
     std::string video_format = ".avi";
     double fps = 1;
     cv::VideoWriter video_writer;
     std::string image_format = ".jpg";
-
 };
 
 #endif // DATA_COLLECTOR_H

@@ -42,7 +42,7 @@ public:
     optical_flow_results optical_flow(std::vector<cv::Point2f> points,cv::Mat last_frame, cv::Mat frame);
 
     // -- Method for determining velocity of a point
-    float determine_velocity(std::vector<cv::Point2f> positions, float fps);
+    float determine_velocity(std::vector<cv::Point2f> positions, float fps, int frames);
 
     // -- Method for calculating distance between two points --
     float determine_distance(cv::Point2f point_old, cv::Point2f point_new);
@@ -77,22 +77,6 @@ public:
 
     // -- Recurrence algorithm for partioning a vector
     void partition_vector(std::vector<keypoint_data> data, int index, int subset_count, int subset_num, std::vector<std::vector<keypoint_data>>& subsets, std::vector<std::vector<std::vector<keypoint_data>>>& results);
-
-//    // -- Update cluster means --
-//    std::vector<float> update_centers(std::vector<std::vector<keypoint_data>> clusters);
-
-//    // -- Method that finds index of closest cluster
-//    int find_closest_cluster(std::vector<float> values, std::vector<float> centers);
-
-
-
-    // -- Method that determines the best number of clusters based on the
-
-//    // -- Updates velocities --
-//    std::vector<keypoint_data> insert_data(std::vector<keypoint_data> list, std::vector<cv::Point2f> new_pos);
-
-    // Group velocities
-    //std::vector<std::vector<cv::Point2f>> group_velocities(std::vector<float> velocities, std::vector<optical_flow_results> frames);
 
 private:
     // Variables used for optical flow
