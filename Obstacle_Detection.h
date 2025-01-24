@@ -30,6 +30,9 @@ public:
     // -- Performs optical flow on video --
     void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false, int cluster_setting = ON_FRAME, std::string recording_name = "Unnamed_optical_flow_recording", int frame_gap = 0);
 
+    // -- The complete obstacle detection pipeline using optical flow
+    void detect_obstacles_video(std::string video_path, int feature_type = METHOD_ORB, int frame_gap = 0,int cluster_setting = ON_FRAME);
+
 private:
     // -- Minimum number of features required for optical flow to continue --
     int min_points = 5;

@@ -8,6 +8,7 @@
 #include <cmath>
 #include <random>
 #include <algorithm>
+#include <chrono>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
@@ -19,6 +20,7 @@
 static const int VELOCITY = 0;
 static const int VELOCITY_AND_POS = 1;
 static const int POSITION = 2;
+static const float ANGLE_ERROR = 400;
 
 class feature_analyzer
 {
@@ -78,6 +80,12 @@ public:
     // -- Recurrence algorithm for partioning a vector
     void partition_vector(std::vector<keypoint_data> data, int index, int subset_count, int subset_num, std::vector<std::vector<keypoint_data>>& subsets, std::vector<std::vector<std::vector<keypoint_data>>>& results);
 
+    // -- Algorithm that filters keypoints based on movement --
+    std::vector<keypoint_data> angle_filter(std::vector<keypoint_data> keypoints);
+
+    // -- Method that calculates angle of line between two points and the x-axis --
+    float calculate_angle(cv::Point2f last_point, cv::Point2f current_point);
+
 private:
     // Variables used for optical flow
     cv::Size window_size = cv::Size(15,15); // search window at each level
@@ -86,6 +94,13 @@ private:
 
     // Clustering variables
     float max_allowed_distance = 50.0;
+
+    // Variable that defines what an outlier is in terms of inter quantile ranges
+    float IQR_outlier_range = 0.5; // Usually 1.5. Lower -> more strict
+
+    // Variables used to further remove outliers in terms of angle
+    float angle_outliers = 0.5;
+
 };
 
 #endif // FEATURE_ANALYZER_H

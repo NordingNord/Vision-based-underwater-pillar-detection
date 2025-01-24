@@ -700,11 +700,15 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
         }
 
         // Sort velocities
+        auto start = chrono::high_resolution_clock::now();
         vector<keypoint_data> sorted_keypoints = keypoints;
         sort(sorted_keypoints.begin(),sorted_keypoints.end(), [](keypoint_data a, keypoint_data b){
             return a.velocity < b.velocity;
         });
         vector<keypoint_data> sorted_keypoints_stored = sorted_keypoints;
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::microseconds>(stop-start);
+        cout << "Time to sort = " << duration.count() << endl;
 
         // Calculate vector mean
         float vel_sum = 0;
@@ -722,13 +726,19 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
         cout << "Sum of squares of vector mean determined" << endl;
 
         // Find all subsets
+        start = chrono::high_resolution_clock::now();
+
         vector<vector<keypoint_data>> subsets(cluster_count);
         vector<vector<vector<keypoint_data>>> results;
         partition_vector(sorted_keypoints,0,cluster_count,0,subsets,results);
 
         cout << "Number of combinations: " << results.size() << endl;
+        stop = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(stop-start);
+        cout << "Time to find combinations = " << duration.count() << endl;
 
         // Remove all combinations that include gaps
+        start = chrono::high_resolution_clock::now();
         bool result_good = true;
         vector<vector<vector<keypoint_data>>> kept_results;
         for(int i = 0; i < results.size(); i++){ // Results
@@ -748,6 +758,9 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
             }
             result_good = true;
         }
+        stop = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(stop-start);
+        cout << "Time to remove combinations with gaps = " << duration.count() << endl;
 
         // Test print
 //        for(int i = 0; i < kept_results.size(); i++){
@@ -773,6 +786,7 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
 //        }
 
         // Calculate sum of squared deviations for range means and deviations
+        start = chrono::high_resolution_clock::now();
         vector<float> sum_of_squared_results;
         for(int i = 0; i < kept_results.size(); i++){
             float sum_of_squared = 0;
@@ -791,15 +805,22 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
             cout << "Version " << i << " result: " << sum_of_squared << endl;
             sum_of_squared_results.push_back(sum_of_squared);
         }
+        stop = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(stop-start);
+        cout << "Time to calc sum of squared deviations = " << duration.count() << endl;
 
         // Lowest result -> minimum variance
 
         // Calculate goodness of variance fit on the ranges
+        start = chrono::high_resolution_clock::now();
         vector<float> goodness_of_fits;
         for(int i = 0; i < sum_of_squared_results.size(); i++){
             float goodness_of_fit = (sum_of_squares-sum_of_squared_results[i]);
             goodness_of_fits.push_back(goodness_of_fit);
         }
+        stop = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(stop-start);
+        cout << "Time to calc goodness of fit = " << duration.count() << endl;
 
         // Take clustering that have the highest goodness of fit
         float best_goodness_of_fit = *max_element(goodness_of_fits.begin(),goodness_of_fits.end());
@@ -807,14 +828,19 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
         vector<vector<keypoint_data>> best_clusters = kept_results[best_cluster_index];
 
         // Convert to clusters
+        start = chrono::high_resolution_clock::now();
         for(int i = 0; i < best_clusters.size(); i++){
             cluster current_cluster;
             current_cluster.keypoints = best_clusters[i];
             current_cluster.id = i;
             clusters.push_back(current_cluster);
         }
+        stop = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(stop-start);
+        cout << "Time to convert to clusters = " << duration.count() << endl;
 
         // Assign random colours to each cluster
+        start = chrono::high_resolution_clock::now();
         data_visualization visualizer;
         vector<Scalar> colours = visualizer.generate_random_colours(clusters.size());
         for(int i = 0; i < clusters.size(); i++){
@@ -822,6 +848,9 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
                 clusters[i].keypoints.at(j).colour = colours[i];
             }
         }
+        stop = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(stop-start);
+        cout << "Time to assign color = " << duration.count() << endl;
 
     }
     catch(const exception& error){
@@ -834,7 +863,7 @@ vector<cluster> feature_analyzer::Jenks_Natural_Breaks_Clustering(vector<keypoin
 }
 
 
-// -- Recurrence algorithm for partioning a vector
+// -- Recurrence algorithm for partioning a vector (Fix storage issues)
 void feature_analyzer::partition_vector(vector<keypoint_data> data, int index, int subset_count, int subset_num, vector<vector<keypoint_data>>& subsets, vector<vector<vector<keypoint_data>>>& results){
     if(index >= data.size()){ // index bigger than size so we should return
         // Visualization
@@ -844,9 +873,31 @@ void feature_analyzer::partition_vector(vector<keypoint_data> data, int index, i
                 vector<keypoint_data> current_subset;
                 //cout << "{ ";
                 for(int y = 0; y < subsets[x].size();y++){
+                    // Count elements in other subsets smaller than this element
+                    for(int x_other = x+1; x_other < subsets.size(); x_other++){
+                        int smaller_elements = count_if(subsets[x_other].begin(), subsets[x_other].end(), [&](keypoint_data data_point){return data_point.velocity < subsets[x][y].velocity;});
+                        // Stop if not ascending
+                        if(smaller_elements > 0){
+                            //cout << "not ascending" << endl;
+                            return;
+                        }
+                    }
+
                     //cout << subsets[x][y].velocity;
                     current_subset.push_back(subsets[x][y]);
-
+//                    if(y == subsets[x].size()-1){
+//                        cout << " ";
+//                    }
+//                    else{
+//                        cout << ", ";
+//                    }
+                }
+//                if(x == subsets.size()-1){
+//                    cout << "}";
+//                }
+//                else{
+//                    cout << "}, ";
+//                }
                 current_combination.push_back(current_subset);
             }
             results.push_back(current_combination);
@@ -854,8 +905,18 @@ void feature_analyzer::partition_vector(vector<keypoint_data> data, int index, i
         }
         return;
     }
+
+
     // Else continue going down
     for(int i = 0; i < subset_count; i++){
+        // Stop if something does not align
+//        if(subsets[i].size() > 0){
+//            cout << subsets[i].end()->velocity << " > " << data[index].velocity << endl;
+//            if(subsets[i].end()->velocity > data[index].velocity){
+//                return;
+//            }
+//        }
+
         if(subsets[i].size() > 0){ // if there is already something in the subset, push data to it
             subsets[i].push_back(data[index]);
 
@@ -879,297 +940,145 @@ void feature_analyzer::partition_vector(vector<keypoint_data> data, int index, i
     }
 }
 
+// -- Algorithm that filters keypoints based on angle --
+vector<keypoint_data> feature_analyzer::angle_filter(vector<keypoint_data> keypoints){
+    // Initialize output
+    vector<keypoint_data> result_data = keypoints;
+    try{
+        // For each keypoint calcualte angle of line from last to current coordinate
+        vector<float> angles;
+        for(int i = 0; i < keypoints.size(); i++){
+            if(keypoints[i].positions.size() < 2){
+                throw runtime_error("Not enough positions to calculate angle");
+            }
+            Point2f last_point = keypoints[i].positions.at(0); // keypoints[i].positions.size()-2
+            Point2f current_point = keypoints[i].positions.at(keypoints[i].positions.size()-1);
+
+            float angle = calculate_angle(last_point,current_point); // Upward line -> negative angle. Downward line -> positive angle.
+            angles.push_back(angle);
+        }
+
+        // sort angles from smallest to biggest
+        vector<float> angles_temp = angles;
+        sort(angles_temp.begin(), angles_temp.end());
+
+        // Find median and split vector
+        //float median = 0;
+        int median_index = 0;
+
+        vector<float> lower_quantile;
+        vector<float> upper_quantile;
+
+        if(angles_temp.size()%2 == 0){
+            // Even so take mean of two middle values
+            median_index = angles_temp.size()/2;
+            //median = (angles_temp[median_index]+angles_temp[median_index+1])/2;
+            lower_quantile.insert(lower_quantile.begin(), angles_temp.begin(), angles_temp.begin()+median_index);
+            upper_quantile.insert(upper_quantile.begin(), angles_temp.begin()+median_index, angles_temp.end());
+        }
+        else{
+            median_index = angles_temp.size()/2; // uneven so take middle index
+            //median = angles_temp[median_index];
+
+            lower_quantile.insert(lower_quantile.begin(), angles_temp.begin(), angles_temp.begin()+median_index);
+            upper_quantile.insert(upper_quantile.begin(), angles_temp.begin()+median_index+1, angles_temp.end());
+        }
+
+        // Determine quantiles
+        float lower_median = 0;
+        float upper_median = 0;
+        if(lower_quantile.size()%2 == 0){
+            median_index = lower_quantile.size()/2;
+            lower_median = (lower_quantile[median_index]+lower_quantile[median_index+1])/2;
+            upper_median = (upper_quantile[median_index]+upper_quantile[median_index+1])/2;
+        }
+        else{
+            median_index = lower_quantile.size()/2; // uneven so take middle index
+            lower_median = lower_quantile[median_index];
+            upper_median = upper_quantile[median_index];
+        }
+
+        // Calculate IQR
+        float IQR = upper_median-lower_median;
+
+        // Remove outliers
+        vector<int> index_status;
+        for(int i = 0; i < angles.size(); i++){
+            if(angles[i] < lower_median-IQR*IQR_outlier_range || angles[i] > upper_median+IQR*IQR_outlier_range){
+                index_status.push_back(0);
+            }
+            else{
+                index_status.push_back(1);
+            }
+        }
+
+        // Calculate average angle
+        float sum = 0;
+        for(int i = 0; i < angles.size(); i++){
+            if(index_status[i] == 1){
+                sum += angles[i];
+            }
+        }
+        float average_angle = sum/count(index_status.begin(),index_status.end(),1);
 
 
+        // Keep only points that Close to kept average
+        for(int i = 0; i < angles.size(); i++){
+            if(index_status[i] == 1 && (angles[i] < average_angle*(1-angle_outliers) || angles[i] > average_angle*(1+angle_outliers))){
+                index_status[i] = 0;
+            }
+        }
 
-//// -- velocity sorter --
-//bool feature_analyzer::velocity_sorter(const keypoint_data &last, const keypoint_data &next){
-//    return last.velocity < next.velocity;
-//}
-
-//// -- Update cluster means --
-//vector<vector<float>> feature_analyzer::update_centers(vector<vector<keypoint_data>> clusters, int setting){
-//    vector<vector<float>> centers;
-//    try{
-//        // Go through each cluster
-//        for(int i = 0; i < clusters.size(); i++){
-//            vector<float> new_center;
-
-//            // For each keypoint determine sum of all chosen variables
-//            for(int j = 0; j < clusters[i].size(); j++){
-
-//                if(setting == VELOCITY_AND_POS || setting == POSITION){
-//                    if(new_center.size() == 0){
-//                        new_center.push_back(clusters[i].at(j).point.x);
-//                        new_center.push_back(clusters[i].at(j).point.y);
-//                    }
-//                    else{
-//                        new_center[0] += clusters[i].at(j).point.x;
-//                        new_center[1] += clusters[i].at(j).point.y;
-//                    }
-//                }
-
-//                else if(setting == VELOCITY){
-//                    if(new_center.size() == 0){
-//                        new_center.push_back(clusters[i].at(j).velocity);
-//                    }
-//                    else{
-//                        new_center[0] += clusters[i].at(j).velocity;
-//                    }
-
-//                }
-
-//                if(setting == VELOCITY_AND_POS){
-//                    if(new_center.size() < 3){
-//                        new_center.push_back(clusters[i].at(j).velocity);
-//                    }
-//                    else{
-//                        new_center[2] += clusters[i].at(j).velocity;
-//                    }
-//                }
-
-//            }
-//            // Find center (mean)
-//            for(int j = 0; j < new_center.size(); j++){
-
-//            }
-//            new_center = new_center/clusters[i].size();
-//            centers[i] = new_center;
-//        }
-
-//    }
-//    catch(const exception& error){
-//        cout << "Error: " << error.what() << endl;
-//    }
-//    return centers;
-//}
+        // Prepare output
+        vector<keypoint_data> temp;
+        for(int i = 0; i < keypoints.size(); i++){
+            if(index_status[i] == 1){
+                temp.push_back(keypoints[i]);
+            }
+        }
+        result_data = temp;
+        cout << "remaining: " << result_data.size() << endl;
 
 
-
-//// -- Method that finds index of closest value
-//int feature_analyzer::find_closest_cluster(std::vector<float> values, std::vector<float> centers){
-//    int index = 0;
-//    try{
-//    }
-//    catch(const exception& error){
-//        cout << "Error: " << error.what() << endl;
-//    }
-//    return index;
-//}
-
-
-
-
-//optical_flow_results feature_analyzer::optical_flow(feature_frame_data last_frame, Mat frame){
-
-//    // Initialize status and error vectors
-//    vector<uchar> status; // 1 = feature found, 0 = feature not found
-//    vector<float> error; // error value for each feature
-
-//    feature_finder finder;
-
-//    // Convert frames to grayscale
-//    Mat grayscaled_last_frame = finder.apply_grayscale(last_frame.frame.frame);
-//    Mat grayscaled_frame = finder.apply_grayscale(frame);
-
-//    // Convert keypoints to 2D points
-//    vector<Point2f> points_old, points_new;
-
-//    for(int i = 0; i < last_frame.features.size(); i++){
-//        Point2f point = last_frame.features[i].pt;
-//        points_old.push_back(point);
-//    }
-
-//    // Initialize settings
-//    Size window_size = Size(15,15); // search window at each level
-//    int max_pyramid_layers = 2; // 2 -> 3 layers max, since 1 -> 2 layers and 0 -> 1 layers = no pyramid
-//    TermCriteria termination_criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);  //  count is the maximum number of iterations while eps is epsilon is a limit for how little the window is allowed to be moved before stopping the proecess
-
-//    // Determine Lucas-Kanade optical flow
-//    cout << "Points before optical flow: " << points_old.size() << endl;
-//    calcOpticalFlowPyrLK(grayscaled_last_frame, grayscaled_frame, points_old, points_new, status, error, window_size, max_pyramid_layers, termination_criteria);
-//    cout << "Points after optical flow: " << points_new.size() << endl;
-
-//    // Clean keypoints based on status
-//    vector<Point2f> cleaned_points;
-
-//    for(int i = 0; i < points_old.size(); i++){
-//        if(status[i] == 1){
-//            cleaned_points.push_back(points_new[i]);
-//        }
-//    }
-//    optical_flow_results results;
-//    results.cleaned_points = cleaned_points;
-//    results.points = points_new;
-//    results.error = error;
-//    results.status = status;
-
-//    return results;
-//}
-
-//vector<float> feature_analyzer::determine_velocities(vector<optical_flow_results> frame_results,  float fps){
-//    // Determine time passed
-//    int frames = frame_results.size();
-//    float time = frames/fps;
-
-//    // Determine distance for all valid points
-//    vector<float> distances;
-//    //vector<Point2f> first_frame_points = frame_results[0].points;
-//    //vector<Point2f> last_frame_points = frame_results[frames-1].points;´
-//    for(int i = 0; i < frame_results.size()-1; i++){
-//        optical_flow_results frame = frame_results[i];
-//        optical_flow_results next_frame = frame_results[i+1];
-//        for(int j = 0; j < frame.points.size(); j++){
-//            float distance = 0;
-//            if(next_frame.status[j] == 1){
-//                float x_diff = next_frame.points[j].x - frame.points[j].x;
-//                float y_diff = next_frame.points[j].y - frame.points[j].y;
-//                distance = sqrt(pow(x_diff,2)+pow(y_diff,2));
-//            }
-//            if(i == 0){
-//                distances.push_back(distance);
+//        // Test visualization
+//        for(int i = 0; i < keypoints.size(); i++){
+//            Point2f last_point = keypoints[i].positions.at(0); // keypoints[i].positions.size()-2
+//            Point2f current_point = keypoints[i].positions.at(keypoints[i].positions.size()-1);
+//            if(index_status[i] == 0){
+//                arrowedLine(frame,last_point,current_point,Scalar(0,0,255),2);
 //            }
 //            else{
-//                distances[j] += distance;
+//                arrowedLine(frame,last_point,current_point,Scalar(0,255,0),2);
 //            }
+//            //circle(frame,current_point,2,Scalar(0,255,0),-1);
+//            //string angle_text = to_string(angles[i]);
+//            //putText(frame,angle_text,current_point,FONT_HERSHEY_SCRIPT_COMPLEX,1.0,Scalar(0,0,255),1,LINE_AA);
 //        }
-//    }
+//        imshow("test", frame);
+//        waitKey(0);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return result_data;
+}
 
-//    // Determine velocities
-//    vector<float> velocities;
-//    for(int i = 0; i < distances.size(); i++){
-//        velocities.push_back(distances[i]/time);
-//    }
+// -- Method that calculates angle of line between two points and the x-axis --
+float feature_analyzer::calculate_angle(Point2f last_point, Point2f current_point){
+    float thetha = ANGLE_ERROR;
+    try{
+        // Calculate coordinate differences
+        float x_diff = current_point.x - last_point.x;
+        float y_diff = current_point.y - last_point.y;
 
-//    return velocities;
-//}
+        // Calculate line gradient
+        float a = y_diff/x_diff;
 
-//vector<vector<Point2f>> feature_analyzer::group_velocities(vector<float> velocities, vector<optical_flow_results> frames){
-    // Decide on method for grouping
-
-//}
-
-//vector<KeyPoint> feature_analyzer::points_to_keypoints(vector<Point2f> points){
-//    vector<KeyPoint> result;
-//    for(int i = 0; i < points.size(); i++){
-//        KeyPoint keypoint = KeyPoint(points[i].x,points[i].y,1);
-//        result.push_back(keypoint);
-//    }
-//    return result;
-//}
-
-//vector<Point2f> feature_analyzer::keypoints_to_points(vector<KeyPoint> keypoints){
-//    vector<Point2f> result;
-//    for(int i = 0; i < keypoints.size(); i++){
-//        Point2f point = keypoints[i].pt;
-//        result.push_back(point);
-//    }
-//    return result;
-//}
-
-
-//vector<vector<keypoint_data>> feature_analyzer::k_mean_cluster_keypoints_vel(vector<keypoint_data> keypoints, int initial_cluster_count, bool allow_more_clusters){
-//    vector<vector<keypoint_data>> clusters;
-//    try{
-//        // Initialize centers and indexes for initial center creation
-//        vector<float> centers;
-//        vector<int> indexes;
-//        RNG random;
-
-//        // Choose random starting centers
-//        for(int i = 0; i < initial_cluster_count; i++){
-//            int index = random.uniform(0, keypoints.size());
-//            if(count(indexes.begin(), indexes.end(), index) == 0){
-//                indexes.push_back(index);
-//                centers.push_back(keypoints[index].velocity);
-//                vector<keypoint_data> cluster;
-//                cluster.push_back(keypoints[index]);
-//                clusters.push_back(cluster);
-//            }
-//        }
-
-//        // Initialize variable that keeps track of changes in clusters
-//        bool changes = false;
-
-//        // Assign clusters until all keypoints at at the closest cluster
-//        while(true){
-//            // Go through all keypoints and assign calcualte closest distance.
-//            for(int i = 0; i < keypoints.size(); i++){
-//                // Calculate euclidean distance to each cluster center (Just difference since 1D)
-//                vector<float> distances;
-//                for(int j = 0; j < centers.size(); j++){
-//                    vector<float> values = {keypoints[i].velocity};
-//                    vector<float> compares = {centers[j]};
-//                    float distance = calc_euclidean(values,compares);
-//                    distances.push_back(distance);
-//                }
-//                // Find closest cluster
-//                auto closest_cluster = min_element(distances.begin(), distances.end());
-//                int min_index = closest_cluster - distances.begin();
-
-//                // If clusters can be added, check for max distance
-//                if(distances[min_index] > max_allowed_distance & allow_more_clusters == true){
-//                    // Create new cluster
-//                    vector<keypoint_data> new_cluster;
-//                    new_cluster.push_back(keypoints[i]);
-//                    changes = true;
-//                    // Assign its center
-//                    centers.push_back(keypoints[i].velocity);
-//                    clusters.push_back(new_cluster);
-//                }
-//                else{
-//                    // Check all cluster for keypoint
-//                    for(int j = 0; j < clusters.size(); j++){
-//                        // Remove if not correct index
-//                        int id = keypoints[i].id;
-//                        if(count_if(clusters[j].begin(),clusters[j].end(),[&id](const keypoint_data& data_point) { return data_point.id == id;}) > 0 & j !=min_index){
-//                            // Determine index
-//                            auto iterator = find_if(clusters[j].begin(), clusters[j].end(), [&id](const keypoint_data& data_point) { return data_point.id == id;});
-//                            int index = iterator-clusters[j].begin();
-//                            // Remove datapoint
-//                            clusters[j].erase(clusters[j].begin() + index);
-
-//                            changes = true;
-//                        }
-//                        // Add if not in correct index
-//                        if(count_if(clusters[j].begin(),clusters[j].end(),[&id](const keypoint_data& data_point) { return data_point.id == id;}) == 0 & j == min_index){
-//                            clusters[j].push_back(keypoints[i]);
-//                            changes = true;
-//                        }
-//                    }
-//                }
-//            }
-
-//            // Break if nothing was changed
-//            if(changes == false){
-//                // Assign random colours to each cluster
-//                data_visualization visualizer;
-//                vector<Scalar> colours = visualizer.generate_random_colours(clusters.size());
-//                for(int i = 0; i < clusters.size(); i++){
-//                    for(int j = 0; j < clusters[i].size(); j++){
-//                        clusters[i].at(j).colour = colours[i];
-//                    }
-//                }
-//                break;
-//            }
-//            else{
-//                changes = false;
-//                // Update centers
-//                for(int i = 0; i < clusters.size(); i++){
-//                    float new_center = 0;
-//                    for(int j = 0; j < clusters[i].size(); j++){
-//                        // sum up all velocities
-//                        new_center += clusters[i].at(j).velocity;
-//                    }
-//                    // Find center (average velocity)
-//                    new_center = new_center/clusters[i].size();
-//                    centers[i] = new_center;
-//                }
-//            }
-//        }
-//    }
-//    catch(const exception& error){
-//        cout << "Error: " << error.what() << endl;
-//    }
-//    return clusters;
-//}
+        // Calculate angle between line and x-axis (positive)
+        thetha = atan(a)*180/M_PI;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return thetha;
+}

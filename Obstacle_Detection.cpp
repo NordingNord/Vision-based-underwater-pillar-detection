@@ -21,7 +21,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
 
         feature_analyzer analyzer; // Initialize feature analyzer
 
-        //data_visualization visualizer; // Initialize visualizer
+        data_visualization visualizer; // Initialize visualizer
 
         //-- Get frame data --//
         Mat frame = cam_handler.get_frame();
@@ -32,9 +32,9 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
         int fps = cam_handler.get_fps(); // Get video FPS
 
         //-- Filming settings --//
-        //string titel = recording_name + ".avi"; // Create recording title
+        string titel = recording_name + ".avi"; // Create recording title
 
-        //VideoWriter video_writer(titel,CV_FOURCC('M','J','P','G'),10, Size(width,height)); // Creates video writer
+        VideoWriter video_writer(titel,CV_FOURCC('M','J','P','G'),10, Size(width,height)); // Creates video writer
 
         // Initialize loop variables
         bool find_features = true;
@@ -43,6 +43,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
         Mat last_frame;
 
         int test_int = 0;
+        int data_handle_count_test = 0;
 
         int gap_tracker = 0; // Value that keeps track of frames since last data update
 
@@ -50,6 +51,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
         while(true){
             cout << "New frame: " << test_int << endl;
             test_int++;
+            data_handle_count_test++;
             // Check if data should be worked with
             if(gap_tracker == 0){
                 cout << "Updating data" << endl;
@@ -79,7 +81,6 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                         find_features = false;
                     }
                     else{
-                        //cout << "Lacking keypoints. Using next frame for keypoint detection" << endl;
                         if(record == true){
                             video_writer.write(frame);
                         }
@@ -87,14 +88,12 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                 }
                 // Else statement since two frames are needed for optical flow
                 else{
-                    //cout << "Performing optical flow" << endl;
                     // Perform optical flow
                     optical_flow_results flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_features), last_frame, frame);
 
                     // Fix keypoint data
                     current_data = analyzer.remove_invalid_data(current_data,flow_results);
 
-                    //cout << "Determining distances" << endl;
                     // Update distance traveled and points (currently double work since also done when determining velocity)
                     for(int i = 0; i < current_data.size(); i++){
                         current_data[i].distance += analyzer.determine_distance(current_data[i].point, flow_results.cleaned_points[i]);
@@ -113,6 +112,12 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                         }
 
                         current_data[i].velocity = analyzer.determine_velocity(velocity_positions, fps, gap_tracker+1);
+                    }
+
+                    // Filter results using angles
+                    if(data_handle_count_test >= 10){
+                        vector<keypoint_data> filter_results = analyzer.angle_filter(current_data);
+                        data_handle_count_test = 0;
                     }
 
                     // Perform clustering based on setting
@@ -148,7 +153,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                     }
 
                     // Test Jenks natural breaks
-                    //clusters = analyzer.Jenks_Natural_Breaks_Clustering(current_data,3);
+                    clusters = analyzer.Jenks_Natural_Breaks_Clustering(current_data,3);
 
                     // If clusters found colour keypoints
                     if(new_cluster == true){
@@ -195,10 +200,9 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                             final_frame = visualizer.mark_velocity(current_data,final_frame);
                         }
                         // Write frame
+                        imshow("data", final_frame);
+                        waitKey(0);
                         video_writer.write(final_frame);
-                        //cout << "Recorded frame" << endl;
-    //                    imshow("frame clustered", final_frame);
-    //                    waitKey(0);
                     }
 
                     // Update features
@@ -214,7 +218,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                 }
             }
             gap_tracker++;
-            if(gap_tracker == frame_gap){
+            if(gap_tracker >= frame_gap){
                 gap_tracker = 0;
             }
             //cout << "Updating frame" << endl;
@@ -233,5 +237,109 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
     }
     catch(const exception& error){
         cout << "Error: Could not finish optical flow on video feed" << endl;
+    }
+}
+
+
+// -- The complete obstacle detection pipeline using optical flow (No video creation)
+void obstacle_detection::detect_obstacles_video(string video_path, int feature_type, int frame_gap,int cluster_setting){
+    try{
+        // Initialize objects from needed classes
+        camera_handler cam_handler(video_path); // Prepares the video
+        feature_finder finder(feature_type); // Initializes feature finder with desired setting
+        feature_analyzer analyzer; // Initialize feature analyzer
+        data_visualization visualizer; // Initialize visualizer
+
+        // Get video relevant data
+        Mat frame = cam_handler.get_frame(); // This gets us the first video frame
+        Size frame_size = frame.size();
+
+        int width = frame_size.width; // Get width data
+        int height = frame_size.height; // Get height data
+        int fps = cam_handler.get_fps(); // Get video FPS
+
+        // Initilaize loop variables
+        bool find_features = true; // Variable that keeps track of when new features should be found
+        vector<KeyPoint> current_features;
+        vector<keypoint_data> current_data;
+        Mat last_frame;
+        int gap_tracker = 0; // Value that keeps track of frames since last data update
+
+        // Go through every frame in video
+        while(true){
+            // Only do anything when gap is zero
+            if(gap_tracker == 0){
+                // Find features if there is a lack thereof
+                if(find_features == true){
+                    // Find features based on method
+                    if(feature_type == METHOD_UNIFORM){
+                        current_features = finder.make_uniform_keypoints(frame); // Make uniform keypoints using base values
+                    }
+                    else{
+                        current_features = finder.find_features(frame); // Find features using initialized detector
+                    }
+
+                    // Only continue if more than min keypoints
+                    if(current_features.size() >= min_points){
+                        // Prepare keypoint data
+                        current_data = analyzer.convert_to_data(current_features);
+                        find_features = false;
+                    }
+                }
+
+                // Else since we need two frames do compare features
+                else{
+                    // Perform optical flow
+                    optical_flow_results flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_features), last_frame, frame);
+
+                    // Remove keypoints that show bad optical flow results
+                    current_data = analyzer.remove_invalid_data(current_data,flow_results);
+
+                    // Update distance traveled since last frame
+                    for(int i = 0; i < current_data.size(); i++){
+                        current_data[i].distance = analyzer.determine_distance(current_data[i].point, flow_results.cleaned_points[i]);
+                        current_data[i].point = flow_results.cleaned_points[i];
+                        current_data[i].positions.push_back(flow_results.cleaned_points[i]);
+                        // Keep only last two elements if more than two positions present
+                        if(current_data[i].positions.size() > 2){
+
+
+                        }
+                    }
+
+                    // Calculate velocities
+                    for(int i = 0; i < current_data.size(); i++){
+                        vector<Point2f> velocity_positions = current_data[i].positions;
+                         // Take newest data points if many are present
+                        if(current_data[i].positions.size() > max_velocity_positions){
+                            vector<Point2f> temp(current_data[i].positions.end()-max_velocity_positions,current_data[i].positions.end());
+                            velocity_positions = temp;
+                        }
+
+                        current_data[i].velocity = analyzer.determine_velocity(velocity_positions, fps, gap_tracker+1);
+                    }
+
+
+                }
+
+            }
+            // Update gap tracker
+            gap_tracker++;
+            if(gap_tracker == frame_gap){
+                gap_tracker = 0;
+            }
+            // Update frames
+            last_frame = frame;
+            frame = cam_handler.get_frame();
+
+            // Break if no more frames
+            if(frame.empty()){
+                cout << "Reached end of video stream" << endl;
+                break;
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << error.what() << endl;
     }
 }
