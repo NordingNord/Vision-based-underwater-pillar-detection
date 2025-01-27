@@ -43,6 +43,7 @@ struct keypoint_data{
     cv::Scalar colour;
     int distance;
     float velocity;
+    std::vector<cv::Point2f> estimate_positions;
 
 };
 

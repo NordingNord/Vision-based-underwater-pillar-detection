@@ -23,7 +23,7 @@ int main(){
 
 //    // Testing optical flow //
     obstacle_detection detection;
-    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",2, true, ON_FRAME, "gap_test",0);
+    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_FRAME, "gap_test",0);
 
 //    feature_analyzer test;
 //    vector<keypoint_data> keypoints;
@@ -34,4 +34,17 @@ int main(){
 //        keypoints.push_back(keypoint);
 //    }
 //    test.Jenks_Natural_Breaks_Clustering(keypoints, 2);
+
+    // Test kalman filter
+//    vector<float> x = {1,2,3,4,6};
+//    vector<float> y = {1,1,5,-1,1};
+//    vector<Point2f> results;
+//    feature_analyzer test;
+//    test.init_kalman(4,2,0,0,0);
+//    for(int i = 0; i < x.size(); i++){
+//        Point2f result = test.predict_kalman();
+//        results.push_back(result);
+//        test.correct_kalman(x[i],y[i]);
+//        cout << result.x << ", " << result.y << endl;
+//    }
 }

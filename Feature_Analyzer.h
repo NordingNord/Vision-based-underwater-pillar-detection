@@ -86,6 +86,15 @@ public:
     // -- Method that calculates angle of line between two points and the x-axis --
     float calculate_angle(cv::Point2f last_point, cv::Point2f current_point);
 
+    // -- Method that initializes kalman filter --
+    void init_kalman(int state_dim, int measurement_dim, int control_params, float start_x, float start_y);
+
+    // -- corection method for kalman filter --
+    cv::Point2f correct_kalman(float x, float y);
+
+    // -- prediction method for kalman filter --
+    cv::Point2f predict_kalman();
+
 private:
     // Variables used for optical flow
     cv::Size window_size = cv::Size(15,15); // search window at each level
@@ -100,6 +109,9 @@ private:
 
     // Variables used to further remove outliers in terms of angle
     float angle_outliers = 0.5;
+
+    // Kalman filter object
+    cv::KalmanFilter kalman_filter;
 
 };
 

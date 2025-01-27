@@ -38,7 +38,7 @@ private:
     int min_points = 5;
 
     // -- Maximum number of positions used for velocity calculations
-    int max_velocity_positions = 2;
+    int max_velocity_positions = 5;
 };
 
 #endif // OBSTACLE_DETECTION_H

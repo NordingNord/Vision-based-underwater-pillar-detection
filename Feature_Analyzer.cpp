@@ -1082,3 +1082,68 @@ float feature_analyzer::calculate_angle(Point2f last_point, Point2f current_poin
     }
     return thetha;
 }
+
+// -- Method that initializes kalman filter --
+void feature_analyzer::init_kalman(int state_dim, int measurement_dim, int control_params, float start_x, float start_y){
+    try{
+        // Initialize object
+        kalman_filter = KalmanFilter(state_dim,measurement_dim,control_params);
+
+        // Initialize states
+        kalman_filter.statePre = (Mat_<float>(4,1) << start_x,start_y,0,0);
+        kalman_filter.statePost = (Mat_<float>(4,1) << start_x,start_y,0,0);
+
+        // Initialize transision matrix
+        kalman_filter.transitionMatrix = (Mat_<float>(4,4) << 1,0,1,0, 0,1,0,1, 0,0,1,0, 0,0,0,1);
+
+        // Initialize process noise covariance
+        setIdentity(kalman_filter.processNoiseCov,Scalar::all(1e-4));// = (Mat_<float>(4,4) << 0.3f,0,0,0, 0,0.3f,0,0, 0,0,0,0.3f, 0,0,0,0.3f);
+
+        // Initialize measurements matrix
+        setIdentity(kalman_filter.measurementMatrix);// = (Mat_<float>(2,4) << 1,0,0,0, 0,1,0,0);
+
+        // Initialize measurement noise covariance
+        setIdentity(kalman_filter.measurementNoiseCov, Scalar::all(1e-1));// = Mat::eye(2,2,CV_32F);
+
+        // Initialize error covariance
+        setIdentity(kalman_filter.errorCovPost,Scalar::all(.1));
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+// -- corection method for kalman filter --
+Point2f feature_analyzer::correct_kalman(float x, float y){
+    Point2f point;
+    try{
+        // convert values to mat
+        Mat data_point = (Mat_<float>(2,1) << x,y);
+        // Run correct
+        Mat estimate = kalman_filter.correct(data_point);
+        // Convert to point
+        point.x = estimate.at<float>(0);
+        point.y = estimate.at<float>(1);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return point;
+}
+
+// -- prediction method for kalman filter --
+cv::Point2f feature_analyzer::predict_kalman(){
+    Point2f point;
+    try{
+        // Get prediction
+        Mat prediction = kalman_filter.predict();
+
+        // Convert to point
+        point.x = prediction.at<float>(0);
+        point.y = prediction.at<float>(1);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return point;
+}

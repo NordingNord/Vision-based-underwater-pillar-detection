@@ -23,6 +23,9 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
 
         data_visualization visualizer; // Initialize visualizer
 
+        //-- Initialize vector of kalman filters --
+        vector<feature_analyzer> kalman_filters;
+
         //-- Get frame data --//
         Mat frame = cam_handler.get_frame();
         Size frame_size = frame.size();
@@ -41,6 +44,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
         vector<KeyPoint> current_features;
         vector<keypoint_data> current_data;
         Mat last_frame;
+        vector<vector<Point2f>> kalman_paths;
 
         int test_int = 0;
         int data_handle_count_test = 0;
@@ -57,6 +61,8 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                 cout << "Updating data" << endl;
                 // Find features if begining of video or most features are lost
                 if(find_features == true){
+                    // Prepare kalman filter creation
+                    vector<feature_analyzer> kalman_filters_temp;
                     if(feature_type == METHOD_UNIFORM){
                         cout << "Uniform features are found" << endl;
                         current_features = finder.make_uniform_keypoints(frame); // Make uniform keypoints using base values
@@ -79,6 +85,16 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                             video_writer.write(circle_frame);
                         }
                         find_features = false;
+                        // Assign a kalman filter to each point
+                        for(int i = 0; i < current_data.size(); i++){
+                            current_data[i].estimate_positions.push_back(current_data[i].point);
+                            feature_analyzer analyzer_kalman;
+                            analyzer_kalman.init_kalman(4,2,0,current_data[i].point.x,current_data[i].point.y);
+                            kalman_filters_temp.push_back(analyzer_kalman);
+                            vector<Point2f> temp_path = {current_data[i].point};
+                            kalman_paths.push_back(temp_path);
+                        }
+                        kalman_filters = kalman_filters_temp;
                     }
                     else{
                         if(record == true){
@@ -88,30 +104,110 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                 }
                 // Else statement since two frames are needed for optical flow
                 else{
+
+                    // Test dense optical flow
+//                    Mat last_gray, gray;
+//                    cvtColor(last_frame, last_gray, COLOR_BGR2GRAY);
+//                    cvtColor(frame, gray, COLOR_BGR2GRAY);
+//                    Mat flow(last_gray.size(),CV_32FC2);
+//                    calcOpticalFlowFarneback(last_gray,gray,flow,0.5,3,15,3,5,1.2,0);
+//                    cout << "Made it past doom" << endl;
+//                    Mat flow_parts[2];
+//                    split(flow,flow_parts);
+//                    Mat magnitude, angle, magn_norm;
+//                    cout << "Time to polar" << endl;
+//                    cartToPolar(flow_parts[0],flow_parts[1],magnitude,angle,true);
+//                    cout << "Time to normalize" << endl;
+//                    normalize(magnitude, magn_norm, 0.0f, 1.0f, NORM_MINMAX);
+//                    angle *= ((1.f / 360.f) * (180.f / 255.f));
+//                    cout << "I guess i am here" << endl;
+//                    Mat _hsv[3],hsv,hsv8,bgr;
+//                    _hsv[0] = angle;
+//                    _hsv[1] = Mat::ones(angle.size(),CV_32F);
+//                    _hsv[2] = magn_norm;
+//                    merge(_hsv,3,hsv);
+//                    hsv.convertTo(hsv8,CV_8U,255.0);
+//                    cvtColor(hsv8,bgr,COLOR_HSV2BGR);
+//                    cout << "done?" << endl;
+
+//                    imshow("frame2", bgr);
+//                    waitKey(0);
+
+                    // Analyse frequency spectrum for fun
+
+
+
+
                     // Perform optical flow
                     optical_flow_results flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_features), last_frame, frame);
 
                     // Fix keypoint data
                     current_data = analyzer.remove_invalid_data(current_data,flow_results);
 
+                    // Kalman prediction values
+                    vector<Point2f> kalman_predictions;
+
+                    // Kalman estimates
+                    vector<Point2f> kalman_estimates;
+
                     // Update distance traveled and points (currently double work since also done when determining velocity)
                     for(int i = 0; i < current_data.size(); i++){
                         current_data[i].distance += analyzer.determine_distance(current_data[i].point, flow_results.cleaned_points[i]);
                         current_data[i].point = flow_results.cleaned_points[i];
                         current_data[i].positions.push_back(flow_results.cleaned_points[i]);
+
+                        // estimate positions using kalman filters
+                        Point2f prediction = kalman_filters[current_data[i].id].predict_kalman();
+                        kalman_predictions.push_back(prediction);
+
+                        // correct kalman filters
+                        Point2f estimate = kalman_filters[current_data[i].id].correct_kalman(current_data[i].point.x,current_data[i].point.y);
+                        current_data[i].estimate_positions.push_back(estimate);
+                        kalman_estimates.push_back(estimate);
+
+//                        cout << "Point compared to kalman:" << endl;
+//                        cout << current_data[i].point.x << ", " << current_data[i].point.y << endl;
+//                        cout << estimate.x << ", " << estimate.y << endl;
+
+
+//                        // Update kalman paths
+//                        kalman_paths[current_data[i].id].push_back(prediction);
                     }
 
                     //cout << "Determining velocities" << endl;
                     // Update velocities
                     for(int i = 0; i < current_data.size(); i++){
-                        vector<Point2f> velocity_positions = current_data[i].positions;
+                        //vector<Point2f> velocity_positions = current_data[i].positions;
+                        vector<Point2f> velocity_positions = current_data[i].estimate_positions;
                          // Take newest data points if many are present
-                        if(current_data[i].positions.size() > max_velocity_positions){
-                            vector<Point2f> temp(current_data[i].positions.end()-max_velocity_positions,current_data[i].positions.end());
+//                        if(current_data[i].positions.size() > max_velocity_positions){
+//                            vector<Point2f> temp(current_data[i].positions.end()-max_velocity_positions,current_data[i].positions.end());
+//                            velocity_positions = temp;
+//                        }
+                        if(current_data[i].estimate_positions.size() > max_velocity_positions){
+                            vector<Point2f> temp(current_data[i].estimate_positions.end()-max_velocity_positions,current_data[i].estimate_positions.end());
                             velocity_positions = temp;
                         }
+                        cout << "Point path: " << endl;
+                        for(int j = 0; j < velocity_positions.size(); j++){
+                            cout << velocity_positions[j].x << ", " << velocity_positions[j].y << endl;
+                        }
+                        current_data[i].velocity = analyzer.determine_velocity(velocity_positions, fps, gap_tracker+velocity_positions.size());
+                        cout << "Resulting velocity: " << current_data[i].velocity << endl;
+                        cout << gap_tracker+velocity_positions.size() << endl;
+                    }
 
-                        current_data[i].velocity = analyzer.determine_velocity(velocity_positions, fps, gap_tracker+1);
+                    // For fun change velocity to average distance traveled
+                    for(int i = 0; i < current_data.size(); i++){
+                        float sum = 0;
+                        for(int j = 1; j < current_data[i].positions.size(); j++){
+                            float x_diff = current_data[i].positions[j-1].x - current_data[i].positions[j].x;
+                            float y_diff = current_data[i].positions[j-1].y - current_data[i].positions[j].y;
+                            sum += sqrt(pow(x_diff,2)+pow(y_diff,2));
+                        }
+                        cout << "Sum: " << sum << endl;
+                        cout << "Number of entries: " << current_data[i].positions.size() << endl;
+                        current_data[i].velocity = sum/current_data[i].positions.size();
                     }
 
                     // Filter results using angles
@@ -152,9 +248,8 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                         }
                     }
 
-                    // Test Jenks natural breaks
-                    clusters = analyzer.Jenks_Natural_Breaks_Clustering(current_data,3);
-
+                    // Test Jenks natural breaks (Requires to much memory)
+                    //clusters = analyzer.Jenks_Natural_Breaks_Clustering(current_data,3);
                     // If clusters found colour keypoints
                     if(new_cluster == true){
                         for(int i = 0; i < current_data.size(); i++){
@@ -199,6 +294,16 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                             // Add velocity text
                             final_frame = visualizer.mark_velocity(current_data,final_frame);
                         }
+                        // Mark kalman results
+//                        for(int i = 0; i < kalman_predictions.size(); i++){
+//                            circle(final_frame,kalman_predictions[i],2,(0,0,0),-1);
+//                        }
+//                        // Draw kalman paths
+//                        for(int i = 1; i < kalman_paths[current_data[0].id].size(); i++){
+//                            for(int j = 0; j < current_data.size(); j++){
+//                                line(final_frame,kalman_paths[current_data[j].id].at(i-1),kalman_paths[current_data[j].id].at(i),(0,0,0),2);
+//                            }
+//                        }
                         // Write frame
                         imshow("data", final_frame);
                         waitKey(0);
