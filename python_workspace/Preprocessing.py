@@ -159,24 +159,49 @@ class preprocessing:
 
         # Get subband coefficients (all two-dimensional arrays)
         LL = wavelet_coefficients[0]
-        print(LL.size)
+        #print(LL.shape)
         subbands_in_layer = []
         for level in range(levels):
-            subbands = [wavelet_coefficients[-(level+1)][0], wavelet_coefficients[-(level+1)][1], wavelet_coefficients[-(level+1)][2]]
+            subbands = [wavelet_coefficients[-(level+1)][0], wavelet_coefficients[-(level+1)][1], wavelet_coefficients[-(level+1)][2]] # Reverse than wavelet coefficients in terms of layer
             subbands_in_layer.append(subbands)
-            print(wavelet_coefficients[-(level+1)][0].size)
-            print(wavelet_coefficients[-(level+1)][1].size)
-            print(wavelet_coefficients[-(level+1)][2].size)
-
-        #(LH_level_1,HL_level_1,HH_level_1) = wavelet_coefficients[-1]
-        #(LH_level_2,HL_level_2,HH_level_2) = wavelet_coefficients[-2]
-        #subbands_in_layer = [[LH_level_1,HL_level_1,HH_level_1],LH_level_2,HL_level_2,HH_level_2] # [layer][subband]
 
         # Noise variance is estimated using level 1 HH
         # get all values in a list
         flat_HH_level_1 = [value for row in subbands_in_layer[0][2] for value in row]
         # calculate the estimate
         noise_variance = statistics.median(np.abs(flat_HH_level_1))/0.6745
+
+        # print("Original sizes: ")
+        # print("Overall shape: " + str(len(wavelet_coefficients)))
+        # print(len(wavelet_coefficients[0]))
+        # print(len(wavelet_coefficients[1]))
+        # print(" - " + str(wavelet_coefficients[1][0].shape))
+        # print(" - " + str(wavelet_coefficients[1][1].shape))
+        # print(" - " + str(wavelet_coefficients[1][2].shape))
+        # print(len(wavelet_coefficients[2]))
+        # print(" - " + str(wavelet_coefficients[2][0].shape))
+        # print(" - " + str(wavelet_coefficients[2][1].shape))
+        # print(" - " + str(wavelet_coefficients[2][2].shape))
+        # print(len(wavelet_coefficients[3]))
+        # print(" - " + str(wavelet_coefficients[3][0].shape))
+        # print(" - " + str(wavelet_coefficients[3][1].shape))
+        # print(" - " + str(wavelet_coefficients[3][2].shape))
+
+        # print("Sizes during work: ")
+        # print("Overall shape: " + str(4))
+        # print(len(LL))
+        # print(len(subbands_in_layer[2]))
+        # print(" - " + str(subbands_in_layer[2][0].shape))
+        # print(" - " + str(subbands_in_layer[2][1].shape))
+        # print(" - " + str(subbands_in_layer[2][2].shape))
+        # print(len(subbands_in_layer[1]))
+        # print(" - " + str(subbands_in_layer[1][0].shape))
+        # print(" - " + str(subbands_in_layer[1][1].shape))
+        # print(" - " + str(subbands_in_layer[1][2].shape))
+        # print(len(subbands_in_layer[0]))
+        # print(" - " + str(subbands_in_layer[0][0].shape))
+        # print(" - " + str(subbands_in_layer[0][1].shape))
+        # print(" - " + str(subbands_in_layer[0][2].shape))
 
         # Process each subband seperately
         for level in range(levels-1):
@@ -208,26 +233,42 @@ class preprocessing:
                 variance = math.sqrt(max(np.power(signal_variance,2)-np.power(noise_variance,2),0)) # My interpretation of subscript + is bigger than zero
                 # update wavelet
                 parent_correlation = np.sqrt(np.power(y_array,2)+np.power(y_parent_array,2))
+                print(parent_correlation)
                 variance_component = (np.sqrt(3)*np.power(noise_variance,2))/variance
-                numerator = np.max(parent_correlation-variance_component,0)
+                numerator = np.max(parent_correlation-variance_component,0) # ,0 before matlab says np.finfo(1.0).eps, but max only works with integers
                 division = np.divide(numerator,parent_correlation)
                 subbands_in_layer[level][subband] = np.multiply(division,y_array)
                 
         # Time to reconstruct # shape doesnt match for some reason
-        updated_coefficients = [LL] 
-        print(LL.size)
-        for level in range(levels):
-            current_level = (subbands_in_layer[level][0],subbands_in_layer[level][1],subbands_in_layer[level][2])
-            print(subbands_in_layer[level][0].size)
-            print(subbands_in_layer[level][1].size)
-            print(subbands_in_layer[level][2].size)
+        updated_coefficients = [LL]
+        for level in reversed(range(levels)):
+            temp_coefficients_0 = list(wavelet_coefficients[-(level+1)][0])
+            temp_coefficients_0 = subbands_in_layer[level][0]
+            temp_coefficients_1 = list(wavelet_coefficients[-(level+1)][1])
+            temp_coefficients_1 = subbands_in_layer[level][1]
+            temp_coefficients_2 = list(wavelet_coefficients[-(level+1)][2])
+            temp_coefficients_2 = subbands_in_layer[level][2]
+            temp_tuple = tuple((temp_coefficients_0,temp_coefficients_1,temp_coefficients_2))
+            updated_coefficients.append(temp_tuple)
 
-            #for subband in range(len(subbands_in_layer[level])):
-            #    current_level.append(subbands_in_layer[level][subband])
-            updated_coefficients.append(current_level)
+        # print("Sizes final sizes: ")
+        # print("Overall shape: " + str(len(updated_coefficients)))
+        # print(len(updated_coefficients[0]))
+        # print(len(updated_coefficients[1]))
+        # print(" - " + str(updated_coefficients[1][0].shape))
+        # print(" - " + str(updated_coefficients[1][1].shape))
+        # print(" - " + str(updated_coefficients[1][2].shape))
+        # print(len(updated_coefficients[2]))
+        # print(" - " + str(updated_coefficients[2][0].shape))
+        # print(" - " + str(updated_coefficients[2][1].shape))
+        # print(" - " + str(updated_coefficients[2][2].shape))
+        # print(len(updated_coefficients[3]))
+        # print(" - " + str(updated_coefficients[3][0].shape))
+        # print(" - " + str(updated_coefficients[3][1].shape))
+        # print(" - " + str(updated_coefficients[3][2].shape))
 
-
-        denoised_frame = pywt.waverec2(updated_coefficients,'db8',mode='per')
+        denoised_frame = frame.copy()
+        denoised_frame[:,:,0] = pywt.waverec2(updated_coefficients,'db8',mode='per')
         return denoised_frame
 
 
@@ -259,7 +300,7 @@ while(True):
     #resized = cv.resize(extended_frame, (0, 0), fx = 0.2, fy = 0.2)
     #resized_original = cv.resize(frame, (0, 0), fx = 0.2, fy = 0.2)
 
-    cv.imshow("image",resized_original)
+    cv.imshow("image",frame)
 
     cv.imshow("homomorphic image", homomorphic_frame)
     cv.imshow("denoised image", denoised_frame)
