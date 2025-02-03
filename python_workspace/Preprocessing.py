@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import math
 import statistics 
 import cv2 as cv
+import time
 
 ###############################################
 # Pre-processing class                        #
@@ -127,9 +128,17 @@ class preprocessing:
         rows,cols,_ = frame.shape
         exponent_values = np.zeros(fourier_frame.shape, dtype = np.float32)
 
-        for row in range(rows):
-            for col in range(cols):
-                exponent_values[row,col] = -((np.power(col,2)+np.power(row,2))/(2*np.power(cutoff,2)))
+        # Get row indexes
+        row_indexes = range(exponent_values.shape[0])
+        # Get column indexes
+        col_indexes = range(exponent_values.shape[1])
+
+        # Calculate exponents
+        exponent_values = -(np.divide(np.power(col_indexes,2)+np.power(row_indexes,2),2*np.power(cutoff,2)))
+
+        # for row in range(rows):
+        #     for col in range(cols):
+        #         exponent_values[row,col] = -((np.power(col,2)+np.power(row,2))/(2*np.power(cutoff,2)))
 
         high_pass_filter = coefficient_diff*(1-np.exp(exponent_values))+minimum_coefficient
 
@@ -229,14 +238,22 @@ class preprocessing:
                 sum_of_squares = np.sum(convolutions_squared)
                 # Estimate signal variance
                 signal_variance = 1/window_size*sum_of_squares
-                # estimate variance
-                variance = math.sqrt(max(np.power(signal_variance,2)-np.power(noise_variance,2),0)) # My interpretation of subscript + is bigger than zero
+                # estimate variance (0 if g < 0 else g)
+                g = np.power(signal_variance,2)-np.power(noise_variance,2)
+                if g < 0:
+                    g = 0
+                variance = math.sqrt(g) # My interpretation of subscript plus is the g function
                 # update wavelet
                 parent_correlation = np.sqrt(np.power(y_array,2)+np.power(y_parent_array,2))
-                print(parent_correlation)
+                #print(parent_correlation)
                 variance_component = (np.sqrt(3)*np.power(noise_variance,2))/variance
-                numerator = np.max(parent_correlation-variance_component,0) # ,0 before matlab says np.finfo(1.0).eps, but max only works with integers
-                division = np.divide(numerator,parent_correlation)
+                # numerator is also a g function
+                numerator = parent_correlation-variance_component
+                numerator = np.where(numerator < 0, 0, numerator)
+                # if(numerator < 0):
+                #     numerator = 0
+                division = np.zeros(numerator.ndim)
+                division = np.divide(numerator,parent_correlation, where=numerator!=0)
                 subbands_in_layer[level][subband] = np.multiply(division,y_array)
                 
         # Time to reconstruct # shape doesnt match for some reason
@@ -271,40 +288,272 @@ class preprocessing:
         denoised_frame[:,:,0] = pywt.waverec2(updated_coefficients,'db8',mode='per')
         return denoised_frame
 
+    def diffusion_function(self,input,K):
+        absolute_input = np.abs(input)
+        division = np.divide(absolute_input,K)
+        norm = np.linalg.norm(division) # We work with 1 channel pixel values so norm makes no sense (implementation doesnt do this)
+        power_result = -np.power(norm,2)
+        return np.exp(power_result)
+
+    # Anisotropic filtering  found original implementation (https://github.com/pastapleton/Perona-Malik/blob/master/Perona-Malik%20-%20Cian%2C%20Patrick%2C%20Ivan.py)
+    def anisotropic_filter(self,frame,iterations):
+        # Get only Y channel
+        lum_frame = frame[:,:,0]
+
+        # Get dimension
+        rows,cols = lum_frame.shape
+
+        # Set variables
+        K = 0.1 # Value favors high contrast over low contrast
+        lamda = 1/4 # Should be between 0 and 1/4
+
+        # Make 3 dimensional array containing north, south, east and west differences for each pixel value
+        directions = 4
+        differences = np.zeros((rows,cols,directions))
+
+        # Make matrix that is shifted downwards meaning north elements are pushed one down
+        north = np.roll(lum_frame,shift=1,axis=0)
+        # Make matrix that is shifted upwards meaning south elements are pushed up down
+        south = np.roll(lum_frame,shift=-1,axis=0)
+        # Make matrix that is shifted left meaning east elements are pushed one left
+        east = np.roll(lum_frame,shift=-1,axis=1)
+        # Make matrix that is shifted right meaning west elements are pushed  one right
+        west = np.roll(lum_frame,shift=1,axis=1)
+
+        # Use elementwise subtraction to calculate differences
+        north_diff = north - lum_frame
+        south_diff = south - lum_frame
+        east_diff = east - lum_frame
+        west_diff = west - lum_frame
+
+        # Remove borders where shift does not apply
+        top_row = rows-1
+        top_col = cols-1
+        north_diff[top_row,:] = np.zeros((1,cols)) # top row
+        south_diff[0,:] = np.zeros((1,cols)) # bottom row
+        east_diff[:,top_col] = np.zeros((rows)) # rightmost col
+        west_diff[:,0] = np.zeros((rows)) # leftmost col
+
+        # Calculate diffusion coefficients
+        north_coef = self.diffusion_function(north_diff,K)
+        south_coef = self.diffusion_function(south_diff,K)
+        east_coef = self.diffusion_function(east_diff,K)
+        west_coef = self.diffusion_function(west_diff,K)
+
+        # update values
+        north_results = np.multiply(north_coef,north_diff)
+        south_results = np.multiply(south_coef,south_diff)
+        east_results = np.multiply(east_coef,east_diff)
+        west_results = np.multiply(west_coef,west_diff)
+
+        lum_frame = lum_frame + np.multiply(lamda,north_results+south_results+east_results+west_results)
+
+
+        # Go through each pixel intensity
+        # for i in range(iterations):
+        #     for x in range(cols):
+        #         for y in range(rows):
+        #             # Calculate nearest-neighbor difference and diffusion coefficient
+        #             north_diff = south_diff = east_diff = west_diff = 0
+        #             north_coef = south_coef = east_coef = west_coef = 0
+        #             if(y > 0):
+        #                 north_diff = lum_frame[y-1][x] - lum_frame[y][x]
+        #                 north_coef = self.diffusion_function(north_diff,K)
+        #             if(y < rows-1):
+        #                 south_diff = lum_frame[y+1][x] - lum_frame[y][x]
+        #                 south_coef = self.diffusion_function(south_diff,K)
+        #             if(x < cols-1):
+        #                 east_diff = lum_frame[y][x+1] - lum_frame[y][x]
+        #                 east_coef = self.diffusion_function(east_diff,K)
+        #             if(x > 0):
+        #                 west_diff = lum_frame[y][x-1] - lum_frame[y][x]
+        #                 west_coef = self.diffusion_function(west_diff,K)
+                    
+        #             # Update pixel
+        #             lum_frame[y][x] = lum_frame[y][x] + lamda*(north_coef*north_diff + south_coef*south_diff+east_coef*east_diff+west_coef*west_diff)
+
+        filtered_frame = frame.copy()
+        filtered_frame[:,:,0] = lum_frame
+        return filtered_frame
+    
+    # contrast streching
+    def strech_contrast(self,frame):
+        # Get only Y channel
+        lum_frame = frame[:,:,0]
+
+        # Get dimension
+        rows,cols = lum_frame.shape
+
+        # Get min and max values
+        max_intensity = lum_frame.max()
+        min_intensity = lum_frame.min()
+
+        # Update intensities
+        division_matrix = np.where(lum_frame > 0,np.divide(lum_frame-min_intensity, max_intensity-min_intensity)*255,0)
+        temp_matrix = np.where(0 < lum_frame,1,0)
+        temp_matrix = np.where(lum_frame < 255,1,temp_matrix)
+        lum_frame = np.where(temp_matrix == 1,division_matrix,lum_frame)
+        lum_frame = np.where(0 > lum_frame,0,lum_frame)
+        lum_frame = np.where(255 < lum_frame,255,lum_frame)
+
+
+        # for x in range(cols):
+        #     for y in range(rows):
+        #         # They base it on 0 < pixel < 1 but opencv is 0 -> 255
+        #         if(0 < lum_frame[y][x] and lum_frame[y][x] < 255):
+        #             lum_frame[y][x] = np.divide(lum_frame[y][x]-min_intensity, max_intensity-min_intensity)
+        #         elif(0 > lum_frame[y][x]):
+        #             lum_frame[y][x] = 0
+        #         elif(255 < lum_frame[y][x]):
+        #             lum_frame[y][x] = 255
+        
+        streched_frame = frame.copy()
+        streched_frame[:,:,0] = lum_frame
+        return streched_frame
+        
+
+    # Convert from YCbCr color space to bgr
+    def convert_to_bgr(self,frame):
+        frame_bgr = cv.cvtColor(frame,cv.COLOR_YCrCb2BGR)
+        return frame_bgr
+
+    # Reverts image to before extension
+    def revert_frame(self,current_frame,original_frame):
+        # Get original size
+        rows,cols,_ = original_frame.shape
+        # Get extended size
+        rows_extended,cols_extended,_ = current_frame.shape
+        # Get number of rows and columns to remove from each side
+        remove_bottom = remove_top = remove_left = remove_right = 0
+        if((rows_extended-rows)%2 == 0):
+            remove_bottom = remove_top = np.abs(rows_extended-rows)//2
+        else:
+            remove_top = np.abs(rows_extended-rows)//2+1
+            remove_bottom = np.abs(rows_extended-rows)//2
+        
+        if((cols_extended-cols)%2 == 0):
+            remove_left = remove_right = np.abs(cols_extended-cols)//2
+        else:
+            remove_left = np.abs(cols_extended-cols)//2+1
+            remove_right = np.abs(cols_extended-cols)//2
+        
+        # Create new frame
+        start_row = remove_bottom
+        end_row = rows_extended-remove_top
+        start_col = remove_left
+        end_col = cols_extended-remove_right
+        reverted_frame = current_frame[start_row:end_row,start_col:end_col]
+        return reverted_frame
+
+
 
 
 # main stuff
+x_dim = 0.5
+y_dim = 0.5
 cap = cv.VideoCapture('../../Data/Video_Data/Solo_Pillar.mkv')
+frame_size = (int(cap.get(3)),int(cap.get(4)))
+fps = 30
+writer = cv.VideoWriter( "../../Data/Video_Data/Preprocessed_Solo_Pillar.mkv", cv2.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
 preprocessor = preprocessing()
 while(True):
     ret,frame = cap.read()
     if ret is not True:
         break
 
+    visual_frame = cv.resize(frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("image",visual_frame)
+    cv.waitKey(0)
 
     # Step 1 
-    #moire_removed = preprocessor.remove_moire(frame,25,0.1)
+    start = time.time()
+    moire_removed = preprocessor.remove_moire(frame,25,0.1)
+    end = time.time()
+    time_spent = (end-start) * 10**3
+    print("Step 1: " + str(time_spent) + " ms")
+    visual_frame = cv.resize(frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("Step 1",visual_frame)
+    cv.waitKey(0)
     # Step 2
-    extended_frame = preprocessor.get_squared_image(frame)
+    start = time.time()
+    extended_frame = preprocessor.get_squared_image(moire_removed)
+    end = time.time()
+    time_spent = (end-start) * 10**3
+    print("Step 2: " + str(time_spent) + " ms")
+    visual_frame = cv.resize(extended_frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("Step 2",visual_frame)
+    cv.waitKey(0)
     # Step 3:
+    start = time.time()
     lum_frame = preprocessor.convert_to_luminance_chrominance(extended_frame)
+    end = time.time()
+    time_spent = (end-start) * 10**3
+    print("Step 3: " + str(time_spent) + " ms")
+    visual_frame = cv.resize(lum_frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("Step 3",visual_frame[:,:,0])
+    cv.waitKey(0)
     # Step 4:
+    start = time.time()
     homomorphic_frame = preprocessor.homomorphic_filter(lum_frame)
+    end = time.time()
+    time_spent = (end-start) * 10**3
+    print("Step 4: " + str(time_spent) + " ms")
+    visual_frame = cv.resize(homomorphic_frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("Step 4",visual_frame[:,:,0])
+    cv.waitKey(0)
     # Step 5:
+    start = time.time()
     denoised_frame = preprocessor.wavelet_denoising(homomorphic_frame,3,7)
+    end = time.time()
+    time_spent = (end-start) * 10**3
+    print("Step 5: " + str(time_spent) + " ms")
+    visual_frame = cv.resize(denoised_frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("Step 5",visual_frame[:,:,0])
+    cv.waitKey(0)
+    # Step 6:
+    start = time.time()
+    filtered_frame = preprocessor.anisotropic_filter(denoised_frame,2)
+    end = time.time()
+    time_spent = (end-start) * 10**3
+    print("Step 6: " + str(time_spent) + " ms")
+    visual_frame = cv.resize(filtered_frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("Step 6",visual_frame[:,:,0])
+    cv.waitKey(0)
+    # Step 7:
+    start = time.time()
+    streched_frame = preprocessor.strech_contrast(filtered_frame)
+    end = time.time()
+    time_spent = (end-start) * 10**3
+    print("Step 7: " + str(time_spent) + " ms")
+    visual_frame = cv.resize(streched_frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("Step 7",visual_frame[:,:,0])
+    cv.waitKey(0)
+    # Step 8:
+    start = time.time()
+    bgr_frame = preprocessor.convert_to_bgr(streched_frame)
+    reverted_frame = preprocessor.revert_frame(bgr_frame, frame)
+    end = time.time()
+    time_spent = (end-start) * 10**3
+    print("Step 8: " + str(time_spent) + " ms")
+    visual_frame = cv.resize(reverted_frame, (0, 0), fx = x_dim, fy = y_dim)
+    cv.imshow("Step 8",visual_frame)
+    cv.waitKey(0)
+    # Step 9: Skip since only make image look nicer to us and have no influence on results (since we work in grayscale)
 
+    writer.write(reverted_frame)
 
+    # Write to video
     # Convert data and show
-    homomorphic_frame = cv.cvtColor(homomorphic_frame,cv.COLOR_YCrCb2BGR)
-    denoised_frame = cv.cvtColor(denoised_frame,cv.COLOR_YCrCb2BGR)
+    #homomorphic_frame = cv.cvtColor(homomorphic_frame,cv.COLOR_YCrCb2BGR)
+    #denoised_frame = cv.cvtColor(denoised_frame,cv.COLOR_YCrCb2BGR)
     #resized = cv.resize(extended_frame, (0, 0), fx = 0.2, fy = 0.2)
     #resized_original = cv.resize(frame, (0, 0), fx = 0.2, fy = 0.2)
 
-    cv.imshow("image",frame)
+    #cv.imshow("final frame", bgr_frame)
 
-    cv.imshow("homomorphic image", homomorphic_frame)
-    cv.imshow("denoised image", denoised_frame)
+    #cv.imshow("homomorphic image", homomorphic_frame)
+    #cv.imshow("denoised image", denoised_frame)
 
-    cv.waitKey(0)
+    #cv.waitKey(0)
 
 
