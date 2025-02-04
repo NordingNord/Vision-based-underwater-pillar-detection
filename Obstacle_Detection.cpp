@@ -198,17 +198,17 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                     }
 
                     // For fun change velocity to average distance traveled
-                    for(int i = 0; i < current_data.size(); i++){
-                        float sum = 0;
-                        for(int j = 1; j < current_data[i].positions.size(); j++){
-                            float x_diff = current_data[i].positions[j-1].x - current_data[i].positions[j].x;
-                            float y_diff = current_data[i].positions[j-1].y - current_data[i].positions[j].y;
-                            sum += sqrt(pow(x_diff,2)+pow(y_diff,2));
-                        }
-                        cout << "Sum: " << sum << endl;
-                        cout << "Number of entries: " << current_data[i].positions.size() << endl;
-                        current_data[i].velocity = sum/current_data[i].positions.size();
-                    }
+//                    for(int i = 0; i < current_data.size(); i++){
+//                        float sum = 0;
+//                        for(int j = 1; j < current_data[i].positions.size(); j++){
+//                            float x_diff = current_data[i].positions[j-1].x - current_data[i].positions[j].x;
+//                            float y_diff = current_data[i].positions[j-1].y - current_data[i].positions[j].y;
+//                            sum += sqrt(pow(x_diff,2)+pow(y_diff,2));
+//                        }
+//                        cout << "Sum: " << sum << endl;
+//                        cout << "Number of entries: " << current_data[i].positions.size() << endl;
+//                        current_data[i].velocity = sum/current_data[i].positions.size();
+//                    }
 
                     // Filter results using angles
                     if(data_handle_count_test >= 10){
