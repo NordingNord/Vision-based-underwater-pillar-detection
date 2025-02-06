@@ -23,6 +23,8 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
 
         data_visualization visualizer; // Initialize visualizer
 
+        preprocessing processor;
+
         //-- Initialize vector of kalman filters --
         vector<feature_analyzer> kalman_filters;
 
@@ -58,6 +60,8 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
             data_handle_count_test++;
             // Check if data should be worked with
             if(gap_tracker == 0){
+                // Preprocess frame
+                frame = processor.median_filter(frame,11);
                 cout << "Updating data" << endl;
                 // Find features if begining of video or most features are lost
                 if(find_features == true){
@@ -134,9 +138,6 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
 //                    waitKey(0);
 
                     // Analyse frequency spectrum for fun
-
-
-
 
                     // Perform optical flow
                     optical_flow_results flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_features), last_frame, frame);

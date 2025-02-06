@@ -13,6 +13,12 @@ import cv2 as cv
 import time
 
 import homofilt
+import aniso
+import filters
+
+from skimage.restoration import denoise_wavelet, estimate_sigma
+from skimage.metrics import peak_signal_noise_ratio
+
 
 ###############################################
 # Pre-processing class                        #
@@ -21,7 +27,15 @@ class preprocessing:
     # Constructor
     def __init__(self):
         print("I have been born")
-    
+
+    # Moire removal from (https://github.com/gmelodie/silentMoire/blob/master/src/filters.py)
+    def remove_moire_impl(self,frame):
+        # Grayscale image
+        frame_gray = cv.cvtColor(frame,cv.COLOR_BGR2GRAY)
+        filtered_frame = filters.low_pass(frame_gray).astype(np.uint8)
+        filtered_frame = cv.cvtColor(filtered_frame,cv.COLOR_GRAY2BGR)
+        return filtered_frame
+
     # Method for removing moire (Not done)
     def remove_moire(self, frame, protect_threshold, weight):
         # Grayscale image
@@ -210,13 +224,27 @@ class preprocessing:
         high_pass_filter = np.fft.ifftshift(high_pass_filter)
 
         # Apply high pass filter 
-        filtered_frame = fourier_frame*high_pass_filter
+        filtered_frame = np.multiply(fourier_frame,high_pass_filter)
 
         frame_returned = np.fft.ifft2(filtered_frame)
 
         frame_returned = np.expm1(np.real(frame_returned))
 
         return frame_returned
+
+    # Sci-image wavelet denosing
+    def sci_wavelet_denoising(self,lum_frame):
+        # estimate noise
+        sigma_estimate = estimate_sigma(lum_frame,channel_axis=-1,average_sigmas=True)
+        # Perform bayes denoising
+        #frame_denoised = denoise_wavelet(lum_frame,channel_axis=-1,convert2ycbcr=False,method='BayesShrink',mode='soft',rescale_sigma=True,)
+        # Perform visushrink
+        frame_denoised = denoise_wavelet(lum_frame,channel_axis=-1,convert2ycbcr=False,method='VisuShrink',mode='soft',sigma=sigma_estimate,rescale_sigma=True,)
+        # Get indication of quality
+        psnr = peak_signal_noise_ratio(lum_frame.astype(np.uint8),frame_denoised.astype(np.uint8))
+        print("psnr: " + str(psnr))
+        return frame_denoised
+
 
     # Wavelet denoising
     def wavelet_denoising(self,lum_frame,levels,window_size):
@@ -296,11 +324,13 @@ class preprocessing:
             updated_coefficients.append(temp_tuple)
 
         denoised_frame = pywt.waverec2(updated_coefficients,'db8',mode='per')
+        # Get indication of quality
+        #psnr = peak_signal_noise_ratio(lum_frame.astype(np.uint8),denoised_frame.astype(np.uint8))
         return denoised_frame
 
     def diffusion_function(self,input,K):
         absolute_input = np.abs(input)
-        division = np.divide(absolute_input,K)
+        division = np.divide(input,K)
         norm = np.linalg.norm(division) # We work with 1 channel pixel values so norm makes no sense (implementation doesnt do this)
         power_result = -np.power(norm,2)
         return np.exp(power_result)
@@ -318,42 +348,43 @@ class preprocessing:
         directions = 4
         differences = np.zeros((rows,cols,directions))
 
-        # Make matrix that is shifted downwards meaning north elements are pushed one down
-        north = np.roll(lum_frame,shift=1,axis=0)
-        # Make matrix that is shifted upwards meaning south elements are pushed up down
-        south = np.roll(lum_frame,shift=-1,axis=0)
-        # Make matrix that is shifted left meaning east elements are pushed one left
-        east = np.roll(lum_frame,shift=-1,axis=1)
-        # Make matrix that is shifted right meaning west elements are pushed  one right
-        west = np.roll(lum_frame,shift=1,axis=1)
+        for iteration in range(iterations):
+            # Make matrix that is shifted downwards meaning north elements are pushed one down
+            north = np.roll(lum_frame,shift=1,axis=0)
+            # Make matrix that is shifted upwards meaning south elements are pushed up down
+            south = np.roll(lum_frame,shift=-1,axis=0)
+            # Make matrix that is shifted left meaning east elements are pushed one left
+            east = np.roll(lum_frame,shift=-1,axis=1)
+            # Make matrix that is shifted right meaning west elements are pushed  one right
+            west = np.roll(lum_frame,shift=1,axis=1)
 
-        # Use elementwise subtraction to calculate differences
-        north_diff = north - lum_frame
-        south_diff = south - lum_frame
-        east_diff = east - lum_frame
-        west_diff = west - lum_frame
+            # Remove borders where shift does not apply
+            top_row = rows-1
+            top_col = cols-1
+            north[top_row,:] = np.zeros((1,cols)) # top row
+            south[0,:] = np.zeros((1,cols)) # bottom row
+            east[:,top_col] = np.zeros((rows)) # rightmost col
+            west[:,0] = np.zeros((rows)) # leftmost col
 
-        # Remove borders where shift does not apply
-        top_row = rows-1
-        top_col = cols-1
-        north_diff[top_row,:] = np.zeros((1,cols)) # top row
-        south_diff[0,:] = np.zeros((1,cols)) # bottom row
-        east_diff[:,top_col] = np.zeros((rows)) # rightmost col
-        west_diff[:,0] = np.zeros((rows)) # leftmost col
+            # Use elementwise subtraction to calculate differences
+            north_diff = north - lum_frame
+            south_diff = south - lum_frame
+            east_diff = east - lum_frame
+            west_diff = west - lum_frame
 
-        # Calculate diffusion coefficients
-        north_coef = self.diffusion_function(north_diff,K)
-        south_coef = self.diffusion_function(south_diff,K)
-        east_coef = self.diffusion_function(east_diff,K)
-        west_coef = self.diffusion_function(west_diff,K)
+            # Calculate diffusion coefficients
+            north_coef = self.diffusion_function(north_diff,K)
+            south_coef = self.diffusion_function(south_diff,K)
+            east_coef = self.diffusion_function(east_diff,K)
+            west_coef = self.diffusion_function(west_diff,K)
 
-        # update values
-        north_results = np.multiply(north_coef,north_diff)
-        south_results = np.multiply(south_coef,south_diff)
-        east_results = np.multiply(east_coef,east_diff)
-        west_results = np.multiply(west_coef,west_diff)
+            # update values
+            north_results = np.multiply(north_coef,north_diff)
+            south_results = np.multiply(south_coef,south_diff)
+            east_results = np.multiply(east_coef,east_diff)
+            west_results = np.multiply(west_coef,west_diff)
 
-        lum_frame = lum_frame + np.multiply(lamda,north_results+south_results+east_results+west_results)
+            lum_frame = lum_frame + np.multiply(lamda,north_results+south_results+east_results+west_results)
 
         filtered_frame = lum_frame
         return filtered_frame
@@ -416,110 +447,135 @@ class preprocessing:
 # main stuff
 x_dim = 0.5
 y_dim = 0.5
-cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Top.mkv')
+cap = cv.VideoCapture('../../Data/Video_Data/Wall_Indents_Top.mkv')
 frame_size = (int(cap.get(3)),int(cap.get(4)))
 fps = 30
-writer = cv.VideoWriter( "../../Data/Video_Data/Preprocessed_New_Pillar_Top.mkv", cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+writer = cv.VideoWriter( "../../Data/Video_Data/Preprocessed_Wall_Indents_Top.mkv", cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
 preprocessor = preprocessing()
 while(True):
     ret,frame = cap.read()
     if ret is not True:
         break
 
-    visual_frame = cv.resize(frame, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("image",visual_frame)
-    cv.waitKey(0)
+    # visual_frame = cv.resize(frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("image",visual_frame)
+    # cv.waitKey(0)
 
-    # Step 1 (sadge)
-    start = time.time()
+    # Step 1 
+    # start = time.time()
     moire_removed = frame
     #moire_removed = preprocessor.remove_moire(frame,25,0.1)
-    end = time.time()
-    time_spent = (end-start) * 10**3
-    print("Step 1: " + str(time_spent) + " ms")
-    visual_frame = cv.resize(frame, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("Step 1",visual_frame)
-    cv.waitKey(0)
+    #moire_removed = preprocessor.remove_moire_impl(frame)
+    # end = time.time()
+    # time_spent = (end-start) * 10**3
+    # print("Step 1: " + str(time_spent) + " ms")
+    # visual_frame = cv.resize(frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step 1",visual_frame)
+    # cv.waitKey(0)
+
+    # Bellow = good to go
 
 
     # Step 2
-    start = time.time()
+    # start = time.time()
     extended_frame = preprocessor.get_squared_image(moire_removed)
-    end = time.time()
-    time_spent = (end-start) * 10**3
-    print("Step 2: " + str(time_spent) + " ms")
-    visual_frame = cv.resize(extended_frame, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("Step 2",visual_frame)
-    cv.waitKey(0)
+    # end = time.time()
+    # time_spent = (end-start) * 10**3
+    # print("Step 2: " + str(time_spent) + " ms")
+    # visual_frame = cv.resize(extended_frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step 2",visual_frame)
+    # cv.waitKey(0)
 
 
     # Step 3:
-    start = time.time()
+    # start = time.time()
     lum_frame = preprocessor.convert_to_luminance_chrominance(extended_frame)
     lum_frame_Y = lum_frame[:,:,0]
-    end = time.time()
-    time_spent = (end-start) * 10**3
-    print("Step 3: " + str(time_spent) + " ms")
-    visual_frame = cv.resize(lum_frame_Y, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("Step 3",visual_frame)
-    cv.waitKey(0)
+    # end = time.time()
+    # time_spent = (end-start) * 10**3
+    # print("Step 3: " + str(time_spent) + " ms")
+    # visual_frame = cv.resize(lum_frame_Y, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step 3",visual_frame)
+    # cv.waitKey(0)
 
 
     # Step 4:
-    start = time.time()
+    # start = time.time()
     homomorphic_frame = preprocessor.homomorphic_filter(lum_frame_Y,0.5,2.5,1.0)
-    end = time.time()
-    time_spent = (end-start) * 10**3
-    print("Step 4: " + str(time_spent) + " ms")
-    #Normalize for visualization
-    visual_frame = np.divide(homomorphic_frame-np.min(homomorphic_frame),np.max(homomorphic_frame)-np.min(homomorphic_frame))*255
-    visual_frame = cv.resize(visual_frame, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("Step 4",visual_frame.astype(np.uint8))
-    cv.waitKey(0)
+    # end = time.time()
+    # time_spent = (end-start) * 10**3
+    # print("Step 4: " + str(time_spent) + " ms")
+    # #Normalize for visualization
+    # visual_frame = np.divide(homomorphic_frame-np.min(homomorphic_frame),np.max(homomorphic_frame)-np.min(homomorphic_frame))*255
+    # visual_frame = cv.resize(visual_frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step 4",visual_frame.astype(np.uint8))
+    # cv.waitKey(0)
+
+
+    # remove background test
+    # se=cv.getStructuringElement(cv.MORPH_RECT , (3,3))
+    # bg=cv.morphologyEx(homomorphic_frame, cv.MORPH_DILATE, se)
+    # homomorphic_frame=cv.divide(homomorphic_frame, bg, scale=255)
+    # visual_frame = np.divide(homomorphic_frame-np.min(homomorphic_frame),np.max(homomorphic_frame)-np.min(homomorphic_frame))*255
+    # visual_frame = cv.resize(visual_frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("background removal",visual_frame .astype(np.uint8))
+    # cv.waitKey(0)
+
+
+    # denoise_test = cv.fastNlMeansDenoising(homomorphic_frame.astype(np.uint8),1,7,11)
+    # visual_frame = np.divide(denoise_test-np.min(denoise_test),np.max(denoise_test)-np.min(denoise_test))*255
+    # visual_frame = cv.resize(visual_frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step test",visual_frame.astype(np.uint8))
+    # cv.waitKey(0)
+
+    # -- To fix and optimize -- 
 
     # Step 5:
-    start = time.time()
+    # start = time.time()
+    #denoised_frame = preprocessor.sci_wavelet_denoising(homomorphic_frame)
     denoised_frame = preprocessor.wavelet_denoising(homomorphic_frame,3,81)
-    end = time.time()
-    time_spent = (end-start) * 10**3
-    print("Step 5: " + str(time_spent) + " ms")
-    visual_frame = np.divide(denoised_frame-np.min(denoised_frame),np.max(denoised_frame)-np.min(denoised_frame))*255
-    visual_frame = cv.resize(visual_frame, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("Step 5",visual_frame.astype(np.uint8))
-    cv.waitKey(0)
+    # end = time.time()
+    # time_spent = (end-start) * 10**3
+    # print("Step 5: " + str(time_spent) + " ms")
+    # visual_frame = np.divide(denoised_frame-np.min(denoised_frame),np.max(denoised_frame)-np.min(denoised_frame))*255
+    # visual_frame = cv.resize(visual_frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step 5",visual_frame.astype(np.uint8))
+    # cv.waitKey(0)
 
 
     # Step 6:
-    start = time.time()
-    filtered_frame = preprocessor.anisotropic_filter(denoised_frame,5,0.1,1/4)
-    end = time.time()
-    time_spent = (end-start) * 10**3
-    print("Step 6: " + str(time_spent) + " ms")
-    visual_frame = cv.resize(filtered_frame, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("Step 6",visual_frame.astype(np.uint8))
-    cv.waitKey(0)
+    # start = time.time()
+    filtered_frame = aniso.anisodiff(denoised_frame, 3, 0.1, 0.25)
+    #filtered_frame = preprocessor.anisotropic_filter(denoised_frame,5,0.1,0.25) # Something is different in mine :'(
+    # end = time.time()
+    # time_spent = (end-start) * 10**3
+    # print("Step 6: " + str(time_spent) + " ms")
+    # visual_frame = np.divide(filtered_frame-np.min(filtered_frame),np.max(filtered_frame)-np.min(filtered_frame))*255
+    # visual_frame = cv.resize(visual_frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step 6",visual_frame.astype(np.uint8))
+    # cv.waitKey(0)
 
     # Step 7:
-    start = time.time()
+    # start = time.time()
     streched_frame = preprocessor.strech_contrast(filtered_frame)
-    end = time.time()
-    time_spent = (end-start) * 10**3
-    print("Step 7: " + str(time_spent) + " ms")
-    visual_frame = cv.resize(streched_frame, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("Step 7",visual_frame.astype(np.uint8))
-    cv.waitKey(0)
+    # end = time.time()
+    # time_spent = (end-start) * 10**3
+    # print("Step 7: " + str(time_spent) + " ms")
+    # visual_frame = cv.resize(streched_frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step 7",visual_frame.astype(np.uint8))
+    # cv.waitKey(0)
 
     # Step 8:
-    start = time.time()
+    # start = time.time()
     lum_frame[:,:,0] = streched_frame
     bgr_frame = preprocessor.convert_to_bgr(lum_frame)
     reverted_frame = preprocessor.revert_frame(bgr_frame, frame)
-    end = time.time()
-    time_spent = (end-start) * 10**3
-    print("Step 8: " + str(time_spent) + " ms")
-    visual_frame = cv.resize(reverted_frame, (0, 0), fx = x_dim, fy = y_dim)
-    cv.imshow("Step 8",visual_frame)
-    cv.waitKey(0)
+    # end = time.time()
+    # time_spent = (end-start) * 10**3
+    # print("Step 8: " + str(time_spent) + " ms")
+    # visual_frame = cv.resize(reverted_frame, (0, 0), fx = x_dim, fy = y_dim)
+    # cv.imshow("Step 8",visual_frame)
+    # cv.waitKey(0)
     # Step 9: Skip since only make image look nicer to us and have no influence on results (since we work in grayscale)
 
     writer.write(reverted_frame)

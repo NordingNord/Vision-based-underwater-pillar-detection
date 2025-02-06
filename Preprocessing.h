@@ -17,6 +17,8 @@
 #include "Data_Visualization.h"
 
 // -- Some name definitions --
+static const int CROSS = 0;
+static const int SQUARE = 0;
 //static const int VELOCITY = 0;
 
 
@@ -26,8 +28,8 @@ public:
     // -- Constructor --
     preprocessing();
 
-    // -- Method that removes moire efect --
-    void remove_moire(cv::Mat frame, float protect_threshold);
+    // -- Method that filters image based on median --
+    cv::Mat median_filter(cv::Mat frame, int kernel_size = 5);
 
 private:
 

@@ -108,3 +108,44 @@
         #             lum_frame[y][x] = 0
         #         elif(255 < lum_frame[y][x]):
         #             lum_frame[y][x] = 255
+        # # Get dimensions
+        # rows,cols = luminance_channel.shape
+        # # Go through every pixel
+        # for row in range(rows):
+        #     print(row)
+        #     for col in range(cols):
+        #         # Prepare indexes
+        #         start_row = row-kernel_size
+        #         end_row = row+kernel_size
+        #         start_col = col-kernel_size
+        #         end_col = col + kernel_size
+
+        #         if(start_row  < 0):
+        #             start_row = 0
+        #         if(end_row >= rows):
+        #             start_row = rows-1
+        #         if(start_col  < 0):
+        #             start_col = 0
+        #         if(end_col >= cols):
+        #             start_col = cols-1
+
+        #         # Make array of pixels in kernel
+        #         pixels = []
+        #         if(kernel_shape == self.cross):
+        #             row_data = luminance_channel[start_row:end_row,:]
+        #             col_data = luminance_channel[:,start_col:end_col]
+        #             pixels = np.concatenate(row_data.flatten(),col_data.flatten())
+        #         elif(kernel_shape == self.square):
+        #             pixels = luminance_channel[start_row:end_row,start_col:end_col].flatten()
+        #         else:
+        #             print("Unknown kernel shape")
+        #             return frame
+                
+        #         # sort data
+        #         pixels = np.sort(pixels)
+                
+        #         # Calculate median
+        #         median = np.median(pixels)
+                
+        #         # Assign median
+        #         new_luminance_channel[row,col] = median

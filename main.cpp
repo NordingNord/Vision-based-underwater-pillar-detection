@@ -6,6 +6,7 @@
 #include "Obstacle_Detection.h"
 #include "Data_Collector.h"
 #include "Feature_Finder.h"
+#include "Preprocessing.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -70,7 +71,7 @@ int main(){
 
 //    // Testing optical flow //
     obstacle_detection detection;
-    detection.perform_optical_flow("../Data/Video_Data/New_Pillar_Top.mkv",2, true, ON_FRAME, "new_pillar_test_orb",0);
+    detection.perform_optical_flow("../Data/Video_Data/New_Pillar_Top.mkv",0, true, ON_FRAME, "preprocess test",0); // 0 -> ORB 2 -> SIFT last int is gap
 //    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_FRAME, "gap_test",0);
 //    feature_analyzer test;
 //    vector<keypoint_data> keypoints;
@@ -93,5 +94,22 @@ int main(){
 //        results.push_back(result);
 //        test.correct_kalman(x[i],y[i]);
 //        cout << result.x << ", " << result.y << endl;
+//    }
+
+
+//    // Test median filter
+//    camera_handler cam_handler("../Data/Video_Data/New_Pillar_Top.mkv");
+//    preprocessing preprocessor;
+//    while(true){
+//        Mat frame = cam_handler.get_frame();
+//        // Break if no more frames
+//        if(frame.empty()){
+//            cout << "Reached end of video stream" << endl;
+//            break;
+//        }
+//        Mat result = preprocessor.median_filter(frame,11);
+//        imshow("Blurred frame",result);
+//        imshow("original frame",frame);
+//        waitKey(0);
 //    }
 }
