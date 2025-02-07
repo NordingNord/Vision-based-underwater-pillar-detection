@@ -29,7 +29,7 @@ class preprocessing:
         luminance_channel = frame_luminance[:,:,0]
 
         # Use opencv median filter implementation
-        luminance_channel = cv.medianBlur(luminance_channel,11)
+        luminance_channel = cv.medianBlur(luminance_channel,kernel_size)
 
         # recombine image and return
         frame_luminance[:,:,0] = luminance_channel
@@ -149,160 +149,277 @@ class preprocessing:
         reverted_frame = current_frame[start_row:end_row,start_col:end_col]
         return reverted_frame
 
+    # My method for removing marine snow and light glare
+    def remove_snow(self,frame,percentage_of_max,snow_percentage,dist_percentage):
+        # Handle invalid inputs
+        if(snow_percentage > 1 or dist_percentage > 1 or percentage_of_max > 1):
+            print("Invalid inputs. Accepted values are from 0 to 1")
+            return frame
+        # Conver to YCrCB
+        frame_luminance = cv.cvtColor(frame,cv.COLOR_BGR2YCrCb)
+        # Extract luminance
+        luminance = frame_luminance[:,:,0]
+        luminance_flat_sort = np.sort(luminance.flatten())
+        #cv.imshow("test",luminance)
+        #cv.waitKey(0)
+        # Get area aroun max luminance
+        luminance_thresh = luminance_flat_sort[-1]*percentage_of_max
+        # Isolate bright spots
+        ret,threshold_mask = cv.threshold(luminance,luminance_thresh,255,cv.THRESH_BINARY)
+        # Close image (combine contours close to eachother)
+        kernel = np.ones((5, 5), np.uint8)
+        threshold_mask = cv.morphologyEx(threshold_mask,cv.MORPH_CLOSE,kernel)
+        # Get frame dimensions
+        rows,cols = threshold_mask.shape
+        # Define contour size limit based on size and percentage
+        area_limit = (rows*cols)*snow_percentage
+        # Calculate distance between median color and maximum color
+        median = np.median(luminance_flat_sort)
+        distance = np.abs(median-luminance_flat_sort[-1])
+        # Determine distance threshold
+        dist_thresh = distance*dist_percentage
+        # Find contours
+        frame_contours,hierachy = cv.findContours(threshold_mask,cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+        # Keep only small contours (big contours might indicate pillars and no marine snow)
+        fixed_image = luminance.copy()
+        for contour in frame_contours:
+            area = cv.contourArea(contour)
+            if area <= area_limit:
+                # draw kept contour onto isolated mask
+                contour_image = np.zeros((rows,cols),dtype=np.uint8)
+                cv.drawContours(contour_image, contour, -1, (255), thickness=cv.FILLED)
+                # Find average colour within contour
+                average_color = cv.mean(luminance,contour_image)[0] # 0 since it returns more than one value. (Allways returns as if 3-channel image even though it is 1 channel)
+                # Dilate and check if new color distance is big until distance is big
+                dist = 0
+                kernel = np.ones((11, 11), np.uint8)
+                final_average = 0 # Used to remove values later
+                mask_final = contour_image.copy()
+                while(dist < dist_thresh):
+                    # Dilate error zone
+                    new_contour_image = cv.dilate(contour_image,kernel, iterations= 1)
+                    # Exclusive or to get only the dilated part
+                    temp = cv.bitwise_xor(new_contour_image,contour_image)
+                    # Find average color in new area
+                    final_average = cv.mean(luminance,temp)[0]
+                    # Isolate values
+                    temp = np.where(temp > 0, luminance,0)
+                    # Use biggest to determine distance
+                    dist = np.abs(average_color-np.max(temp))
+                    #print(str(dist) + " measured against threshold " + str(dist_thresh))
+                    # update data
+                    contour_image = new_contour_image
+                    # Find areas in total mask and asign corresponding lumination values
+                    temp = np.where(contour_image > 0, luminance,0)
+                    # Areas where the differences is smaller than threshold is colored
+                    temp = np.where(np.abs(average_color-temp) < dist_thresh,255,0)
+                    temp = np.array(temp,dtype='int') # Ensure valid values
+                    mask_final = np.array(mask_final,dtype='int') # Ensure valid values
+                    mask_final = cv.bitwise_or(mask_final,temp)
+                    mask_final = mask_final.astype(np.uint8)
+                    # Remove element under mask replacing them with average colour of final dilation
+                    fixed_image = np.where(mask_final == 0, fixed_image, int(final_average))
+
+        # Create output frame
+        frame_luminance[:,:,0] = fixed_image
+        result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+        return result
+    
+    
+    # Method for bluring of marine snow (inspired by: Elimination of Marine Snow effect from underwater image - An adaptive probabilistic approach)
+    def snow_blur(self,frame,high_prob):
+        # Convert to YCrCb
+        frame_luminance = cv.cvtColor(frame,cv.COLOR_BGR2YCrCb)
+        # Get lumination channel
+        luminance = frame_luminance[:,:,0]
+        # Prepare result channel
+        luminance_result = luminance.copy()
+        # Get sliding window
+        kernel_size = 7 # Based on article
+        sliding_window = np.lib.stride_tricks.sliding_window_view(luminance,(kernel_size,kernel_size))
+        # Get all window means
+        window_means = sliding_window.mean(axis=-1)
+        # Get all window variances
+        window_variances = sliding_window.var(axis=-1)
+        # Go through windows analyzing center pixels for high lumination (determined by threshol: local mean + local standard deviation/2)
+        index = 0
+        for(window in sliding_window):
+            # Calculate lumination threshold
+            lum_thresh = window_means[index] + np.divide(window_variances[index],2)
+            # Find center
+            rows,cols = window.shape
+            center_value = window[rows//2, cols//2]
+            # Continue if above lum threshold (they also say high variance but does not define it)
+            if(center_value > lum_thresh):
+                # Calculate marine snow probability
+                high_lum_pixels = np.where(window > lum_thresh,1,0)
+                high_lum_count = np.count_nonzero(high_lum_pixels)
+                # Get total number of pixels in window
+                pixel_count = rows*cols
+                # Calculate likelyhood
+                probability_for_snow = 1-np.divide(high_lum_count/pixel_count)
+                # if probability is high then conduct cross check
+                if(probability_for_snow >= high_prob):
+                    # Create bigger kernel around current kernel (need to figure indexing from sliding windows array)
+                    biger_window = 0
+                    # Count number of high lum pixels
+                    new_high_lum_pixels = np.where(bigger_window > lum_thresh,1,0)
+                    new_high_lum_count = np.count_nonzero(high_lum_pixels)
+                    # If smaller than original count -> snow identified -> turn center into mean
+                    if(new_high_lum_count > high_lum_count):
+                        luminance_result[] = window.median() # Need to figure out indexing
+            index = index+1
+        
+        # Prepare return data
+        frame_luminance[:,:,0] = luminance_result
+        result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+        return result
+
+    
+    # Method that normalizes frame luminosity with weighting low luminance values
+    def normalize_lum(self,frame,weight):
+        # Converf to YCrCB
+        frame_luminance = cv.cvtColor(frame,cv.COLOR_BGR2YCrCb)
+        # Get lum channel
+        luminance = frame_luminance[:,:,0]
+        # Normalize
+        normalized_frame = np.divide(luminance-np.min(luminance),np.max(luminance)-np.min(luminance))*255
+        frame_luminance[:,:,0] = normalized_frame
+        normalized_frame = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+        return normalized_frame
+
+    # Method that creates heavy blur video
+    def blur_create(self,path,save_path,fps, setting, frame_limit):
+        capturer = cv.VideoCapture(path)
+        frame_size = (int(capturer.get(3)),int(capturer.get(4)))
+        writer = cv.VideoWriter(save_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        min_kernel_size = 5
+        kernel_size = 0
+        frames = 0
+        while(True):
+            ret,frame = capturer.read()
+            frames = frames+1
+            if ret is not True:
+                break
+
+            # create kernel if non-existent
+            if(kernel_size == 0):
+                if(setting == "heavy"):
+                    kernel_size = max(int(np.max(frame.shape)*1/20),min_kernel_size)
+                elif(setting == "medium"):
+                    kernel_size = max(int(np.max(frame.shape)*1/50),min_kernel_size)
+                elif(setting == "low"):
+                    kernel_size = max(int(np.max(frame.shape)*1/100),min_kernel_size)
+                else:
+                    print("unknown kernel size setting kernel to low blur")
+                    kernel_size = max(int(np.max(frame.shape)*1/100),min_kernel_size)
+                if(kernel_size%2 == 0):
+                    kernel_size = kernel_size-1
+                print(kernel_size)
+            # apply heavy blur
+            preprocessed_frame = preprocessor.median_filter(frame,kernel_size)
+            # write image
+            writer.write(preprocessed_frame)
+            print(frames)
+            if(frames >= frame_limit):
+                break
+    
+    # Method that creates haze removal video
+    def haze_create(self,path,save_path,fps,frame_limit,pre_blur,post_blur,setting):
+        capturer = cv.VideoCapture(path)
+        frame_size = (int(capturer.get(3)),int(capturer.get(4)))
+        writer = cv.VideoWriter(save_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        min_kernel_size = 5
+        kernel_size = 0
+        frames = 0
+        while(True):
+            ret,frame = capturer.read()
+            frames = frames+1
+            if ret is not True:
+                break
+            # create kernel if non-existent and blur is desired
+            if(kernel_size == 0 and (pre_blur == True or post_blur == True)):
+                if(setting == "heavy"):
+                    kernel_size = max(int(np.max(frame.shape)*1/20),min_kernel_size)
+                elif(setting == "medium"):
+                    kernel_size = max(int(np.max(frame.shape)*1/50),min_kernel_size)
+                elif(setting == "low"):
+                    kernel_size = max(int(np.max(frame.shape)*1/100),min_kernel_size)
+                else:
+                    print("unknown kernel size setting kernel to low blur")
+                    kernel_size = max(int(np.max(frame.shape)*1/100),min_kernel_size)
+                if(kernel_size%2 == 0):
+                    kernel_size = kernel_size-1
+            # Apply pre blur if desired
+            if(pre_blur == True):
+                frame = preprocessor.median_filter(frame,kernel_size)
+            # Apply haze removal
+            dehazed_frame = preprocessor.haze_removal(frame)
+            # Apply post blur if desired
+            if(post_blur == True):
+                dehazed_frame = preprocessor.median_filter(dehazed_frame,kernel_size)
+            
+            # write image
+            writer.write(dehazed_frame)
+            print(frames)
+            if(frames >= frame_limit):
+                break
+                
+            
+
+
+
+# make videos
+preprocessor = preprocessing()
+#preprocessor.blur_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Low_Blur_New_Pillar_Top.mkv',30,"low",150)
+#preprocessor.blur_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Medium_Blur_New_Pillar_Top.mkv',30,"medium",150)
+#preprocessor.blur_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Heavy_Blur_New_Pillar_Top.mkv',30,"heavy",150)
+preprocessor.haze_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Haze_Blur_New_Pillar_Top.mkv',30,150,False,False,"low")
+
 
 
 # Main test
-cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Top.mkv')
-preprocessor = preprocessing()
-kernel_size = 201
-while(True):
-    ret,frame = cap.read()
-    if ret is not True:
-        break
-    cv.imshow("Original 0", frame)
-    cv.waitKey(0)
-    # Apply median filter on image to limit marine snow
-    preprocessed_frame = preprocessor.median_filter(frame,kernel_size)
-    cv.imshow("Denoising 1", preprocessed_frame)
-    cv.waitKey(0)
-    # Dehaze frame i ensure visible pillars
-    dehazed_frame = preprocessed_frame
-    dehazed_frame = preprocessor.haze_removal(frame)
-    cv.imshow("Dehazing 2", dehazed_frame)
-    cv.waitKey(0)
-    # Apply median filter again
-    #preprocessed_frame = preprocessor.median_filter(dehazed_frame,kernel_size)
-    #cv.imshow("Denoising 3", preprocessed_frame)
-    #cv.waitKey(0)
-    # Fix shape
-    extended_frame = preprocessor.get_squared_image(dehazed_frame)
-    # Apply homomorphic filter to ensure better light conditions
-    light_fixed_frame = preprocessor.homomorphic_filter(extended_frame,0.5,2.5,1.0)
-    # Revert frame
-    reverted_frame = preprocessor.revert_frame(light_fixed_frame, frame)
-    cv.imshow("Light fixing 4", reverted_frame)
-    cv.waitKey(0)
-    # Apply median filter again
-    preprocessed_frame = reverted_frame
-    #preprocessed_frame = preprocessor.median_filter(reverted_frame,kernel_size)
-    #cv.imshow("Denoising 5",preprocessed_frame)
-    #cv.waitKey(0)
-
-
-    # Analyze Y component
-    frame_luminance = cv.cvtColor(preprocessed_frame,cv.COLOR_BGR2YCrCb)
-    cv.imshow("Y",frame_luminance[:,:,0])
-    cv.waitKey(0)
-
-    # Get brightest value and isolate it
-    brightest = np.max(frame_luminance[:,:,0].flatten())
-    ret,thresh1 = cv.threshold(frame_luminance[:,:,0],brightest*0.95,255,cv.THRESH_BINARY)
-    cv.imshow("Thresholded image",thresh1)
-    cv.waitKey(0)
-
-    # Find contours
-    kept_contours = []
-    area_limit = 1000
-    frame_contours,hierachy = cv.findContours(thresh1,cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    for contour in frame_contours:
-        area = cv.contourArea(contour)
-        if area <= area_limit:
-            # Remove big contours since they might be pillars
-            kept_contours.append(contour)
-    # draw kept contours (future maybe one mask per contour)
-    height,width,_ = frame.shape
-    contour_image = np.zeros((height,width),dtype=np.uint8)
-    cv.drawContours(contour_image, kept_contours, -1, (255), thickness=cv.FILLED)
-    cv.imshow("Contour image",contour_image)
-    cv.waitKey(0)
-
-    # Find average colour within contours
-    average_color = cv.mean(frame_luminance[:,:,0],contour_image)[0]
-
-    # Dilate and check if new color distance is big until distance is big
-    dist = 0
-    kernel = np.ones((5, 5), np.uint8)
-    final_average = 0
-    mask_final = contour_image.copy()
-    while(dist < 180):
-        new_contour_image = cv.dilate(contour_image,kernel, iterations= 1)
-        # Exclusive or to get new mask
-        mask = cv.bitwise_xor(new_contour_image,contour_image)
-        # Find average color in new area
-        new_average_color = cv.mean(frame_luminance[:,:,0],mask)[0]
-        final_average = new_average_color
-        # calc dist
-        dist = np.abs(average_color - new_average_color)
-        # use biggest color instead
-        temp = cv.bitwise_xor(new_contour_image,contour_image)
-        temp = np.where(temp > 0, frame_luminance[:,:,0],0)
-        dist = np.abs(average_color-np.max(temp))
-        print(average_color)
-        print(np.max(temp))
-        print(dist)
-        # update data
-        contour_image = new_contour_image
-        #average_color = (average_color+new_average_color)/2
-        temp = np.where(contour_image > 0, frame_luminance[:,:,0],0)
-        temp = np.where(np.abs(average_color-temp) < 180,255,0)
-        temp = np.array(temp,dtype='int')
-        mask_final = np.array(mask_final,dtype='int')
-
-        mask_final = cv.bitwise_or(mask_final,temp)
-        mask_final = mask_final.astype(np.uint8)
-    
-    contour_image = mask_final
-    cv.imshow("Final mask",contour_image)
-    cv.waitKey(0)
-
-    # Remove element under mask replacing them with average colour of final dilation
-    fixed_image = np.where(contour_image == 0, frame_luminance[:,:,0],int(final_average))
-    print(fixed_image)
-    # turn mask into median
-    #ret,mask = cv.threshold(contour_image,254,np.abs(new_average_color),cv.THRESH_BINARY)
-
-    cv.imshow("Final image",fixed_image.astype(np.uint8))
-    cv.waitKey(0)
-
-    frame_luminance[:,:,0] = fixed_image
-    result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
-    cv.imshow("Result",result)
-    cv.waitKey(0)
-
-    # normalize
-    visual_frame = np.divide(result-np.min(result),np.max(result)-np.min(result))*255
-    visual_frame = visual_frame.astype(np.uint8)
-    cv.imshow("Normalized",visual_frame)
-    cv.waitKey(0)
-
-
-
-
-
-
-    # Find the 95% quantile
-    # Y_data = frame_luminance[:,:,0].flatten()
-    # upper_quantile = np.quantile(Y_data, .95, axis = 0)
-    # # Try segmenting areas above quantile 
-    # ret,thresh1 = cv.threshold(frame_luminance[:,:,0],upper_quantile,255,cv.THRESH_BINARY)
-    # cv.imshow("Thresholded image",thresh1)
-    # cv.waitKey(0)
-
-
-    # # Remove small very bright areas
-
-
-    # # analyze fft
-    # fourier_frame = np.fft.fftshift(np.fft.fft2(frame_luminance[:,:,0]))
-    # plt.set_cmap("gray")
-    # plt.subplot(122)
-    # plt.imshow(np.log(abs(fourier_frame)))
-    # plt.show()
-
-
-
-
-
-                    
-
-        
+# cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Top.mkv')
+# preprocessor = preprocessing()
+# kernel_size = 201
+# while(True):
+#     ret,frame = cap.read()
+#     if ret is not True:
+#         break
+#     cv.imshow("Original 0", frame)
+#     cv.waitKey(0)
+#     # Apply median filter on image to limit marine snow
+#     preprocessed_frame = preprocessor.median_filter(frame,kernel_size)
+#     cv.imshow("Denoising 1", preprocessed_frame)
+#     cv.waitKey(0)
+#     # Dehaze frame i ensure visible pillars
+#     dehazed_frame = preprocessed_frame
+#     dehazed_frame = preprocessor.haze_removal(frame)
+#     cv.imshow("Dehazing 2", dehazed_frame)
+#     cv.waitKey(0)
+#     # Apply median filter again
+#     #preprocessed_frame = preprocessor.median_filter(dehazed_frame,kernel_size)
+#     #cv.imshow("Denoising 3", preprocessed_frame)
+#     #cv.waitKey(0)
+#     # Fix shape
+#     extended_frame = preprocessor.get_squared_image(dehazed_frame)
+#     # Apply homomorphic filter to ensure better light conditions
+#     light_fixed_frame = preprocessor.homomorphic_filter(extended_frame,0.5,2.5,1.0)
+#     # Revert frame
+#     reverted_frame = preprocessor.revert_frame(light_fixed_frame, frame)
+#     cv.imshow("Light fixing 4", reverted_frame)
+#     cv.waitKey(0)
+#     # Apply median filter again
+#     preprocessed_frame = reverted_frame
+#     #preprocessed_frame = preprocessor.median_filter(reverted_frame,kernel_size)
+#     #cv.imshow("Denoising 5",preprocessed_frame)
+#     #cv.waitKey(0)
+#     # Apply snow removal
+#     final_frame = preprocessor.remove_snow(preprocessed_frame,0.95,0.05,0.8)
+#     cv.imshow("Homemade glare removal", final_frame)
+#     cv.waitKey(0)
+#     # Normalize for final image
+#     final_frame = preprocessor.normalize_lum(final_frame,0.1) # weight does nothing currently
+#     cv.imshow("Final image", final_frame)
+#     cv.waitKey(0)

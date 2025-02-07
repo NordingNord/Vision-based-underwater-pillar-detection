@@ -34,12 +34,21 @@ public:
     // -- The complete obstacle detection pipeline using optical flow
     void detect_obstacles_video(std::string video_path, int feature_type = METHOD_ORB, int frame_gap = 0,int cluster_setting = ON_FRAME);
 
+    // -- The data gathering part of the pipeline with focus on optical flow --
+    void get_detection_data(std::string video_path, int feature_type = 0, int frame_gap = 0, bool continuous = true);
+
 private:
     // -- Minimum number of features required for optical flow to continue --
     int min_points = 5;
 
     // -- Maximum number of positions used for velocity calculations
     int max_velocity_positions = 5;
+
+    // -- General size for buffers to have --
+    int buffer_size = 5;
+
+    // -- Limit to how many features we can have in a frame --
+    int max_features = 500;
 };
 
 #endif // OBSTACLE_DETECTION_H

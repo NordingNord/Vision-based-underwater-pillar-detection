@@ -44,6 +44,9 @@ public:
     // -- gets fps of video --
     int get_fps();
 
+    // -- gets dimensions of video --
+    std::vector<int> get_dim();
+
 
 private:
     // Frame data

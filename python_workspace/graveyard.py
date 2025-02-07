@@ -149,3 +149,114 @@
                 
         #         # Assign median
         #         new_luminance_channel[row,col] = median
+
+            # # Analyze Y component
+    # frame_luminance = cv.cvtColor(preprocessed_frame,cv.COLOR_BGR2YCrCb)
+    # cv.imshow("Y",frame_luminance[:,:,0])
+    # cv.waitKey(0)
+
+    # # Get brightest value and isolate it
+    # brightest = np.max(frame_luminance[:,:,0].flatten())
+    # ret,thresh1 = cv.threshold(frame_luminance[:,:,0],brightest*0.95,255,cv.THRESH_BINARY)
+    # cv.imshow("Thresholded image",thresh1)
+    # cv.waitKey(0)
+
+    # # Find contours
+    # kept_contours = []
+    # area_limit = 1000
+    # frame_contours,hierachy = cv.findContours(thresh1,cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    # for contour in frame_contours:
+    #     area = cv.contourArea(contour)
+    #     if area <= area_limit:
+    #         # Remove big contours since they might be pillars
+    #         kept_contours.append(contour)
+    # # draw kept contours (future maybe one mask per contour)
+    # height,width,_ = frame.shape
+    # contour_image = np.zeros((height,width),dtype=np.uint8)
+    # cv.drawContours(contour_image, kept_contours, -1, (255), thickness=cv.FILLED)
+    # cv.imshow("Contour image",contour_image)
+    # cv.waitKey(0)
+
+    # # Find average colour within contours
+    # average_color = cv.mean(frame_luminance[:,:,0],contour_image)[0]
+
+    # # Dilate and check if new color distance is big until distance is big
+    # dist = 0
+    # kernel = np.ones((5, 5), np.uint8)
+    # final_average = 0
+    # mask_final = contour_image.copy()
+    # while(dist < 180):
+    #     new_contour_image = cv.dilate(contour_image,kernel, iterations= 1)
+    #     # Exclusive or to get new mask
+    #     mask = cv.bitwise_xor(new_contour_image,contour_image)
+    #     # Find average color in new area
+    #     new_average_color = cv.mean(frame_luminance[:,:,0],mask)[0]
+    #     final_average = new_average_color
+    #     # calc dist
+    #     dist = np.abs(average_color - new_average_color)
+    #     # use biggest color instead
+    #     temp = cv.bitwise_xor(new_contour_image,contour_image)
+    #     temp = np.where(temp > 0, frame_luminance[:,:,0],0)
+    #     dist = np.abs(average_color-np.max(temp))
+    #     print(average_color)
+    #     print(np.max(temp))
+    #     print(dist)
+    #     # update data
+    #     contour_image = new_contour_image
+    #     #average_color = (average_color+new_average_color)/2
+    #     temp = np.where(contour_image > 0, frame_luminance[:,:,0],0)
+    #     temp = np.where(np.abs(average_color-temp) < 180,255,0)
+    #     temp = np.array(temp,dtype='int')
+    #     mask_final = np.array(mask_final,dtype='int')
+
+    #     mask_final = cv.bitwise_or(mask_final,temp)
+    #     mask_final = mask_final.astype(np.uint8)
+    
+    # contour_image = mask_final
+    # cv.imshow("Final mask",contour_image)
+    # cv.waitKey(0)
+
+    # # Remove element under mask replacing them with average colour of final dilation
+    # fixed_image = np.where(contour_image == 0, frame_luminance[:,:,0],int(final_average))
+    # print(fixed_image)
+    # # turn mask into median
+    # #ret,mask = cv.threshold(contour_image,254,np.abs(new_average_color),cv.THRESH_BINARY)
+
+    # cv.imshow("Final image",fixed_image.astype(np.uint8))
+    # cv.waitKey(0)
+
+    # frame_luminance[:,:,0] = fixed_image
+    # result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+    # cv.imshow("Result",result)
+    # cv.waitKey(0)
+
+    # # normalize
+    # visual_frame = np.divide(result-np.min(result),np.max(result)-np.min(result))*255
+    # visual_frame = visual_frame.astype(np.uint8)
+    # cv.imshow("Normalized",visual_frame)
+    # cv.waitKey(0)
+
+
+
+
+
+
+    # # Find the 95% quantile
+    # # Y_data = frame_luminance[:,:,0].flatten()
+    # # upper_quantile = np.quantile(Y_data, .95, axis = 0)
+    # # # Try segmenting areas above quantile 
+    # # ret,thresh1 = cv.threshold(frame_luminance[:,:,0],upper_quantile,255,cv.THRESH_BINARY)
+    # # cv.imshow("Thresholded image",thresh1)
+    # # cv.waitKey(0)
+
+
+    # # # Remove small very bright areas
+
+
+    # # # analyze fft
+    # # fourier_frame = np.fft.fftshift(np.fft.fft2(frame_luminance[:,:,0]))
+    # # plt.set_cmap("gray")
+    # # plt.subplot(122)
+    # # plt.imshow(np.log(abs(fourier_frame)))
+    # # plt.show()
+

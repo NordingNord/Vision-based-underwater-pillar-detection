@@ -584,3 +584,15 @@
 //            }
 //            cout << "]" << endl;
 //        }
+
+
+
+//// test stuff
+//cout << "Updated data position vectors" << endl;
+//for(int i = 0; i < current_data.size(); i++){
+//    cout << "Point " << current_data.at(i).id << ": ";
+//    for(int j = 0; j < current_data.at(i).positions.size(); j++){
+//        cout << current_data.at(i).positions.at(j) << " ";
+//    }
+//    cout << endl;
+//}

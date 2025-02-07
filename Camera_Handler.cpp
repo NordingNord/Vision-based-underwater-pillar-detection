@@ -146,3 +146,12 @@ int camera_handler::get_fps(){
     int fps = capturer.get(CAP_PROP_FPS);
     return fps;
 }
+
+// -- gets dimensions of video --
+vector<int> camera_handler::get_dim(){
+    int rows = capturer.get(CAP_PROP_FRAME_HEIGHT);
+    int cols = capturer.get(CAP_PROP_FRAME_WIDTH);
+    vector<int> dim = {rows,cols};
+    return dim;
+
+}

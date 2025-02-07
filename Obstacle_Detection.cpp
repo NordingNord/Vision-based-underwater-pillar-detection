@@ -10,6 +10,131 @@ obstacle_detection::obstacle_detection(){
 
 }
 
+// -- The data gathering part of the pipeline with focus on optical flow --
+void obstacle_detection::get_detection_data(string video_path, int feature_type, int frame_gap, bool continuous){
+    try{
+        // Initialize classses
+        camera_handler cam_handler(video_path); // Prepares the video
+        feature_finder finder(feature_type); // Finds the features based on desired type
+        feature_analyzer analyzer; // Analyzes features
+        data_visualization visualizer; // Handles color consistensies between features and visualization
+
+        // Get dimension
+        vector<int> dim = cam_handler.get_dim();
+        int height = dim.at(0);
+        int width = dim.at(1);
+
+        // get fps
+        int fps = cam_handler.get_fps();
+
+        // Initialize loop variables
+        bool find_features = true; // Decides when features are found (continous = true results in this allways being true)
+        vector<KeyPoint> current_features; // Features currently in use
+        vector<keypoint_data> current_data; // Features currently in use with the addition of data like velocity past positions and more
+        Mat last_frame; // Last frame is needed for optical flow
+        Mat frame;
+
+        int frame_counter = 0; // Keeps track of number of frames analyzed
+        int gap_tracker = 0; // Value that keeps track of frames since last data update
+
+        // Go through all frames
+        while(true){
+            // Read frame
+            frame = cam_handler.get_frame();
+            // Break if no more frames
+            if(frame.empty()){
+                cout << "Reached end of video stream" << endl;
+                break;
+            }
+            cout << find_features << endl;
+            frame_counter++;
+            cout << "New frame: " << frame_counter << endl;
+            // Use frame if done with gap
+            if(gap_tracker == 0){
+                // Find features
+                if(find_features == true && current_features.size() < max_features){
+                    // Uniform requires its own call
+                    vector<KeyPoint> temp_features;
+                    if(feature_type == METHOD_UNIFORM){
+                        temp_features = finder.make_uniform_keypoints(frame); // Make uniform keypoints using base values
+                    }
+                    else{
+                        temp_features = finder.find_features(frame); // Find features using initialized detector
+                    }
+                    // Add found feature to currently alive features
+                    current_features.insert(current_features.end(), temp_features.begin(), temp_features.end());
+                    // Assign data to new features
+                    vector<keypoint_data> temp_data = analyzer.convert_to_data(temp_features);
+                    // Assign color for visualization
+                    vector<Scalar> colours = visualizer.generate_random_colours(temp_features.size());
+                    temp_data = analyzer.insert_data(temp_data, colours);
+                    current_data.insert(current_data.end(), temp_data.begin(), temp_data.end());
+
+                    // Only ready for new keypoints if not enough points or continous
+                    if(current_features.size() >= min_points && continuous == false){
+                        find_features = false;
+                    }
+                    // show current features
+                    Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
+                }
+                // Time to analyze the features found if more than one frame is present
+                if(last_frame.empty() == false){
+                    // Perform optical flow
+                    optical_flow_results flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_features), last_frame, frame);
+                    // Remove keypoints with heigh uncertainty
+                    current_data = analyzer.remove_invalid_data(current_data,flow_results);
+                    // Update data based on optical flow result
+                    for(int i = 0; i < current_data.size(); i++){
+                        // Update point to represent the news estimated position
+                        current_data[i].point = flow_results.cleaned_points[i];
+                        // Add new position to list of positions
+                        current_data[i].positions.push_back(flow_results.cleaned_points[i]);
+                        // Ensure that the positions buffer have a limited size
+                        if(current_data[i].positions.size() > buffer_size){
+                            vector<Point2f> temp(current_data[i].positions.end()-buffer_size,current_data[i].positions.end());
+                            current_data[i].positions = temp;
+                        }
+                    }
+
+                    // Update features
+                    current_features = analyzer.points_to_keypoints(flow_results.cleaned_points);
+                }
+                // Visualize paths
+                Mat visualize_frame = frame.clone();
+                // Mark points
+                Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
+                // Draw lines for alive features
+                Mat line_frame = visualizer.mark_lines(current_data,frame);
+                // Combine mask and frame
+                add(line_frame,circle_frame,visualize_frame);
+                imshow("Surviving features path",visualize_frame);
+                waitKey(0);
+
+                // Ensure that features are found again if few are present
+                if(current_features.size() < min_points){
+                    find_features = true;
+                }
+            }
+            // Update gap tracker
+            gap_tracker++;
+            // Reset if gap ha been achieved
+            if(gap_tracker >= frame_gap){
+                gap_tracker = 0;
+            }
+
+            // Update last frame
+            last_frame = frame;
+        }
+    }
+    catch(const exception& error){
+        cout << error.what() << endl;
+    }
+}
+
+
+
+
+
 // -- Performs optical flow on video --
 void obstacle_detection::perform_optical_flow(string video_path, int feature_type, bool record, int cluster_setting, string recording_name, int frame_gap){
     try{
@@ -61,7 +186,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
             // Check if data should be worked with
             if(gap_tracker == 0){
                 // Preprocess frame
-                frame = processor.median_filter(frame,11);
+                //frame = processor.median_filter(frame,11);
                 cout << "Updating data" << endl;
                 // Find features if begining of video or most features are lost
                 if(find_features == true){
@@ -87,6 +212,9 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                             // record initial frame
                             Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
                             video_writer.write(circle_frame);
+                            imwrite("Low_blur_features.jpg", circle_frame);
+                            imshow("features",circle_frame);
+                            waitKey(0);
                         }
                         find_features = false;
                         // Assign a kalman filter to each point
@@ -165,6 +293,7 @@ void obstacle_detection::perform_optical_flow(string video_path, int feature_typ
                         Point2f estimate = kalman_filters[current_data[i].id].correct_kalman(current_data[i].point.x,current_data[i].point.y);
                         current_data[i].estimate_positions.push_back(estimate);
                         kalman_estimates.push_back(estimate);
+
 
 //                        cout << "Point compared to kalman:" << endl;
 //                        cout << current_data[i].point.x << ", " << current_data[i].point.y << endl;

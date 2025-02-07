@@ -69,9 +69,13 @@ int main(){
 //        waitKey(0);
 //    }
 
-//    // Testing optical flow //
+    // Test simplified optical flow
     obstacle_detection detection;
-    detection.perform_optical_flow("../Data/Video_Data/New_Pillar_Top.mkv",0, true, ON_FRAME, "preprocess test",0); // 0 -> ORB 2 -> SIFT last int is gap
+    detection.get_detection_data("../Data/Video_Data/Low_Blur_New_Pillar_Top.mkv", 2, 0, true);
+
+//    // Testing optical flow //
+//    obstacle_detection detection;
+//    detection.perform_optical_flow("../Data/Video_Data/Heavy_Blur_New_Pillar_Top.mkv",0, true, ON_FRAME, "preprocess test",0); // 0 -> ORB 2 -> SIFT last int is gap
 //    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_FRAME, "gap_test",0);
 //    feature_analyzer test;
 //    vector<keypoint_data> keypoints;
