@@ -260,3 +260,35 @@
     # # plt.imshow(np.log(abs(fourier_frame)))
     # # plt.show()
 
+        # for window in sliding_window:
+        #     # Calculate lumination threshold
+        #     lum_thresh = window_means[index] + np.divide(window_variances[index],2)
+        #     # Find center
+        #     rows,cols = window.shape
+        #     center_value = window[rows//2, cols//2]
+        #     # Continue if above lum threshold (they also say high variance but does not define it)
+        #     if(center_value > lum_thresh):
+        #         # Calculate marine snow probability
+        #         high_lum_pixels = np.where(window > lum_thresh,1,0)
+        #         high_lum_count = np.count_nonzero(high_lum_pixels)
+        #         # Get total number of pixels in window
+        #         pixel_count = rows*cols
+        #         # Calculate likelyhood
+        #         probability_for_snow = 1-np.divide(high_lum_count/pixel_count)
+        #         # if probability is high then conduct cross check
+        #         if(probability_for_snow >= high_prob):
+        #             # Create bigger kernel around current kernel (need to figure indexing from sliding windows array)
+        #             biger_window = 0
+        #             # Count number of high lum pixels
+        #             new_high_lum_pixels = np.where(bigger_window > lum_thresh,1,0)
+        #             new_high_lum_count = np.count_nonzero(high_lum_pixels)
+        #             # If smaller than original count -> snow identified -> turn center into mean
+        #             if(new_high_lum_count > high_lum_count):
+        #                 print("fix below")
+        #                 #luminance_result[] = window.median() # Need to figure out indexing
+        #     index = index+1
+        
+        # # Prepare return data
+        # frame_luminance[:,:,0] = luminance_result
+        # result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+        # return result

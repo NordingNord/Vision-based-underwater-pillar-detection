@@ -46,8 +46,7 @@ private:
 
     // -- Base settings for each method based on test results --
     sift_settings settings_sift = {1000,3,0.03,43,1.6,0,false};
-    orb_settings settings_orb = {100,1.6,6,34,0,2,34,13};
-
+    orb_settings settings_orb = {100,1.6,6,34,0,2,34,4};//{100,1.6,6,34,0,2,34,13};
     // -- Base method if none is given --
     int base_method = METHOD_ORB;
 };

@@ -76,6 +76,9 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
                     }
                     // show current features
                     Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
+                    imwrite("Haze_pre_snow_remove_low_fast_features.jpg", circle_frame);
+                    imshow("features",circle_frame);
+                    waitKey(0);
                 }
                 // Time to analyze the features found if more than one frame is present
                 if(last_frame.empty() == false){

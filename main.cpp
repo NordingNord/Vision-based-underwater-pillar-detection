@@ -71,7 +71,7 @@ int main(){
 
     // Test simplified optical flow
     obstacle_detection detection;
-    detection.get_detection_data("../Data/Video_Data/Low_Blur_New_Pillar_Top.mkv", 2, 0, true);
+    detection.get_detection_data("../Data/Video_Data/Haze_Snow_removal_New_Pillar_Top.mkv", 0, 0, true);
 
 //    // Testing optical flow //
 //    obstacle_detection detection;
