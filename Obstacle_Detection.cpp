@@ -48,6 +48,7 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
             }
             cout << find_features << endl;
             frame_counter++;
+            string title = "../Data/Video_Data/New_Pillar_Videos/Order_4/"+to_string(frame_counter)+".jpg";
             cout << "New frame: " << frame_counter << endl;
             // Use frame if done with gap
             if(gap_tracker == 0){
@@ -76,9 +77,9 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
                     }
                     // show current features
                     Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
-                    imwrite("Haze_pre_snow_remove_low_fast_features.jpg", circle_frame);
-                    imshow("features",circle_frame);
-                    waitKey(0);
+                    imwrite(title, circle_frame);
+//                    imshow("features",circle_frame);
+//                    waitKey(0);
                 }
                 // Time to analyze the features found if more than one frame is present
                 if(last_frame.empty() == false){
@@ -110,11 +111,14 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
                 Mat line_frame = visualizer.mark_lines(current_data,frame);
                 // Combine mask and frame
                 add(line_frame,circle_frame,visualize_frame);
-                imshow("Surviving features path",visualize_frame);
-                waitKey(0);
+                imwrite(title, visualize_frame);
+                //imshow("Surviving features path",visualize_frame);
+                //waitKey(0);
 
                 // Ensure that features are found again if few are present
                 if(current_features.size() < min_points){
+                    cout << "Not enough features. Test has ended." << endl;
+                    break;
                     find_features = true;
                 }
             }

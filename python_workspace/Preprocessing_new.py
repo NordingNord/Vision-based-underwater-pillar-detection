@@ -85,7 +85,8 @@ class preprocessing:
 
         frame_returned = np.fft.ifft2(filtered_frame)
 
-        frame_returned = np.expm1(np.real(frame_returned))
+        #frame_returned = np.expm1(np.real(frame_returned))
+        frame_returned = np.uint8(np.exp(np.real(frame_returned))-1)
 
         frame_luminance[:,:,0] = frame_returned
         frame_complete = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
@@ -239,7 +240,7 @@ class preprocessing:
         # apply new kernel, if odd
         if(kernel%2 != 0):
             kernel_size = kernel
-        high_variance = 100
+        high_variance = 30 # had 100 last
         sliding_window = np.lib.stride_tricks.sliding_window_view(luminance,(kernel_size,kernel_size))
         # Sliding window index 0 -> row pixels, index 1 -> col pixel then mask. output trimmed based on kernel size. meaning 0,0 in my case would be pixel 3,3. Borders are thus not affected. Maybe just remove border, in order to avoid consequencies of light edges being kept
         # Get all window means
@@ -310,7 +311,6 @@ class preprocessing:
                         new_high_lum_count = np.count_nonzero(high_lum_pixels)
                         # If smaller than original count -> snow identified -> turn center into mean
                         if(new_high_lum_count <= high_lum_count):
-                            print("supress")
                             luminance_result[row,col] = window_means[window_row_index][window_col_index]
                 if(visualize == True):
                     cv.imshow("kernel",test_image)
@@ -318,14 +318,17 @@ class preprocessing:
         # Prepare return data
         frame_luminance[:,:,0] = luminance_result
         rows,cols,_ = frame_luminance.shape
-        # Remove borders
+        # Remove borders 
         result = frame_luminance[kernel_size//2-1:rows-1-kernel_size//2,kernel_size//2-1:cols-1-kernel_size//2]
+        # Alternative: Assign median lum (not implemented due to other things being higher priority)
+        #lum_median = np.median(frame_luminance[:,:,0])
+        #frame_luminance[0:kernel_size//2-1,:,0] = 
         # Convert to bgr
         result = cv.cvtColor(result,cv.COLOR_YCrCb2BGR)
         return result
     
     # Method that normalizes frame luminosity with weighting low luminance values
-    def normalize_lum(self,frame,weight):
+    def normalize_lum(self,frame):
         # Converf to YCrCB
         frame_luminance = cv.cvtColor(frame,cv.COLOR_BGR2YCrCb)
         # Get lum channel
@@ -385,6 +388,8 @@ class preprocessing:
             frames = frames+1
             if ret is not True:
                 break
+            # Time taking
+            start = time.time()
             # create kernel if non-existent and blur is desired
             if(kernel_size == 0 and (pre_blur == True or post_blur == True)):
                 if(setting == "heavy"):
@@ -401,16 +406,18 @@ class preprocessing:
             # Apply pre blur if desired
             if(pre_blur == True):
                 frame = preprocessor.median_filter(frame,kernel_size)
-                print("bluring")
             # Apply haze removal
             dehazed_frame = preprocessor.haze_removal(frame)
             # Apply post blur if desired
             if(post_blur == True):
                 dehazed_frame = preprocessor.median_filter(dehazed_frame,kernel_size)
-            
             # write image
             writer.write(dehazed_frame)
-            print(frames)
+            # Time taking
+            end = time.time()
+            time_taken = (end-start) * 10**3
+            print(str(time_taken)+" ms")
+            # Break if all desired frames are handled
             if(frames >= frame_limit):
                 break
                 
@@ -419,31 +426,177 @@ class preprocessing:
         capturer = cv.VideoCapture(path)
         frame_size = (int(capturer.get(3)-(kernel_size-1)),int(capturer.get(4)-(kernel_size-1)))
         writer = cv.VideoWriter(save_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
-        print(frame_size)
         frames = 0
         while(True):
             ret,frame = capturer.read()
             frames = frames+1
             if ret is not True:
                 break
+            # Time taking
+            start = time.time()
             # Apply filter
-            print(frame.shape)
-            cleaned_frame =  preprocessor.snow_blur(frame,prob_limit,kernel_size,True)
-            print(cleaned_frame.shape)
+            cleaned_frame =  preprocessor.snow_blur(frame,prob_limit,kernel_size,False)
+            # Idea: Apply pyramid of filters going either from big kernel to small or reversed -> will remove more "noise" but might also remove important features
+            # cv.imshow("frame",preprocessor.normalize_lum(cleaned_frame))
+            # cv.waitKey(0)
             # write image
             writer.write(cleaned_frame)
-            print(frames)
+            # Time taking
+            end = time.time()
+            time_taken = (end-start) * 10**3
+            print(str(time_taken)+" ms")
+            # Break if all desired frames are handled
             if(frames >= frame_limit):
                 break
+        
+    # Records resized video
+    def record_smaller(self,path,save_path,fps,frame_limit,min_size):
+        capturer = cv.VideoCapture(path)
+        # Prepare size
+        rows = int(capturer.get(4))
+        cols = int(capturer.get(3))
+        diff_percentage = 1.0
+        if(rows < cols):
+            diff_percentage = min_size/rows
+        else:
+            diff_percentage = min_size/cols
+        frame_size = (int(capturer.get(3)*diff_percentage),int(capturer.get(4)*diff_percentage))
+        # Create writer and loop variables
+        writer = cv.VideoWriter(save_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        frames = 0
+        while(True):
+            ret,frame = capturer.read()
+            frames = frames+1
+            if ret is not True:
+                break
+            # Time taking
+            start = time.time()
+            # Resize frame
+            frame = cv.resize(frame,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
+            # cv.imshow("frame",frame)
+            # cv.waitKey(0)
+            # Record frame
+            writer.write(frame)
+            # Time taking
+            end = time.time()
+            time_taken = (end-start) * 10**3
+            print(str(time_taken)+" ms")
+            # Break if all desired frames are handled
+            if(frames >= frame_limit):
+                break
+    
+    # Creates video with homomorphic filter
+    def homomorphic_create(self,path,save_path,fps,frame_limit,min_coef,max_coef,cutoff):
+        capturer = cv.VideoCapture(path)
+        frame_size = (int(capturer.get(3)),int(capturer.get(4)))
+        writer = cv.VideoWriter(save_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        frames = 0
+        while(True):
+            ret,frame = capturer.read()
+            frames = frames+1
+            if ret is not True:
+                break
+            # Time taking
+            start = time.time()
+            # Extend in order to use the filter
+            extended_frame = preprocessor.get_squared_image(frame)
+            # Apply filter
+            homomorphic_frame = preprocessor.homomorphic_filter(extended_frame,min_coef,max_coef,cutoff)
+            # Revert frame
+            homomorphic_frame = preprocessor.revert_frame(homomorphic_frame, frame)
+            # Brighten up
+            frame_luminance = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
+            frame_luminance[:,:,0] = preprocessor.brighten_frame(frame_luminance[:,:,0],20,6.0)
+            homomorphic_frame = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+            # cv.imshow("frame",homomorphic_frame)
+            # cv.imshow("frame_org",frame)
+            # cv.waitKey(0)
+            # Record frame
+            writer.write(homomorphic_frame)
+            # Time taking
+            end = time.time()
+            time_taken = (end-start) * 10**3
+            print(str(time_taken)+" ms") 
+            # Break if all desired frames are handled
+            if(frames >= frame_limit):
+                break
+
+    # Creates normalized video
+    def normalized_create(self,path,save_path,fps,frame_limit):
+        capturer = cv.VideoCapture(path)
+        frame_size = (int(capturer.get(3)),int(capturer.get(4)))
+        writer = cv.VideoWriter(save_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        frames = 0
+        while(True):
+            ret,frame = capturer.read()
+            frames = frames+1
+            if ret is not True:
+                break
+            # Time taking
+            start = time.time()
+            # Normalize lum channel
+            norman = preprocessor.normalize_lum(frame)
+            # cv.imshow("frame",norman)
+            # cv.waitKey(0)
+            # Record frame
+            writer.write(norman)
+            # Time taking
+            end = time.time()
+            time_taken = (end-start) * 10**3
+            print(str(time_taken)+" ms") 
+            # Break if all desired frames are handled
+            if(frames >= frame_limit):
+                break
+
+    # Creates sharpen video
+    def sharpen_create(self,path,save_path,fps,frame_limit,sigma,strength):
+        capturer = cv.VideoCapture(path)
+        frame_size = (int(capturer.get(3)),int(capturer.get(4)))
+        writer = cv.VideoWriter(save_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        frames = 0
+        while(True):
+            ret,frame = capturer.read()
+            frames = frames+1
+            if ret is not True:
+                break
+            # Time taking
+            start = time.time()
+            # Sharpen
+            sharp_frame = preprocessor.unsharp_masking(frame,sigma,strength)
+            # cv.imshow("frame",sharp_frame)
+            # cv.waitKey(0)
+            # Record frame
+            writer.write(sharp_frame)
+            # Time taking
+            end = time.time()
+            time_taken = (end-start) * 10**3
+            print(str(time_taken)+" ms") 
+            # Break if all desired frames are handled
+            if(frames >= frame_limit):
+                break
+
 
     # sharpens edges in frame
     def sharpen_frame(self,frame):
         # Create sharpen kernel
-        kernel = np.array([0,-1,0],[-1,5,-1],[0,-1,0])
+        kernel = np.array([[0,-1,0],[-1,9,-1],[0,-1,0]])
         # Apply kernel to frame
         sharpened_frame = cv.filter2D(frame,-1,kernel)
         # Return frame
         return frame
+    
+    # Sharpening using unsharp masking
+    def unsharp_masking(self,frame,sigma,strength):
+        # Applying gaussian blur
+        blurred_frame = cv.GaussianBlur(frame,(0,0),sigma)
+        # Remove blurred image from orignal to get sharpened frame
+        sharpened_frame = cv.addWeighted(frame,1.0+strength,blurred_frame,-strength,0)
+        return sharpened_frame
+
+    # Brighten up image
+    def brighten_frame(self,frame,light,contrast):
+        brightened_frame = cv.addWeighted(frame,contrast,np.zeros(frame.shape,frame.dtype),0,light)
+        return brightened_frame
 
 # make videos
 preprocessor = preprocessing()
@@ -452,10 +605,99 @@ preprocessor = preprocessing()
 #preprocessor.blur_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Heavy_Blur_New_Pillar_Top.mkv',30,"heavy",150)
 #preprocessor.haze_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Haze_pre_blur_New_Pillar_Top.mkv',30,150,True,False,"low")
 #preprocessor.blur_create('../../Data/Video_Data/Haze_New_Pillar_Top.mkv','../../Data/Video_Data/Haze_Low_Blur_New_Pillar_Top.mkv',30,"low",150)
-preprocessor.snow_removal_create('../../Data/Video_Data/Haze_New_Pillar_Top.mkv','../../Data/Video_Data/Haze_Snow_removal_New_Pillar_Top.mkv',30,150,0.6,7)
+#preprocessor.snow_removal_create('../../Data/Video_Data/Haze_New_Pillar_Top.mkv','../../Data/Video_Data/Haze_Snow_removal_New_Pillar_Top_Resize.mkv',30,150,0.6,7,384) # old had kernel 7 and no resizing
+
+# Step-wise video making
+
+# ---- ORDER 1 ---- 
+# Observation: Resizing before haze removal, ruins image quality
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1/Resized_Video.mkv',30,150,384)
+
+# Step 1: Dehazing
+#preprocessor.haze_create('../../Data/Video_Data/New_Pillar_Videos/Order_1/Resized_Video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1/Haze_Video.mkv',30,150,False,False,"low")
+
+# Step 2: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_1/Haze_Video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1/Snow_Removal_video.mkv',30,150,0.6,7)
+
+# Step 3: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_1/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1/Homomorphic_video.mkv',30,150,0.5,2.5,1.0)
+
+# Step 4: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_1/Homomorphic_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1/Big_Snow_Removal_video.mkv',30,150,0.6,31)
+
+# Step 5: Normalize
+#preprocessor.normalized_create('../../Data/Video_Data/New_Pillar_Videos/Order_1/Big_Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1/Normalized_video.mkv',30,150)
+
+# Step 6: Sharpen
+#preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_1/Normalized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1/Sharpened_video.mkv',30,150,1.0,1.5)
+
+# ---- ORDER 2 ----
+# Observation: It is the second snow removal that ruins image quality
+# Step 0: Dehazing
+#preprocessor.haze_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_2/Haze_Video.mkv',30,150,False,False,"low")
+
+# Step 1: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Videos/Order_2/Haze_Video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_2/Resized_Video.mkv',30,150,384)
+
+# Step 2: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_2/Resized_Video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_2/Snow_Removal_video.mkv',30,150,0.6,7)
+
+# Step 3: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_2/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_2/Homomorphic_video.mkv',30,150,0.5,2.5,1.0)
+
+# Step 4: Remove snow # This step adds large squares to image due to many values being seen noise
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_2/Homomorphic_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_2/Big_Snow_Removal_video.mkv',30,150,0.6,31)
+
+# Step 5: Normalize
+#preprocessor.normalized_create('../../Data/Video_Data/New_Pillar_Videos/Order_2/Big_Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_2/Normalized_video.mkv',30,150)
+
+# Step 6: Sharpen
+#preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_2/Normalized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_2/Sharpened_video.mkv',30,150,1.0,1.5)
+
+# ---- ORDER 3 ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_3/Resized_Video.mkv',30,150,384)
+# Step 1: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_3/Resized_Video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_3/Snow_Removal_video.mkv',30,150,0.6,7)
+# Step 2: Sharpen
+#preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_3/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_3/Sharpened_video.mkv',30,150,1.0,1.5)
+
+# ---- ORDER 4 ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4/Resized_video.mkv',30,150,384)
+# Step 1: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4/Homomorphic_video.mkv',30,150,0.5,2.5,1.0)
+
+# --- Resized ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Resized/Resized_video.mkv',30,150,384)
+
+
+# Write all small images to directory
+cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Videos/Resized/Resized_video.mkv')
+frame_i = 0
+while(True):
+    ret,frame = cap.read()
+    if ret is not True:
+        break
+    frame_i = frame_i+1
+    title = "../../Data/Video_Data/New_Pillar_Videos/Resized/"+str(frame_i)+".png"
+    cv.imwrite(title,frame)
+
+
+
+# Test result
+# cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Videos/Order_2/Sharpened_video.mkv')
+# while(True):
+#     ret,frame = cap.read()
+#     if ret is not True:
+#         break
+#     cv.imshow("frame", frame)
+#     cv.waitKey(0)
+
 
 # Main test
-#cap = cv.VideoCapture('../../Data/Video_Data/Haze_Snow_removal_New_Pillar_Top.mkv')
 # preprocessor = preprocessing()
 # frame = cv.imread("../../Data/marine_snow_test_image.png")
 # cleaned_img = preprocessor.snow_blur(frame,0.6,7,False)

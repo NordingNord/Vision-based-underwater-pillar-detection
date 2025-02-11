@@ -71,7 +71,7 @@ int main(){
 
     // Test simplified optical flow
     obstacle_detection detection;
-    detection.get_detection_data("../Data/Video_Data/Haze_Snow_removal_New_Pillar_Top.mkv", 0, 0, true);
+    detection.get_detection_data("/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_4/Homomorphic_video.mkv", 0, 0, false);
 
 //    // Testing optical flow //
 //    obstacle_detection detection;
