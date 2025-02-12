@@ -48,7 +48,7 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
             }
             cout << find_features << endl;
             frame_counter++;
-            string title = "../Data/Video_Data/New_Pillar_Videos/Order_4/"+to_string(frame_counter)+".jpg";
+            string title = "../Data/Video_Data/New_Pillar_Videos/Order_10/"+to_string(frame_counter)+".jpg";
             cout << "New frame: " << frame_counter << endl;
             // Use frame if done with gap
             if(gap_tracker == 0){

@@ -372,7 +372,7 @@ class preprocessing:
             # write image
             writer.write(preprocessed_frame)
             print(frames)
-            if(frames >= frame_limit):
+            if(frames >= frame_limit and frame_limit > -1):
                 break
     
     # Method that creates haze removal video
@@ -418,7 +418,7 @@ class preprocessing:
             time_taken = (end-start) * 10**3
             print(str(time_taken)+" ms")
             # Break if all desired frames are handled
-            if(frames >= frame_limit):
+            if(frames >= frame_limit and frame_limit > -1):
                 break
                 
     # Blurs marine snow regions in video
@@ -446,7 +446,7 @@ class preprocessing:
             time_taken = (end-start) * 10**3
             print(str(time_taken)+" ms")
             # Break if all desired frames are handled
-            if(frames >= frame_limit):
+            if(frames >= frame_limit and frame_limit > -1):
                 break
         
     # Records resized video
@@ -482,7 +482,7 @@ class preprocessing:
             time_taken = (end-start) * 10**3
             print(str(time_taken)+" ms")
             # Break if all desired frames are handled
-            if(frames >= frame_limit):
+            if(frames >= frame_limit and frame_limit > -1):
                 break
     
     # Creates video with homomorphic filter
@@ -518,7 +518,7 @@ class preprocessing:
             time_taken = (end-start) * 10**3
             print(str(time_taken)+" ms") 
             # Break if all desired frames are handled
-            if(frames >= frame_limit):
+            if(frames >= frame_limit and frame_limit > -1):
                 break
 
     # Creates normalized video
@@ -545,7 +545,7 @@ class preprocessing:
             time_taken = (end-start) * 10**3
             print(str(time_taken)+" ms") 
             # Break if all desired frames are handled
-            if(frames >= frame_limit):
+            if(frames >= frame_limit and frame_limit > -1):
                 break
 
     # Creates sharpen video
@@ -572,7 +572,7 @@ class preprocessing:
             time_taken = (end-start) * 10**3
             print(str(time_taken)+" ms") 
             # Break if all desired frames are handled
-            if(frames >= frame_limit):
+            if(frames >= frame_limit and frame_limit > -1):
                 break
 
 
@@ -669,21 +669,102 @@ preprocessor = preprocessing()
 # Step 1: Homomorphic filter
 #preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4/Homomorphic_video.mkv',30,150,0.5,2.5,1.0)
 
+# ---- ORDER 5 ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5/Resized_video.mkv',30,150,384)
+
+# Step 1: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_5/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5/Snow_Removal_video.mkv',30,150,0.6,7)
+
+# Step 2: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_5/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5/Homomorphic_video.mkv',30,150,0.5,2.5,1.0)
+
+# ---- ORDER 6 ----
+# Step 0: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_6/Snow_Removal_video.mkv',30,150,0.6,7)
+
+# Step 1: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Videos/Order_6/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_6/Resized_video.mkv',30,150,384)
+
+# Step 2: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_6/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_6/Homomorphic_video.mkv',30,150,0.5,2.5,1.0)
+
+# ---- ORDER 7 ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_7/Resized_video.mkv',30,150,384)
+
+# Step 1: Sharpen
+#preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_7/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_7/Sharpened_video.mkv',30,150,1.0,1.5)
+
+# ---- ORDER 8 ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_8/Resized_video.mkv',30,150,384)
+
+# Step 1: Dehaze
+#preprocessor.haze_create('../../Data/Video_Data/New_Pillar_Videos/Order_8/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_8/Haze_Video.mkv',30,150,False,False,"low")
+
+# ---- ORDER 9 ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_9/Resized_video.mkv',30,150,384)
+
+# Step 1: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_9/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_9/Homomorphic_video.mkv',30,150,0.5,2.5,1.0)
+
+# Step 2: Sharpen
+#preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_9/Homomorphic_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_9/Sharpened_video.mkv',30,150,1.0,1.5)
+
+# ---- ORDER 10 ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_10/Resized_video.mkv',30,150,384)
+
+# Step 1: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_10/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_10/Homomorphic_video.mkv',30,150,0.5,2.5,1.0)
+
+# Step 2: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_10/Homomorphic_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_10/Snow_Removal_video.mkv',30,150,0.6,7)
+
+
+# ---- ORDER 4 full test----
+# Step 0: Resize
+preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Resized_video.mkv',30,-1,384)
+# Step 1: Homomorphic filter
+preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+
 # --- Resized ----
 # Step 0: Resize
 #preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Resized/Resized_video.mkv',30,150,384)
 
 
 # Write all small images to directory
-cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Videos/Resized/Resized_video.mkv')
-frame_i = 0
-while(True):
-    ret,frame = cap.read()
-    if ret is not True:
-        break
-    frame_i = frame_i+1
-    title = "../../Data/Video_Data/New_Pillar_Videos/Resized/"+str(frame_i)+".png"
-    cv.imwrite(title,frame)
+# cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Top.mkv')
+# frame_i = 0
+# while(True):
+#     ret,frame = cap.read()
+#     if ret is not True:
+#         break
+#     frame_i = frame_i+1
+#     print(frame_i)
+#     title = "../../Data/Video_Data/New_Pillar_Videos/Images/"+str(frame_i)+".jpg"
+#     cv.imwrite(title,frame)
+#     if(frame_i > 150):
+#         break
+
+# Write UIEC2Net frames
+# frame = cv.imread("../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_Images/1.jpg",cv.IMREAD_COLOR)
+# rows,cols,_ = frame.shape
+# frame_size = (cols,rows)
+# index = 1
+# writer = cv.VideoWriter("../../Data/Video_Data/New_Pillar_Videos/UIEC2Net.mkv", cv.VideoWriter_fourcc('M','J','P','G'), 30, frame_size)
+# while(True):
+#     writer.write(frame)
+#     index = index+1
+#     if(index > 50):
+#         break
+#     path = "../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_Images/"+str(index)+".jpg"
+#     frame = cv.imread(path,cv.IMREAD_COLOR)
+
+
 
 
 
