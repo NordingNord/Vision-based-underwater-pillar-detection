@@ -227,8 +227,10 @@ class preprocessing:
         result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
         return result
     
-    # Method for bluring of marine snow (inspired by: Elimination of Marine Snow effect from underwater image - An adaptive probabilistic approach)
-    def snow_blur(self,frame,high_prob,kernel,visualize):
+    # The old snow blur method
+    def snow_blur_old(self,frame,high_prob,kernel,visualize):
+        # Time taking
+        start = time.time()
         # Convert to YCrCb
         frame_luminance = cv.cvtColor(frame,cv.COLOR_BGR2YCrCb)
         # Get lumination channel
@@ -247,7 +249,13 @@ class preprocessing:
         window_means = sliding_window.mean(axis=(2,3)) # Mean of each window, meaning a value for each pixel. Window is at index 2 and 3 in 4D matrix
         # Get all window variances
         window_variances = sliding_window.var(axis=(2,3))
+
+        # # Prepare return data
+        frame_luminance[:,:,0] = luminance_result
+        result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+        # return result
         # Go through windows analyzing center pixels for high lumination (determined by threshol: local mean + local standard deviation/2)
+        test = 0
         for window_row_index in range(sliding_window.shape[0]):
             for window_col_index in range(sliding_window.shape[1]):
                 window = sliding_window[window_row_index][window_col_index]
@@ -308,9 +316,10 @@ class preprocessing:
 
                         # Find number of values above lum thresh
                         new_high_lum_pixels = np.where(bigger_window > lum_thresh, 1, 0)
-                        new_high_lum_count = np.count_nonzero(high_lum_pixels)
+                        new_high_lum_count = np.count_nonzero(new_high_lum_pixels)
                         # If smaller than original count -> snow identified -> turn center into mean
                         if(new_high_lum_count <= high_lum_count):
+                            test = test +1
                             luminance_result[row,col] = window_means[window_row_index][window_col_index]
                 if(visualize == True):
                     cv.imshow("kernel",test_image)
@@ -320,11 +329,234 @@ class preprocessing:
         rows,cols,_ = frame_luminance.shape
         # Remove borders 
         result = frame_luminance[kernel_size//2-1:rows-1-kernel_size//2,kernel_size//2-1:cols-1-kernel_size//2]
-        # Alternative: Assign median lum (not implemented due to other things being higher priority)
-        #lum_median = np.median(frame_luminance[:,:,0])
-        #frame_luminance[0:kernel_size//2-1,:,0] = 
         # Convert to bgr
         result = cv.cvtColor(result,cv.COLOR_YCrCb2BGR)
+        # Time taking
+        end = time.time()
+        time_taken = (end-start) * 10**3
+        print(str(time_taken)+" ms")
+        print(test)
+        return result
+
+    # Method for bluring of marine snow (inspired by: Elimination of Marine Snow effect from underwater image - An adaptive probabilistic approach)
+    def snow_blur(self,frame,high_prob,kernel,visualize):
+        # Time taking
+        #start = time.time()
+        # Convert to YCrCb
+        frame_luminance = cv.cvtColor(frame,cv.COLOR_BGR2YCrCb)
+        # Get sizes
+        rows,cols,_ = frame_luminance.shape
+        # Get lumination channel
+        luminance = frame_luminance[:,:,0]
+        # Prepare result channel
+        luminance_result = luminance.copy()
+        # Get sliding window
+        kernel_size = 7 # Based on article
+        # apply new kernel, if odd
+        if(kernel%2 != 0):
+            kernel_size = kernel
+        high_variance = 30 # had 100 last
+        sliding_window = np.lib.stride_tricks.sliding_window_view(luminance,(kernel_size,kernel_size))
+        # Sliding window index 0 -> row pixels, index 1 -> col pixel then mask. output trimmed based on kernel size. meaning 0,0 in my case would be pixel 3,3. Borders are thus not affected. Maybe just remove border, in order to avoid consequencies of light edges being kept
+        # Get all window means
+        window_means = sliding_window.mean(axis=(2,3)) # Mean of each window, meaning a value for each pixel. Window is at index 2 and 3 in 4D matrix
+        # Get all window variances
+        window_variances = sliding_window.var(axis=(2,3))
+        # Get all lum thresholds
+        lum_thresholds = window_means + np.divide(np.sqrt(window_variances),2)
+        # Get center values
+        center_values = sliding_window[:,:,kernel_size//2,kernel_size//2]
+        # Identify windows that might contain snow
+        snow_windows = (center_values >= lum_thresholds).astype(int)
+        del center_values
+        variance_check = (window_variances > high_variance).astype(int)
+        del window_variances
+        snow_windows = np.logical_and(snow_windows,variance_check).astype(int)
+        del variance_check
+        # Get indexes of snow windows
+        snow_indexes = np.transpose((snow_windows == 1).nonzero())
+        if(snow_indexes.shape[0]==0):
+            print("No snow detected")
+            return frame[kernel_size//2-1:rows-1-kernel_size//2,kernel_size//2-1:cols-1-kernel_size//2]
+        del snow_windows
+        # Get total number of pixels in window
+        pixel_count = kernel_size*kernel_size
+
+        # --- new test improvements ---
+        # Expand lum threshold
+        expanded_lum_thresholds = lum_thresholds[:,:,np.newaxis,np.newaxis]
+        expanded_lum_thresholds = np.pad(expanded_lum_thresholds,((0,0),(0,0),(0,kernel_size-1),((0,kernel_size-1))),'edge')
+        # Determine high lum pixel count in windows that might contain snow
+        high_lum_mask = np.where(sliding_window >= expanded_lum_thresholds,1,0)
+        del sliding_window
+        # Extract only snow areas
+        snow_specific_mask = np.array([high_lum_mask[tuple(coord)] for coord in snow_indexes])
+        snow_specific_mask = snow_specific_mask.reshape(snow_specific_mask.shape[0],-1)
+        high_lum_count = np.count_nonzero(snow_specific_mask,axis=1) 
+        # Calculate probabilities
+        probability_for_snow = 1-np.divide(high_lum_count,pixel_count)
+        # Keep only indexes with high probability
+        indexes_of_indexes = np.transpose((probability_for_snow >= high_prob).nonzero()).flatten()
+        if(indexes_of_indexes.shape[0]==0):
+            print("No snow detected")
+            return frame[kernel_size//2-1:rows-1-kernel_size//2,kernel_size//2-1:cols-1-kernel_size//2]
+        # Prepare variables
+        bigger_kernel_size = kernel_size+2
+
+        # Get dimensions
+        row = snow_indexes[indexes_of_indexes,0]+kernel_size//2
+        col = snow_indexes[indexes_of_indexes,1]+kernel_size//2
+        start_rows = row-bigger_kernel_size//2
+        start_cols = col-bigger_kernel_size//2
+        end_rows = row+bigger_kernel_size//2
+        end_cols = col+bigger_kernel_size//2
+        # Fix dimensions based on borders
+        start_rows = np.where(start_rows >= 0,start_rows,0)
+        start_cols = np.where(start_cols >= 0,start_cols,0)
+        end_rows = np.where(end_rows < luminance.shape[0],end_rows,luminance.shape[0]-1)
+        end_cols = np.where(end_cols < luminance.shape[0],end_cols,luminance.shape[0]-1)
+        # Create larger windows
+        #bigger_windows = np.ones([len(start_rows),bigger_kernel_size,bigger_kernel_size], dtype=int)
+        #test = 0
+        for index in range(len(start_rows)):
+            current_window = luminance[start_rows[index]:end_rows[index]+1,start_cols[index]:end_cols[index]+1]
+            new_high_lum_pixels = np.where(current_window > lum_thresholds[snow_indexes[indexes_of_indexes[index]][0],snow_indexes[indexes_of_indexes[index]][1]], 1, 0)
+            new_high_lum_count = np.count_nonzero(new_high_lum_pixels)
+            # If smaller than original count -> snow identified -> turn center into mean
+            if(new_high_lum_count <= high_lum_count[indexes_of_indexes[index]]):
+                luminance_result[row[index],col[index]] = window_means[snow_indexes[indexes_of_indexes[index]][0]][snow_indexes[indexes_of_indexes[index]][1]]
+                #test = test+1
+
+        # ALternative idea: get bigger sliding window and the index between the two instead of creating my own
+
+        # new smaller for loop to gain bigger kernel
+        #test = 0
+        # for index in indexes_of_indexes:
+        #     # We create a bigger window around the center
+        #     row = snow_indexes[index][0]+kernel_size//2
+        #     col = snow_indexes[index][1]+kernel_size//2
+        #     start_row = row-bigger_kernel_size//2
+        #     start_col = col-bigger_kernel_size//2
+        #     end_row = row+bigger_kernel_size//2
+        #     end_col = col+bigger_kernel_size//2
+        #     # Fix based on borders
+        #     if(start_row < 0):
+        #         start_row = 0
+        #     if(start_col < 0):
+        #         start_col = 0
+        #     if(end_row >= luminance.shape[0]):
+        #         end_row = luminance.shape[0]-1
+        #     if(end_col >= luminance.shape[1]):
+        #         end_col = luminance.shape[1]-1
+        #     # Apply window  
+        #     bigger_window = luminance[start_row:end_row+1,start_col:end_col+1]
+        #     # Find number of values above lum thresh
+        #     new_high_lum_pixels = np.where(bigger_window > lum_thresholds[snow_indexes[index][0],snow_indexes[index][1]], 1, 0)
+        #     new_high_lum_count = np.count_nonzero(new_high_lum_pixels)
+        #     # If smaller than original count -> snow identified -> turn center into mean
+        #     if(new_high_lum_count <= high_lum_count[index]):
+        #         #test = test+1
+        #         luminance_result[row,col] = window_means[snow_indexes[index][0]][snow_indexes[index][1]]
+
+        # ---- Before improvements ----
+
+        # probalities = []
+        # for index in range(len(snow_indexes)):
+        #     # Count number of pixels in window that have high lum
+        #     coordinate = (snow_indexes[index][0],snow_indexes[index][1])
+        #     match_index = np.where(sliding_window[coordinate] >= lum_thresholds[coordinate],1,0)
+        #     lum_count = np.count_nonzero(match_index)
+        #     # Calculate probability for marine snow
+        #     probability_for_snow = 1-np.divide(lum_count,pixel_count)
+        #     # List for vizualisation
+        #     probalities.append(probability_for_snow)
+        #     # if probability is high perform cross check
+        #     if(probability_for_snow >= high_prob):
+        #         # We create a bigger window around the center
+        #         bigger_kernel_size = kernel_size+2
+        #         # Get windowframe.copy()
+        #         row = coordinate[0]+kernel_size//2
+        #         col = coordinate[1]+kernel_size//2
+        #         start_row = row-bigger_kernel_size//2
+        #         start_col = col-bigger_kernel_size//2
+        #         end_row = row+bigger_kernel_size//2
+        #         end_col = col+bigger_kernel_size//2
+
+        #         if(start_row < 0):
+        #             start_row = 0
+        #         if(start_col < 0):
+        #             start_col = 0
+        #         if(end_row >= luminance.shape[0]):
+        #             end_row = luminance.shape[0]-1
+        #         if(end_col >= luminance.shape[1]):
+        #             end_col = luminance.shape[1]-1
+                        
+        #         bigger_window = luminance[start_row:end_row+1,start_col:end_col+1]
+        #         # Find number of values above lum thresh
+        #         new_high_lum_pixels = np.where(bigger_window > lum_thresholds[coordinate], 1, 0)
+        #         new_high_lum_count = np.count_nonzero(new_high_lum_pixels)
+        #         # If smaller than original count -> snow identified -> turn center into mean
+        #         if(new_high_lum_count <= lum_count):
+        #             luminance_result[row,col] = window_means[coordinate[0]][coordinate[1]]
+
+        # Visualization weird, since it no longer shows step wize removal
+        if(visualize == True):
+            snow_area_index = 0
+            for window_row_index in range(sliding_window.shape[0]):
+                for window_col_index in range(sliding_window.shape[1]):
+                    # Prepare inital visualisation
+                    row = window_row_index+kernel_size//2
+                    col = window_col_index+kernel_size//2
+                    test_image = frame.copy()
+                    test_image = cv.cvtColor(test_image,cv.COLOR_BGR2YCrCb)
+                    test_image[:,:,0] = luminance_result
+                    test_image = cv.cvtColor(test_image,cv.COLOR_YCrCb2BGR)
+                    temp = np.zeros((kernel_size,kernel_size,3),dtype=int)
+                    temp[:,:,2] = temp[:,:,2]+155
+                    test_image[row-kernel_size//2:row+kernel_size//2+1, col-kernel_size//2:col+kernel_size//2+1] = temp
+                    test_image[row,col] = np.array([0,0,255])
+                    # If snow zone do further visualization
+                    current_row = snow_indexes[snow_area_index][0]
+                    current_col = snow_indexes[snow_area_index][1]
+                    if(window_row_index == current_row and window_col_index == current_col):
+                        if(probalities[snow_area_index] >= high_prob):
+                            bigger_kernel_size = kernel_size+2
+                            row = window_row_index+kernel_size//2
+                            col = window_col_index+kernel_size//2
+                            start_row = row-bigger_kernel_size//2
+                            start_col = col-bigger_kernel_size//2
+                            end_row = row+bigger_kernel_size//2
+                            end_col = col+bigger_kernel_size//2
+                            if(start_row < 0):
+                                start_row = 0
+                            if(start_col < 0):
+                                start_col = 0
+                            if(end_row >= luminance.shape[0]):
+                                end_row = luminance.shape[0]-1
+                            if(end_col >= luminance.shape[1]):
+                                end_col = luminance.shape[1]-1       
+                            bigger_window = luminance[start_row:end_row+1,start_col:end_col+1]
+                            temp = np.zeros((bigger_window.shape[0],bigger_window.shape[1],3),dtype=int)
+                            temp[:,:,2] = temp[:,:,2]+155
+                            temp[:,:,1] = temp[:,:,1]+155
+                            test_image[start_row:end_row+1, start_col:end_col+1] = temp
+                            test_image[row,col] = np.array([0,0,255])
+                            snow_area_index = snow_area_index+1
+                    cv.imshow("kernel",test_image)
+                    cv.waitKey(1)
+
+        # Prepare return data
+        frame_luminance[:,:,0] = luminance_result
+        #rows,cols,_ = frame_luminance.shape
+        # Remove borders 
+        result = frame_luminance[kernel_size//2-1:rows-1-kernel_size//2,kernel_size//2-1:cols-1-kernel_size//2]
+        # Convert to bgr
+        result = cv.cvtColor(result,cv.COLOR_YCrCb2BGR)
+        # Time taking
+        # end = time.time()
+        # time_taken = (end-start) * 10**3
+        # print(str(time_taken)+" ms")
+        # print(test)
         return result
     
     # Method that normalizes frame luminosity with weighting low luminance values
@@ -575,7 +807,6 @@ class preprocessing:
             if(frames >= frame_limit and frame_limit > -1):
                 break
 
-
     # sharpens edges in frame
     def sharpen_frame(self,frame):
         # Create sharpen kernel
@@ -597,6 +828,9 @@ class preprocessing:
     def brighten_frame(self,frame,light,contrast):
         brightened_frame = cv.addWeighted(frame,contrast,np.zeros(frame.shape,frame.dtype),0,light)
         return brightened_frame
+
+# Test snow removal
+
 
 # make videos
 preprocessor = preprocessing()
@@ -726,9 +960,58 @@ preprocessor = preprocessing()
 
 # ---- ORDER 4 full test----
 # Step 0: Resize
-preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Resized_video.mkv',30,-1,384)
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Resized_video.mkv',30,-1,384)
 # Step 1: Homomorphic filter
-preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+# ---- ORDER 5 full test ----
+
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full/Resized_video.mkv',30,-1,384)
+
+# Step 0: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full/Snow_Removal_video.mkv',30,-1,0.6,7)
+
+# Step 2: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+# ---- ORDER 5 full bottom test ----
+
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Bottom.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_bottom/Resized_video.mkv',30,-1,384)
+
+# Step 0: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_bottom/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_bottom/Snow_Removal_video.mkv',30,-1,0.6,7)
+
+# Step 2: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_bottom/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_bottom/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+# ---- ORDER 4 full test----
+# Step 0: Resize
+preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Bottom.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Resized_video.mkv',30,-1,384)
+# Step 1: Homomorphic filter
+preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+
+# ---- ORDER 6 full test ----
+# Step 0: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_6_full/Snow_Removal_video.mkv',30,-1,0.6,7)
+
+# Step 1: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Videos/Order_6_full/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_6_full/Resized_video.mkv',30,-1,384)
+
+# Step 2: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_6_full/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_6_full/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+# ---- ORDER 9 full test----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_9_full/Resized_video.mkv',30,-1,384)
+
+# Step 1: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_9_full/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_9_full/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+# Step 2: Sharpen
+#preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_9_full/Homomorphic_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_9_full/Sharpened_video.mkv',30,-1,1.0,1.5)
 
 
 # --- Resized ----
@@ -779,15 +1062,15 @@ preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4
 
 
 # Main test
-# preprocessor = preprocessing()
+#preprocessor = preprocessing()
 # frame = cv.imread("../../Data/marine_snow_test_image.png")
 # cleaned_img = preprocessor.snow_blur(frame,0.6,7,False)
-# cleaned_img_2 = preprocessor.snow_blur(cleaned_img,0.6,5,False)
+# cleaned_img_2 = preprocessor.snow_blur_old(frame,0.6,7,False)
 # cv.imshow("Original 0", frame)
-# cv.waitKey(0)
-# cv.imshow("Cleaned 1", cleaned_img)
-# cv.waitKey(0)
-# cv.imshow("Cleaned 2", cleaned_img_2)
+
+# cv.imshow("Cleaned", cleaned_img)
+
+# cv.imshow("Cleaned old", cleaned_img_2)
 # cv.waitKey(0)
 #kernel_size = 201
 # while(True):

@@ -95,6 +95,9 @@ public:
     // -- prediction method for kalman filter --
     cv::Point2f predict_kalman();
 
+    // -- Perform FLANN feature matching --
+    match_result get_flann_matches(cv::Mat descriptors_top, cv::Mat descriptors_bottom,int number_of_best_matches, float ratio_threshold);
+
 private:
     // Variables used for optical flow
     cv::Size window_size = cv::Size(15,15); // search window at each level

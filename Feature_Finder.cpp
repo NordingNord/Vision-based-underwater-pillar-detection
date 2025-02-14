@@ -12,6 +12,92 @@ feature_finder::feature_finder(int method){
     base_method = method;
 }
 
+// -- Determines either SIFT or ORB descriptors based on input settings or base setting --
+Mat feature_finder::get_descriptors(Mat frame,vector<KeyPoint> keypoints){
+    // Initialize result Mat
+    Mat descriptors;
+    try{
+        // Run feature detector based on base method
+        if(base_method == METHOD_ORB){
+            descriptors = get_descriptors(frame,keypoints,settings_orb);
+        }
+        else if(base_method == METHOD_SIFT){
+            descriptors = get_descriptors(frame,keypoints,settings_sift);
+        }
+        else if(base_method == METHOD_UNIFORM){
+            descriptors = get_brief_descriptors(frame,keypoints);
+        }
+        else{
+            string error_message = "Error: Non valid base method of " + to_string(base_method);
+            throw (error_message);
+        }
+    }
+    catch(string error){
+        cout << error << endl;
+    }
+    return descriptors;
+}
+
+Mat feature_finder::get_descriptors(Mat frame,vector<KeyPoint> keypoints, orb_settings settings){
+    // Initialize result mat
+    Mat descriptors;
+    try{
+        if(keypoints.size() == 0){
+            throw runtime_error("No features was found using ORB.");
+        }
+        // Initialize detector
+        Ptr<ORB> orb_detector = ORB::create(settings.max_features, settings.scale_factor, settings.levels, settings.edge_threshold, settings.first_level, settings.wta_k, ORB::HARRIS_SCORE, settings.patch_size, settings.fast_threshold);
+        // Grayscale frame
+        Mat gray_frame = apply_grayscale(frame);
+        // Get descriptors
+        orb_detector->compute(gray_frame,keypoints, descriptors);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return descriptors;
+
+}
+Mat feature_finder::get_descriptors(Mat frame,vector<KeyPoint> keypoints, sift_settings settings){
+    // Initialize result mat
+    Mat descriptors;
+    try{
+        if(keypoints.size() == 0){
+            throw runtime_error("No features was found using SIFT>.");
+        }
+        // Initialize detector
+        Ptr<SIFT> sift_detector = SIFT::create(settings.max_features, settings.layers, settings.contrast_threshold, settings.edge_threshold, settings.sigma, settings.descriptor_type, settings.enable_precise_upscale);
+        // Grayscale frame
+        Mat gray_frame = apply_grayscale(frame);
+        // Find descriptors
+        sift_detector->compute(gray_frame,keypoints,descriptors);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return descriptors;
+}
+
+Mat feature_finder::get_brief_descriptors(Mat frame,vector<KeyPoint> keypoints){
+    // Initialize result mat
+    Mat descriptors;
+    try{
+        if(keypoints.size() == 0){
+            throw runtime_error("No features was found using SIFT>.");
+        }
+        // Initialize descriptor
+        Ptr<xfeatures2d::BriefDescriptorExtractor> descriptor = xfeatures2d::BriefDescriptorExtractor::create();
+        // Grayscale frame
+        Mat gray_frame = apply_grayscale(frame);
+        // Find descriptors
+        descriptor->compute(gray_frame,keypoints,descriptors);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return descriptors;
+}
+
 
 // -- Finds either SIFT or ORB features based on input settings or base setting  --
 vector<KeyPoint> feature_finder::find_features(Mat frame){
@@ -24,6 +110,9 @@ vector<KeyPoint> feature_finder::find_features(Mat frame){
         }
         else if(base_method == METHOD_SIFT){
             keypoints = find_features(frame,settings_sift);
+        }
+        else if(base_method == METHOD_UNIFORM){
+            keypoints = make_uniform_keypoints(frame, uniform_gap, uniform_keypoint_size);
         }
         else{
             string error_message = "Error: Non valid base method of " + to_string(base_method);

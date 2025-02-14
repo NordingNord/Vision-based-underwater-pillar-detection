@@ -10,6 +10,134 @@ obstacle_detection::obstacle_detection(){
 
 }
 
+// -- Multicam feature pipeline --
+void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int feature_finding_gap){
+    try{
+        // Initialize cameras
+        camera_handler cam_top(video_path_top); // Prepares the top camera video
+        camera_handler cam_bottom(video_path_bottom); // Prepares the bottom camera video
+
+        // Initialize filter classes
+        feature_finder finder(feature_type); // Finds the features based on desired type
+        feature_analyzer analyzer; // Analyzes features
+
+        // Initialize visualization classes
+        data_visualization visualizer; // Handles color consistensies between features and visualization
+
+        // Initialize loop variables
+        bool find_features = true; // Tells loop when new features should be added. Based on feature finding gap.
+
+        vector<KeyPoint> current_top_features; // Features currently in use in top image
+        vector<KeyPoint> current_bottom_features; // Features currently in use in bottom image
+
+        vector<KeyPoint> current_features; // Features that are kept after filtering
+
+        vector<keypoint_data> current_data; // Features currently in use with the addition of data like velocity past positions and more
+
+        // Storage for current frames
+        Mat frame_top, frame_bottom;
+
+        // Go through all frames
+        cout << "Initialization complete" << endl;
+        while(true){
+            // Read frames
+            frame_top = cam_top.get_frame();
+            frame_bottom = cam_bottom.get_frame();
+
+            // Break if no more frames any of the videos
+            if(frame_top.empty() || frame_bottom.empty()){
+                cout << "Reached end of a video stream" << endl;
+                // Error notification if one video ends prematurely
+                if(frame_top.empty() == false){
+                    throw runtime_error("Top video was limited by bottom video length.");
+                }
+                else if(frame_bottom.empty() == false){
+                    throw runtime_error("Bottom video was limited by top video length.");
+                }
+                break;
+            }
+            // Perform pipeline
+
+            // Most preprocessing done in python beforehand
+
+            // Perform histogram equalization to hopefully make both images more similar
+//            Mat gray_top = finder.apply_grayscale(frame_top);
+//            Mat gray_bottom = finder.apply_grayscale(frame_bottom);
+//            Mat equalized_top, equalized_bottom;
+//            equalizeHist(gray_top,equalized_top);
+//            equalizeHist(gray_bottom,equalized_bottom);
+//            cvtColor(gray_top,frame_top,COLOR_GRAY2BGR);
+//            cvtColor(gray_bottom,frame_bottom,COLOR_GRAY2BGR);
+            // Rotate frames 90 degrees to allign pillar
+            rotate(frame_top, frame_top, ROTATE_90_CLOCKWISE);
+            rotate(frame_bottom, frame_bottom, ROTATE_90_CLOCKWISE);
+
+            // Find features based on chosen method (if not exceeding maximum allowed features)
+            if(find_features == true && current_features.size() < max_features){
+                // Find features based on method
+                vector<KeyPoint> top_features = finder.find_features(frame_top); // Find features using initialized detector
+                vector<KeyPoint> bottom_features = finder.find_features(frame_top); // Find features using initialized detector
+                cout << "Features found" << endl;
+                // Find descriptors based on method
+                Mat top_descriptors = finder.get_descriptors(frame_top,top_features); // Gets descriptors based on newly found top view features
+                Mat bottom_descriptors = finder.get_descriptors(frame_bottom,bottom_features); // Gets descriptors based on newly found bottom view features
+                cout << "Descriptors determiend" << endl;
+                // Match features between cameras
+                match_result matches = analyzer.get_flann_matches(top_descriptors, bottom_descriptors,number_of_matches, lowes_threshold);
+                cout << "matches found" << endl;
+                // Remove features that are not present on both cameras
+                int n_matches = 0;
+                for(int i = 0; i < matches.good_matches.size(); i++){
+                    if(matches.good_matches[0] == true){
+                        n_matches++;
+                    }
+                }
+//                cout << matches.good_matches.size() << endl;
+//                cout << top_features.size() << endl;
+//                cout << bottom_features.size() << endl;
+//                Mat img_matches;
+//                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                Mat img_keypoints_top;
+//                drawKeypoints(frame_top, top_features, img_keypoints_top );
+//                Mat img_keypoints_bottom;
+//                drawKeypoints(frame_bottom, bottom_features, img_keypoints_bottom );
+//                imshow("matches",img_matches);
+//                imshow("Top features",img_keypoints_top);
+//                imshow("Bottom features",img_keypoints_bottom);
+//                waitKey(0);
+                if(n_matches != top_features.size()){
+                    cout << matches.good_matches.size() << endl;
+                    cout << top_features.size() << endl;
+                    cout << bottom_features.size() << endl;
+                    Mat img_matches;
+                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+                    vector<DMatch> kept_matches;
+                    for(int i = 0; i < matches.matches.size(); i++){
+                        if(matches.good_matches[i] == true){
+                            kept_matches.push_back(matches.matches[i]);
+                        }
+                    }
+                    Mat img_kept_matches;
+                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+                    imshow("matches that went wrong",img_matches);
+                    imshow("matches that survived",img_kept_matches);
+                    waitKey(0);
+                }
+
+
+                // Add found feature to currently alive features
+                current_top_features.insert(current_top_features.end(), top_features.begin(), top_features.end());
+                current_bottom_features.insert(current_bottom_features.end(), bottom_features.begin(), bottom_features.end());
+            }
+
+
+        }
+    }
+    catch(const exception& error){
+        cout << error.what() << endl;
+    }
+}
+
 // -- The data gathering part of the pipeline with focus on optical flow --
 void obstacle_detection::get_detection_data(string video_path, int feature_type, int frame_gap, bool continuous){
     try{
@@ -37,6 +165,10 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
         int frame_counter = 0; // Keeps track of number of frames analyzed
         int gap_tracker = 0; // Value that keeps track of frames since last data update
 
+        // Test variables
+        int frames_since = 0; // Ensures only every something frames are analysed
+        int last_death = 0;
+
         // Go through all frames
         while(true){
             // Read frame
@@ -46,10 +178,11 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
                 cout << "Reached end of video stream" << endl;
                 break;
             }
-            cout << find_features << endl;
+            //cout << find_features << endl;
             frame_counter++;
-            string title = "../Data/Video_Data/New_Pillar_Videos/Order_10/"+to_string(frame_counter)+".jpg";
-            cout << "New frame: " << frame_counter << endl;
+            frames_since++;
+            string title = "../Data/Video_Data/New_Pillar_Videos/Order_5_full/"+to_string(frame_counter)+".jpg";
+            //cout << "New frame: " << frame_counter << endl;
             // Use frame if done with gap
             if(gap_tracker == 0){
                 // Find features
@@ -77,7 +210,11 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
                     }
                     // show current features
                     Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
-                    imwrite(title, circle_frame);
+                    if(frames_since == 30){
+                        imwrite(title, circle_frame);
+                        frames_since = 0;
+                    }
+
 //                    imshow("features",circle_frame);
 //                    waitKey(0);
                 }
@@ -111,14 +248,19 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
                 Mat line_frame = visualizer.mark_lines(current_data,frame);
                 // Combine mask and frame
                 add(line_frame,circle_frame,visualize_frame);
-                imwrite(title, visualize_frame);
+                if(frames_since == 30){
+                    imwrite(title, visualize_frame);
+                    frames_since = 0;
+                }
                 //imshow("Surviving features path",visualize_frame);
                 //waitKey(0);
 
                 // Ensure that features are found again if few are present
                 if(current_features.size() < min_points){
-                    cout << "Not enough features. Test has ended." << endl;
-                    break;
+                    cout << "Not enough features at frame: " <<frame_counter << ". Adding new features." << endl;
+                    cout << "Survieved for " << frame_counter- last_death << " frames." << endl;
+                    last_death = frame_counter;
+                    imwrite(title, visualize_frame);
                     find_features = true;
                 }
             }

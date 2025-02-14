@@ -288,7 +288,75 @@
         #                 #luminance_result[] = window.median() # Need to figure out indexing
         #     index = index+1
         
-        # # Prepare return data
-        # frame_luminance[:,:,0] = luminance_result
-        # result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
-        # return result
+        # # # Prepare return data
+        # # frame_luminance[:,:,0] = luminance_result
+        # # result = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+        # # return result
+        # # Go through windows analyzing center pixels for high lumination (determined by threshol: local mean + local standard deviation/2)
+        # for window_row_index in range(sliding_window.shape[0]):
+        #     for window_col_index in range(sliding_window.shape[1]):
+        #         window = sliding_window[window_row_index][window_col_index]
+        #         variance = window_variances[window_row_index,window_col_index]
+        #         # Calculate lumination threshold
+        #         lum_thresh = window_means[window_row_index][window_col_index] + np.divide(math.sqrt(variance),2) # Square root due to standard deviation being needed
+        #         # Find center of window (allways the same if we use their hardcoded kernel sizes. But i make it variable just in case i experiment with it)
+        #         center_value = sliding_window[window_row_index][window_col_index][kernel_size//2][kernel_size//2]
+        #         if(visualize == True):
+        #             # test visualization of kernel and bigger kernel
+        #             row = window_row_index+kernel_size//2
+        #             col = window_col_index+kernel_size//2
+        #             test_image = frame.copy()
+        #             test_image = cv.cvtColor(test_image,cv.COLOR_BGR2YCrCb)
+        #             test_image[:,:,0] = luminance_result
+        #             test_image = cv.cvtColor(test_image,cv.COLOR_YCrCb2BGR)
+        #             temp = np.zeros((kernel_size,kernel_size,3),dtype=int)
+        #             temp[:,:,2] = temp[:,:,2]+155
+        #             test_image[row-kernel_size//2:row+kernel_size//2+1, col-kernel_size//2:col+kernel_size//2+1] = temp
+        #             test_image[row,col] = np.array([0,0,255])
+        #         # Continue only if above lum theshold and high variance
+        #         if(center_value >= lum_thresh and variance > high_variance):
+        #             # Determine number of pixels in window with high lum
+        #             high_lum_pixels = np.where(sliding_window[window_row_index][window_col_index] >= lum_thresh,1,0)
+        #             high_lum_count = np.count_nonzero(high_lum_pixels)
+        #             # Get total number of pixels in window
+        #             pixel_count = kernel_size*kernel_size
+        #             # Calculate probability for marine snow
+        #             probability_for_snow = 1-np.divide(high_lum_count,pixel_count)
+        #             # if probability is high perform cross check
+        #             if(probability_for_snow >= high_prob):
+        #                 # We create a bigger window around the center
+        #                 bigger_kernel_size = kernel_size+2
+        #                 # Get window
+        #                 row = window_row_index+kernel_size//2
+        #                 col = window_col_index+kernel_size//2
+        #                 start_row = row-bigger_kernel_size//2
+        #                 start_col = col-bigger_kernel_size//2
+        #                 end_row = row+bigger_kernel_size//2
+        #                 end_col = col+bigger_kernel_size//2
+
+        #                 if(start_row < 0):
+        #                     start_row = 0
+        #                 if(start_col < 0):
+        #                     start_col = 0
+        #                 if(end_row >= luminance.shape[0]):
+        #                     end_row = luminance.shape[0]-1
+        #                 if(end_col >= luminance.shape[1]):
+        #                     end_col = luminance.shape[1]-1
+                        
+        #                 bigger_window = luminance[start_row:end_row+1,start_col:end_col+1]
+        #                 if(visualize == True):
+        #                     temp = np.zeros((bigger_window.shape[0],bigger_window.shape[1],3),dtype=int)
+        #                     temp[:,:,2] = temp[:,:,2]+155
+        #                     temp[:,:,1] = temp[:,:,1]+155
+        #                     test_image[start_row:end_row+1, start_col:end_col+1] = temp
+        #                     test_image[row,col] = np.array([0,0,255])
+
+        #                 # Find number of values above lum thresh
+        #                 new_high_lum_pixels = np.where(bigger_window > lum_thresh, 1, 0)
+        #                 new_high_lum_count = np.count_nonzero(high_lum_pixels)
+        #                 # If smaller than original count -> snow identified -> turn center into mean
+        #                 if(new_high_lum_count <= high_lum_count):
+        #                     luminance_result[row,col] = window_means[window_row_index][window_col_index]
+        #         if(visualize == True):
+        #             cv.imshow("kernel",test_image)
+        #             cv.waitKey(1)

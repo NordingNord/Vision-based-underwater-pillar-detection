@@ -70,4 +70,10 @@ struct video_data{
     cv::VideoCapture video_capturer;
 };
 
+// Struct that stores results of matching
+struct match_result{
+    std::vector<cv::DMatch> matches;
+    std::vector<bool> good_matches;
+};
+
 #endif

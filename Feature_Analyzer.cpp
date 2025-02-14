@@ -1147,3 +1147,45 @@ cv::Point2f feature_analyzer::predict_kalman(){
     }
     return point;
 }
+
+// -- Perform FLANN feature matching --
+match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descriptors_bottom,int number_of_best_matches, float ratio_threshold){
+    match_result matches;
+    try{
+        if(descriptors_top.empty() || descriptors_bottom.empty()){
+            throw runtime_error("Frame contains no features. Cannot perform matching.");
+        }
+        // Convert descriptors if needed
+        if(descriptors_top.type()!=CV_32F || descriptors_bottom.type()!=CV_32F) {
+            descriptors_top.convertTo(descriptors_top, CV_32F);
+            descriptors_bottom.convertTo(descriptors_bottom, CV_32F);
+        }
+
+        // Create matcher
+        Ptr<DescriptorMatcher> flann_matcher = DescriptorMatcher::create(DescriptorMatcher::FLANNBASED);
+        // Find matches
+        vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
+        flann_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches);
+        // Filter matches based on lowes ratio test
+        vector<bool> valid_matches;
+        vector<DMatch> best_matches;
+        for(size_t i = 0; i < all_matches.size();i++){
+            if(all_matches[i][0].distance < ratio_threshold*all_matches[i][1].distance){
+                valid_matches.push_back(true);
+            }
+            else{
+                valid_matches.push_back(false);
+            }
+            // Allways push back match with smallest distance
+            best_matches.push_back(all_matches[i][0]);
+        }
+        // Write data to struct
+        matches.good_matches = valid_matches;
+        matches.matches = best_matches;
+    }
+    catch(string error){
+        cout << error << endl;
+    }
+    return matches;
+}
+

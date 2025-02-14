@@ -16,7 +16,7 @@
 #include "Feature_Analyzer.h"
 #include "Preprocessing.h"
 
-// -- Define like variables --
+// -- Define cluster settings --
 static const int ON_FRAME = 0;
 static const int ON_FIRST_VEL = 1;
 static const int ON_VEL_LIMIT = 2;
@@ -27,6 +27,9 @@ class obstacle_detection
 public:
     // -- Constructor --
     obstacle_detection();
+
+    // -- Multicam feature pipeline --
+    void multicam_pipeline(std::string video_path_top, std::string video_path_bottom,int feature_type, int feature_finding_gap);
 
     // -- Performs optical flow on video --
     void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false, int cluster_setting = ON_FRAME, std::string recording_name = "Unnamed_optical_flow_recording", int frame_gap = 0);
@@ -49,6 +52,12 @@ private:
 
     // -- Limit to how many features we can have in a frame --
     int max_features = 500;
+
+    // -- Number of matches we want to find for each feature --
+    int number_of_matches = 2;
+
+    // -- Lowes threshold --
+    float lowes_threshold = 0.7;
 };
 
 #endif // OBSTACLE_DETECTION_H

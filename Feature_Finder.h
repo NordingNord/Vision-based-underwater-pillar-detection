@@ -8,6 +8,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
+#include <opencv2/xfeatures2d.hpp>
 #include "Data_Structures.h"
 
 
@@ -29,6 +30,12 @@ public:
     std::vector<cv::KeyPoint> find_features(cv::Mat frame, orb_settings settings);
     std::vector<cv::KeyPoint> find_features(cv::Mat frame, sift_settings settings);
 
+    // -- Determines either SIFT or ORB descriptors based on input settings or base setting --
+    cv::Mat get_descriptors(cv::Mat frame,std::vector<cv::KeyPoint> keypoints);
+    cv::Mat get_descriptors(cv::Mat frame,std::vector<cv::KeyPoint> keypoints, orb_settings settings);
+    cv::Mat get_descriptors(cv::Mat frame,std::vector<cv::KeyPoint> keypoints, sift_settings settings);
+    cv::Mat get_brief_descriptors(cv::Mat frame,std::vector<cv::KeyPoint> keypoints);
+
     // -- Methods for changing stored detector settings --
     void change_settings(sift_settings settings);
     void change_settings(orb_settings settings);
@@ -47,6 +54,8 @@ private:
     // -- Base settings for each method based on test results --
     sift_settings settings_sift = {1000,3,0.03,43,1.6,0,false};
     orb_settings settings_orb = {100,1.6,6,34,0,2,34,4};//{100,1.6,6,34,0,2,34,13};
+    int uniform_gap = 100;
+    int uniform_keypoint_size = 31;
     // -- Base method if none is given --
     int base_method = METHOD_ORB;
 };
