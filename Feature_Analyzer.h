@@ -95,8 +95,14 @@ public:
     // -- prediction method for kalman filter --
     cv::Point2f predict_kalman();
 
+    // -- Performs brute force matching --
+    match_result get_brute_matches(cv::Mat descriptors_top, cv::Mat descriptors_bottom,int number_of_best_matches,bool do_crosscheck);
+
     // -- Perform FLANN feature matching --
     match_result get_flann_matches(cv::Mat descriptors_top, cv::Mat descriptors_bottom,int number_of_best_matches, float ratio_threshold);
+
+    // -- Method that filters matches based on vector between positions --
+    match_result position_match_filter(match_result match_results, std::vector<cv::KeyPoint> keypoints_top, std::vector<cv::KeyPoint> keypoints_bottom, int good_limit, bool best_down,int max_dist);
 
 private:
     // Variables used for optical flow

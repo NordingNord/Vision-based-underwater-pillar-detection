@@ -53,7 +53,7 @@ private:
 
     // -- Base settings for each method based on test results --
     sift_settings settings_sift = {1000,3,0.03,43,1.6,0,false};
-    orb_settings settings_orb = {100,1.6,6,34,0,2,34,4};//{100,1.6,6,34,0,2,34,13};
+    orb_settings settings_orb = {100,1.6,6,6,0,4,6,4};// original -> {100,1.6,6,34,0,2,34,13}; fixed for more features -> {100,1.6,6,34,0,2,34,4}
     int uniform_gap = 100;
     int uniform_keypoint_size = 31;
     // -- Base method if none is given --

@@ -42,6 +42,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         while(true){
             // Read frames
             frame_top = cam_top.get_frame();
+            //frame_bottom = cam_top.get_frame();
             frame_bottom = cam_bottom.get_frame();
 
             // Break if no more frames any of the videos
@@ -56,6 +57,9 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 }
                 break;
             }
+            imshow("top", frame_top);
+            imshow("bottom",frame_bottom);
+            waitKey(0);
             // Perform pipeline
 
             // Most preprocessing done in python beforehand
@@ -69,14 +73,14 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
 //            cvtColor(gray_top,frame_top,COLOR_GRAY2BGR);
 //            cvtColor(gray_bottom,frame_bottom,COLOR_GRAY2BGR);
             // Rotate frames 90 degrees to allign pillar
-            rotate(frame_top, frame_top, ROTATE_90_CLOCKWISE);
-            rotate(frame_bottom, frame_bottom, ROTATE_90_CLOCKWISE);
+//            rotate(frame_top, frame_top, ROTATE_90_CLOCKWISE);
+//            rotate(frame_bottom, frame_bottom, ROTATE_90_CLOCKWISE);
 
             // Find features based on chosen method (if not exceeding maximum allowed features)
             if(find_features == true && current_features.size() < max_features){
                 // Find features based on method
                 vector<KeyPoint> top_features = finder.find_features(frame_top); // Find features using initialized detector
-                vector<KeyPoint> bottom_features = finder.find_features(frame_top); // Find features using initialized detector
+                vector<KeyPoint> bottom_features = finder.find_features(frame_bottom); // Find features using initialized detector
                 cout << "Features found" << endl;
                 // Find descriptors based on method
                 Mat top_descriptors = finder.get_descriptors(frame_top,top_features); // Gets descriptors based on newly found top view features
@@ -84,14 +88,63 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 cout << "Descriptors determiend" << endl;
                 // Match features between cameras
                 match_result matches = analyzer.get_flann_matches(top_descriptors, bottom_descriptors,number_of_matches, lowes_threshold);
+                //match_result matches = analyzer.get_brute_matches(top_descriptors, bottom_descriptors,number_of_matches,false);
                 cout << "matches found" << endl;
-                // Remove features that are not present on both cameras
+                // Filter matches
+                cout << matches.all_matches[0].size() << endl;
+                //matches = analyzer.position_match_filter(matches, top_features , bottom_features, 35, true,50);
+
+                // Test print best results
+                for(int i = 0; i < matches.matches.size(); i++){
+                    if(matches.good_matches[i] == true){
+                        cout << i << endl;
+                        Mat test_image = frame_top.clone();
+                        Point2f keypoint_top = top_features[matches.matches[i].queryIdx].pt;
+                        Point2f keypoint_bottom = bottom_features[matches.matches[i].trainIdx].pt;
+                        cout << "top = (" << keypoint_top.x << ", " << keypoint_top.y << ")" << endl;
+                        cout << "bottom = (" << keypoint_bottom.x << ", " << keypoint_bottom.y << ")" << endl;
+                        circle(test_image,keypoint_top,5,Scalar(0,0,255),-1);
+                        circle(test_image,keypoint_bottom,5,Scalar(0,255,0),-1);
+                        imshow("current point",test_image);
+                        waitKey(0);
+                    }
+                }
+
+                // Test show features
+                Mat img_keypoints_top;
+                drawKeypoints(frame_top, top_features, img_keypoints_top );
+                Mat img_keypoints_bottom;
+                drawKeypoints(frame_bottom, bottom_features, img_keypoints_bottom );
+                imshow("Top features",img_keypoints_top);
+                imshow("Bottom features",img_keypoints_bottom);
+                waitKey(0);
+
+
+                // Test show best matches
+//                Mat img_matches;
+//                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                imshow("matches that went wrong",img_matches);
+//                waitKey(0);
+
+
+                    // Remove features that are not present on both cameras
                 int n_matches = 0;
                 for(int i = 0; i < matches.good_matches.size(); i++){
-                    if(matches.good_matches[0] == true){
+                    if(matches.good_matches[i] == true){
                         n_matches++;
                     }
                 }
+                cout << "Surviving features: " << n_matches << endl;
+                vector<DMatch> kept_matches;
+                for(int i = 0; i < matches.good_matches.size(); i++){
+                    if(matches.good_matches[i] == true){
+                        kept_matches.push_back(matches.matches[i]);
+                    }
+                }
+                Mat img_kept_matches;
+                drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+                imshow("matches that survived",img_kept_matches);
+                waitKey(0);
 //                cout << matches.good_matches.size() << endl;
 //                cout << top_features.size() << endl;
 //                cout << bottom_features.size() << endl;
@@ -105,32 +158,30 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
 //                imshow("Top features",img_keypoints_top);
 //                imshow("Bottom features",img_keypoints_bottom);
 //                waitKey(0);
-                if(n_matches != top_features.size()){
-                    cout << matches.good_matches.size() << endl;
-                    cout << top_features.size() << endl;
-                    cout << bottom_features.size() << endl;
-                    Mat img_matches;
-                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-                    vector<DMatch> kept_matches;
-                    for(int i = 0; i < matches.matches.size(); i++){
-                        if(matches.good_matches[i] == true){
-                            kept_matches.push_back(matches.matches[i]);
-                        }
-                    }
-                    Mat img_kept_matches;
-                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-                    imshow("matches that went wrong",img_matches);
-                    imshow("matches that survived",img_kept_matches);
-                    waitKey(0);
-                }
+//                if(n_matches != top_features.size()){
+//                    cout << matches.good_matches.size() << endl;
+//                    cout << top_features.size() << endl;
+//                    cout << bottom_features.size() << endl;
+//                    Mat img_matches;
+//                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                    vector<DMatch> kept_matches;
+//                    for(int i = 0; i < matches.matches.size(); i++){
+//                        if(matches.good_matches[i] == true){
+//                            kept_matches.push_back(matches.matches[i]);
+//                        }
+//                    }
+//                    Mat img_kept_matches;
+//                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                    imshow("matches that went wrong",img_matches);
+//                    imshow("matches that survived",img_kept_matches);
+//                    waitKey(0);
+//                }
 
 
-                // Add found feature to currently alive features
-                current_top_features.insert(current_top_features.end(), top_features.begin(), top_features.end());
-                current_bottom_features.insert(current_bottom_features.end(), bottom_features.begin(), bottom_features.end());
+//                // Add found feature to currently alive features
+//                current_top_features.insert(current_top_features.end(), top_features.begin(), top_features.end());
+//                current_bottom_features.insert(current_bottom_features.end(), bottom_features.begin(), bottom_features.end());
             }
-
-
         }
     }
     catch(const exception& error){

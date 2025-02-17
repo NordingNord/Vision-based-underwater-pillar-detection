@@ -740,9 +740,6 @@ class preprocessing:
             frame_luminance = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
             frame_luminance[:,:,0] = preprocessor.brighten_frame(frame_luminance[:,:,0],20,6.0)
             homomorphic_frame = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
-            # cv.imshow("frame",homomorphic_frame)
-            # cv.imshow("frame_org",frame)
-            # cv.waitKey(0)
             # Record frame
             writer.write(homomorphic_frame)
             # Time taking
@@ -828,6 +825,118 @@ class preprocessing:
     def brighten_frame(self,frame,light,contrast):
         brightened_frame = cv.addWeighted(frame,contrast,np.zeros(frame.shape,frame.dtype),0,light)
         return brightened_frame
+
+    # Method that combines two images into one (in order to preprocess them together)
+    def combine_frames(self,frame_top, frame_bottom):
+        # Create numpy array of desired shape
+        rows,cols,channels = frame_top.shape
+        combined_frame = np.zeros((rows*2,cols,channels),frame_top.dtype)
+        # Insert the two frames
+        combined_frame[0:rows,0:cols] = frame_top
+        combined_frame[rows:rows*2,0:cols] = frame_bottom
+
+        return combined_frame
+    
+    # Method that splits a combined frame
+    def split_frames(self,combined,original):
+        # Create numpy arrays
+        top = np.zeros(original.shape,original.dtype)
+        bottom = np.zeros(original.shape,original.dtype)
+
+        # Insert appropriate parts of frame
+        rows,cols,_ = original.shape
+        top = combined[0:rows,0:cols]
+        bottom = combined[rows:rows*2,0:cols]
+
+        return top, bottom
+    
+    # Method that handles entire preprocessing with combined frames
+    def combined_preprocess(self,path_top,path_bottom,save_path_top,save_path_bottom,fps,frame_limit,min_coef,max_coef,cutoff,min_size,prob_limit,kernel_size):
+        capturer_top = cv.VideoCapture(path_top)
+        capturer_bottom = cv.VideoCapture(path_bottom)
+
+        # Resizing variable
+        rows = int(capturer_top.get(4))
+        cols = int(capturer_top.get(3))
+        diff_percentage = 1.0
+        if(rows < cols):
+            diff_percentage = min_size/rows
+        else:
+            diff_percentage = min_size/cols
+
+
+        frame_size = (int(capturer_top.get(3)*diff_percentage-(kernel_size-1)),int(capturer_top.get(4)*diff_percentage-(kernel_size-1)))
+
+        writer_top = cv.VideoWriter(save_path_top, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        writer_bottom = cv.VideoWriter(save_path_bottom, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+
+        frames = 0
+
+        while(True):
+            ret_top,frame_top = capturer_top.read()
+            ret_bottom,frame_bottom = capturer_bottom.read()
+            frames = frames+1
+            if ret_top is not True:
+                break
+            if ret_bottom is not True:
+                break
+        
+            # Time taking
+            start = time.time()
+            # Step 0: Resize
+            frame_top = cv.resize(frame_top,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
+            frame_bottom = cv.resize(frame_bottom,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
+
+            # Step 1: Remove snow
+            cleaned_frame_top =  preprocessor.snow_blur(frame_top,prob_limit,kernel_size,False)
+            cleaned_frame_bottom =  preprocessor.snow_blur(frame_bottom,prob_limit,kernel_size,False)
+
+            # Step 2: combine
+            combined_frame = preprocessor.combine_frames(cleaned_frame_top,cleaned_frame_bottom)
+
+            # Step 3: homomorphic filter
+            # Extend in order to use the filter
+            extended_frame = preprocessor.get_squared_image(combined_frame)
+            # Apply filter
+            homomorphic_frame = preprocessor.homomorphic_filter(extended_frame,min_coef,max_coef,cutoff)
+            # Revert frame
+            homomorphic_frame = preprocessor.revert_frame(homomorphic_frame, combined_frame)
+
+            
+            # Step 4: Apply brightness and contrast
+            frame_luminance = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
+            # add brightness based on the upper 75 perncentiles distance to 75.
+            light_addition = np.abs(75-np.percentile(frame_luminance[:,:,0],75))
+            frame_luminance[:,:,0] = preprocessor.brighten_frame(frame_luminance[:,:,0],light_addition,6.0)
+            homomorphic_frame = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+            #cv.imshow("lum_old",frame_luminance[:,:,0])
+
+            # Test specific brightening
+            #frame_luminance_temp = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
+            #brightness_limit = np.percentile(frame_luminance_temp[:,:,0],25)
+            #frame_luminance_temp[:,:,0] = np.where(frame_luminance_temp[:,:,0] > brightness_limit, frame_luminance_temp[:,:,0]*(frame_luminance_temp[:,:,0]/2),frame_luminance_temp[:,:,0])
+            #homomorphic_frame_temp = cv.cvtColor(frame_luminance_temp,cv.COLOR_YCrCb2BGR)
+            #cv.imshow("lum",frame_luminance_temp[:,:,0])
+
+
+            #cv.imshow("old", homomorphic_frame)
+            #cv.imshow("targeted",homomorphic_frame_temp)
+            #cv.waitKey(0)
+
+            # Step 5: split frame
+            frame_top,frame_bottom = preprocessor.split_frames(homomorphic_frame,cleaned_frame_top)
+
+            # Record frame
+            writer_top.write(frame_top)
+            writer_bottom.write(frame_bottom)
+            # Time taking
+            end = time.time()
+            time_taken = (end-start) * 10**3
+            print(str(time_taken)+" ms") 
+            # Break if all desired frames are handled
+            if(frames >= frame_limit and frame_limit > -1):
+                break
+
 
 # Test snow removal
 
@@ -988,9 +1097,9 @@ preprocessor = preprocessing()
 
 # ---- ORDER 4 full test----
 # Step 0: Resize
-preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Bottom.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Resized_video.mkv',30,-1,384)
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Bottom.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Resized_video.mkv',30,-1,384)
 # Step 1: Homomorphic filter
-preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
 
 
 # ---- ORDER 6 full test ----
@@ -1013,10 +1122,39 @@ preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_4
 # Step 2: Sharpen
 #preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_9_full/Homomorphic_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_9_full/Sharpened_video.mkv',30,-1,1.0,1.5)
 
-
 # --- Resized ----
 # Step 0: Resize
 #preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Resized/Resized_video.mkv',30,150,384)
+
+# ---- ORDER 5 full test (no light tweaking) ----
+
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Resized_video.mkv',30,-1,384)
+
+# Step 0: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Snow_Removal_video.mkv',30,-1,0.6,7)
+
+# Step 2: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+# ---- ORDER 5 full test bottom (no light tweaking) ----
+
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Resized_video.mkv',30,-1,384)
+
+# Step 0: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Snow_Removal_video.mkv',30,-1,0.6,7)
+
+# Step 2: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+
+
+# ----- ORDER 5 combined test
+path_top = '../../Data/Video_Data/New_Pillar_Top.mkv'
+path_bottom = '../../Data/Video_Data/New_Pillar_Bottom.mkv'
+save_top = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_less_bright/combined_top_video.mkv'
+save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_less_bright/combined_bottom_video.mkv'
+preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7)
 
 
 # Write all small images to directory

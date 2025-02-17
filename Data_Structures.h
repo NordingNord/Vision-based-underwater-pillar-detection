@@ -72,6 +72,7 @@ struct video_data{
 
 // Struct that stores results of matching
 struct match_result{
+    std::vector<std::vector<cv::DMatch>> all_matches;
     std::vector<cv::DMatch> matches;
     std::vector<bool> good_matches;
 };

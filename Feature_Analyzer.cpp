@@ -1182,10 +1182,145 @@ match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descri
         // Write data to struct
         matches.good_matches = valid_matches;
         matches.matches = best_matches;
+        matches.all_matches = all_matches;
     }
     catch(string error){
         cout << error << endl;
     }
     return matches;
 }
+
+// -- Performs brute force matching --
+match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descriptors_bottom,int number_of_best_matches, bool do_crosscheck){
+    match_result matches;
+    try{
+        // Check if featuers are present in both frames
+        if(descriptors_top.empty() || descriptors_bottom.empty()){
+            throw runtime_error("Frame contains no features. Cannot perform matching.");
+        }
+        // Initialize matcher
+        bool crosscheck_status = do_crosscheck;
+        if(do_crosscheck == true && number_of_best_matches != 1){
+            crosscheck_status = false;
+        }
+        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING2,crosscheck_status); // Crosscheck true means that the feature must match both ways
+        // Find matches
+        vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
+        brute_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches);
+        cout << all_matches[0].size() << endl;
+        // Prepare shortest distance
+        vector<DMatch> best_matches;
+        vector<bool> accepted_matches;
+        for(size_t i = 0; i < all_matches.size();i++){
+            // check if empty
+            if(all_matches[i].empty() == false){
+                best_matches.push_back(all_matches[i][0]);
+                accepted_matches.push_back(true);
+            }
+        }
+        // Prepare return data
+        matches.matches = best_matches;
+        matches.all_matches = all_matches;
+        matches.good_matches = accepted_matches;
+        // Inform if cross check could not be performed
+        if(do_crosscheck == true && number_of_best_matches > 1){
+            throw runtime_error("Could not perform crosscheck due to number of desired matches exeeding one.");
+        }
+    }
+    catch(string error){
+        cout << error << endl;
+    }
+    return matches;
+}
+
+// -- Method that filters matches based on vector between positions --
+match_result feature_analyzer::position_match_filter(match_result match_results, vector<KeyPoint> keypoints_top, vector<KeyPoint> keypoints_bottom, int good_limit, bool best_down,int max_dist){
+    match_result filtered_matches = match_results;
+    try{
+        // Go through all matches for each keypoint (Slow with dobbelt for loop. Find faster solution if this turns out good)
+        vector<DMatch> filtered_best;
+        vector<bool> accepted_matches;
+        for(int keypoint = 0; keypoint < filtered_matches.all_matches.size(); keypoint++){
+            int best_match = 0; // best match is the one that is closest to 90 degrees (since cameras are right on top of each other)
+            int best_remainder = 0;
+            float best_angle;
+            double best_dist = 0;
+            for(int match = 0; match < filtered_matches.all_matches[keypoint].size(); match++){
+                // Get indexes
+                int top_index = filtered_matches.all_matches[keypoint][match].queryIdx;
+                int bottom_index = filtered_matches.all_matches[keypoint][match].trainIdx;
+                // Get points
+                Point2f position_top = keypoints_top[top_index].pt;
+                Point2f position_bottom = keypoints_bottom[bottom_index].pt;
+                // Calculate angle between points
+                float x_diff = position_top.x-position_bottom.x;
+                float y_diff = position_top.y-position_bottom.y;
+                double angle = std::atan2(y_diff,x_diff)*180/M_PI; // Result between -180 and 180
+                double distance = sqrt(x_diff*x_diff+y_diff*y_diff);
+                // Determine remiander
+                // If value is closer to 0 than 90 that is just the difference
+                float remainder;
+                if(best_down == false){
+                    if(fabs(angle) < 45.0){
+                        if(keypoint == 0){
+                            cout << "Smaller than 45" << endl;
+                        }
+                        remainder = fabs(angle);
+                    }
+                    else{
+                        // Take modulo 90 to identify difference
+                        if(keypoint == 0){
+                            cout << "Bigger than 45" << endl;
+                        }
+                        remainder = fmod(max(fabs(angle),90.0),min(fabs(angle),90.0));
+                    }
+                }
+                else{
+                    // Determine distance from 90 due to camera moving down -> feature moving up
+                    remainder = fabs(90-angle);
+                }
+
+                // Assign best angle based on previous best
+                if(match == 0){
+                    best_angle = angle;
+                    best_remainder = remainder;
+                    best_dist = distance;
+                }
+                // Only accept if above min distance
+                else if(remainder < best_remainder && distance >= max_dist){
+                    best_angle = angle;
+                    best_remainder = remainder;
+                    best_match = match;
+                    best_dist = distance;
+                }
+                if(keypoint == 0){
+                    cout << "angle " << match << ": " << angle << endl;
+                    cout << "remainder " << match << ": " << remainder << endl;
+                }
+            }
+            if(keypoint == 0){
+                cout << "best angle: " << best_angle << endl;
+            }
+            // Insert best match
+            filtered_best.push_back(filtered_matches.all_matches[keypoint][best_match]);
+            // Assign acceptance
+            if(best_remainder <= good_limit && best_dist <= max_dist){
+                accepted_matches.push_back(true);
+                //cout << "angle: " << best_angle << endl;
+                //cout << "remainder: " << best_remainder << endl;
+            }
+            else{
+                accepted_matches.push_back(false);
+            }
+        }
+        // Prepare output
+        filtered_matches.matches = filtered_best;
+        filtered_matches.good_matches = accepted_matches;
+    }
+    catch(string error){
+        cout << error << endl;
+    }
+    return filtered_matches;
+}
+
 

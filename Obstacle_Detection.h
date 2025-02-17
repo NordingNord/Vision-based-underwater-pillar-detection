@@ -54,7 +54,7 @@ private:
     int max_features = 500;
 
     // -- Number of matches we want to find for each feature --
-    int number_of_matches = 2;
+    int number_of_matches = 4;
 
     // -- Lowes threshold --
     float lowes_threshold = 0.7;
