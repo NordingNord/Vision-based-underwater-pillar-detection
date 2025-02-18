@@ -27,6 +27,9 @@ Mat feature_finder::get_descriptors(Mat frame,vector<KeyPoint> keypoints){
         else if(base_method == METHOD_UNIFORM){
             descriptors = get_brief_descriptors(frame,keypoints);
         }
+        else if(base_method == METHOD_AKAZE){
+            descriptors = get_descriptors(frame,keypoints,settings_akaze);
+        }
         else{
             string error_message = "Error: Non valid base method of " + to_string(base_method);
             throw (error_message);
@@ -78,6 +81,26 @@ Mat feature_finder::get_descriptors(Mat frame,vector<KeyPoint> keypoints, sift_s
     return descriptors;
 }
 
+Mat feature_finder::get_descriptors(Mat frame,vector<KeyPoint> keypoints, akaze_settings settings){
+    // Initialize result mat
+    Mat descriptors;
+    try{
+        if(keypoints.size() == 0){
+            throw runtime_error("No features was found using akaze>.");
+        }
+        // Initialize detector
+        Ptr<AKAZE> akaze_detector = AKAZE::create(settings.descriptor_type, settings.descriptor_size, settings.descriptor_channels, settings.threshold, settings.octaves, settings.octave_layers, settings.diffusivity);
+        // Grayscale frame
+        Mat gray_frame = apply_grayscale(frame);
+        // Find descriptors
+        akaze_detector->compute(gray_frame,keypoints,descriptors);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return descriptors;
+}
+
 Mat feature_finder::get_brief_descriptors(Mat frame,vector<KeyPoint> keypoints){
     // Initialize result mat
     Mat descriptors;
@@ -114,6 +137,9 @@ vector<KeyPoint> feature_finder::find_features(Mat frame){
         else if(base_method == METHOD_UNIFORM){
             keypoints = make_uniform_keypoints(frame, uniform_gap, uniform_keypoint_size);
         }
+        else if(base_method == METHOD_AKAZE){
+            keypoints = find_features(frame,settings_akaze);
+        }
         else{
             string error_message = "Error: Non valid base method of " + to_string(base_method);
             throw (error_message);
@@ -132,6 +158,14 @@ vector<KeyPoint> feature_finder::find_features(Mat frame, orb_settings settings)
     try{
         // Initialize detector
         Ptr<ORB> orb_detector = ORB::create(settings.max_features, settings.scale_factor, settings.levels, settings.edge_threshold, settings.first_level, settings.wta_k, ORB::HARRIS_SCORE, settings.patch_size, settings.fast_threshold);
+        cout << "max features: " << orb_detector->getMaxFeatures() << endl;
+        cout << "scale factor: " << orb_detector->getScaleFactor() << endl;
+        cout << "levels: " << orb_detector->getNLevels() << endl;
+        cout << "edge threshold: " << orb_detector->getEdgeThreshold() << endl;
+        cout << "first level: " << orb_detector->getFirstLevel() << endl;
+        cout << "wta: " << orb_detector->getWTA_K() << endl;
+        cout << "patch size: " << orb_detector->getPatchSize() << endl;
+        cout << "fast threshold: " << orb_detector->getFastThreshold() << endl;
         // Grayscale frame
         Mat gray_frame = apply_grayscale(frame);
         // Find features
@@ -159,6 +193,27 @@ vector<KeyPoint> feature_finder::find_features(Mat frame, sift_settings settings
 
         if(keypoints.size() == 0){
             throw runtime_error("No features was found using SIFT>.");
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return keypoints;
+}
+
+vector<KeyPoint> feature_finder::find_features(Mat frame, akaze_settings settings){
+    // Initialize result vector
+    vector<KeyPoint> keypoints;
+    try{
+        // Initialize detector
+        Ptr<AKAZE> akaze_detector = AKAZE::create(settings.descriptor_type, settings.descriptor_size, settings.descriptor_channels, settings.threshold, settings.octaves, settings.octave_layers, settings.diffusivity);
+        // Grayscale frame
+        Mat gray_frame = apply_grayscale(frame);
+        // Find features
+        akaze_detector->detect(gray_frame,keypoints);
+
+        if(keypoints.size() == 0){
+            throw runtime_error("No features was found using AKAZE>.");
         }
     }
     catch(const exception& error){

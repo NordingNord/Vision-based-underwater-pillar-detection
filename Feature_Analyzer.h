@@ -104,6 +104,9 @@ public:
     // -- Method that filters matches based on vector between positions --
     match_result position_match_filter(match_result match_results, std::vector<cv::KeyPoint> keypoints_top, std::vector<cv::KeyPoint> keypoints_bottom, int good_limit, bool best_down,int max_dist);
 
+    // -- Method that filters matches using homography with RANSAC --
+    match_result homography_match_filter(match_result match_results, int min_matches, std::vector<cv::KeyPoint> keypoints_top, std::vector<cv::KeyPoint> keypoints_bottom,double ransac_threshold);
+
 private:
     // Variables used for optical flow
     cv::Size window_size = cv::Size(15,15); // search window at each level

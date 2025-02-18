@@ -44,6 +44,9 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
             frame_top = cam_top.get_frame();
             //frame_bottom = cam_top.get_frame();
             frame_bottom = cam_bottom.get_frame();
+            imshow("top",frame_top);
+            imshow("bottom",frame_bottom);
+            waitKey(0);
 
             // Break if no more frames any of the videos
             if(frame_top.empty() || frame_bottom.empty()){
@@ -81,34 +84,38 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 // Find features based on method
                 vector<KeyPoint> top_features = finder.find_features(frame_top); // Find features using initialized detector
                 vector<KeyPoint> bottom_features = finder.find_features(frame_bottom); // Find features using initialized detector
+                cout << "Top feature count: " << top_features.size() << endl;
+                cout << "Bottom feature count: " << bottom_features.size() << endl;
                 cout << "Features found" << endl;
                 // Find descriptors based on method
                 Mat top_descriptors = finder.get_descriptors(frame_top,top_features); // Gets descriptors based on newly found top view features
                 Mat bottom_descriptors = finder.get_descriptors(frame_bottom,bottom_features); // Gets descriptors based on newly found bottom view features
                 cout << "Descriptors determiend" << endl;
                 // Match features between cameras
-                match_result matches = analyzer.get_flann_matches(top_descriptors, bottom_descriptors,number_of_matches, lowes_threshold);
-                //match_result matches = analyzer.get_brute_matches(top_descriptors, bottom_descriptors,number_of_matches,false);
+                //match_result matches = analyzer.get_flann_matches(top_descriptors, bottom_descriptors,number_of_matches, lowes_threshold);
+                match_result matches = analyzer.get_brute_matches(top_descriptors, bottom_descriptors,number_of_matches,true);
                 cout << "matches found" << endl;
                 // Filter matches
-                cout << matches.all_matches[0].size() << endl;
-                //matches = analyzer.position_match_filter(matches, top_features , bottom_features, 35, true,50);
+                //cout << matches.all_matches[0].size() << endl;
+                //matches = analyzer.position_match_filter(matches, top_features , bottom_features, 45, true,100);
+                cout << "Time for homography filter" << endl;
+                matches = analyzer.homography_match_filter(matches,10,top_features , bottom_features, 3);
 
                 // Test print best results
-                for(int i = 0; i < matches.matches.size(); i++){
-                    if(matches.good_matches[i] == true){
-                        cout << i << endl;
-                        Mat test_image = frame_top.clone();
-                        Point2f keypoint_top = top_features[matches.matches[i].queryIdx].pt;
-                        Point2f keypoint_bottom = bottom_features[matches.matches[i].trainIdx].pt;
-                        cout << "top = (" << keypoint_top.x << ", " << keypoint_top.y << ")" << endl;
-                        cout << "bottom = (" << keypoint_bottom.x << ", " << keypoint_bottom.y << ")" << endl;
-                        circle(test_image,keypoint_top,5,Scalar(0,0,255),-1);
-                        circle(test_image,keypoint_bottom,5,Scalar(0,255,0),-1);
-                        imshow("current point",test_image);
-                        waitKey(0);
-                    }
-                }
+//                for(int i = 0; i < matches.matches.size(); i++){
+//                    if(matches.good_matches[i] == true){
+//                        cout << i << endl;
+//                        Mat test_image = frame_top.clone();
+//                        Point2f keypoint_top = top_features[matches.matches[i].queryIdx].pt;
+//                        Point2f keypoint_bottom = bottom_features[matches.matches[i].trainIdx].pt;
+//                        cout << "top = (" << keypoint_top.x << ", " << keypoint_top.y << ")" << endl;
+//                        cout << "bottom = (" << keypoint_bottom.x << ", " << keypoint_bottom.y << ")" << endl;
+//                        circle(test_image,keypoint_top,5,Scalar(0,0,255),-1);
+//                        circle(test_image,keypoint_bottom,5,Scalar(0,255,0),-1);
+//                        imshow("current point",test_image);
+//                        waitKey(0);
+//                    }
+//                }
 
                 // Test show features
                 Mat img_keypoints_top;
@@ -144,7 +151,35 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 Mat img_kept_matches;
                 drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
                 imshow("matches that survived",img_kept_matches);
+                imwrite("survivors.jpg",img_kept_matches);
+                cout << "written" << endl;
                 waitKey(0);
+
+                // The manual test
+                int approved_count = 0;
+                for(int i = 0; i < kept_matches.size();i++){
+                    Mat img_temp;
+                    vector<DMatch> current_matches;
+                    current_matches.push_back(kept_matches[i]);
+                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, current_matches, img_temp, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+                    imshow("Current match",img_temp);
+                    waitKey(0);
+                    cout << "y -> approved, n -> not approved" << endl;
+                    string answer;
+                    while(true){
+                        cin >> answer;
+                        if(answer == "y" || answer == "n"){
+                            cout << "I know that letter" << endl;
+                            break;
+                        }
+                        else{
+                            cout << "Unrecognised input" << endl;
+                        }
+                    }
+                    if(answer == "y"){
+                        approved_count++;
+                    }
+                }
 //                cout << matches.good_matches.size() << endl;
 //                cout << top_features.size() << endl;
 //                cout << bottom_features.size() << endl;

@@ -1164,8 +1164,10 @@ match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descri
         // Create matcher
         Ptr<DescriptorMatcher> flann_matcher = DescriptorMatcher::create(DescriptorMatcher::FLANNBASED);
         // Find matches
+        cout << "Finding matches" << endl;
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
         flann_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches);
+        cout << "Found mathces" << endl;
         // Filter matches based on lowes ratio test
         vector<bool> valid_matches;
         vector<DMatch> best_matches;
@@ -1184,8 +1186,8 @@ match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descri
         matches.matches = best_matches;
         matches.all_matches = all_matches;
     }
-    catch(string error){
-        cout << error << endl;
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
     }
     return matches;
 }
@@ -1203,7 +1205,12 @@ match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descri
         if(do_crosscheck == true && number_of_best_matches != 1){
             crosscheck_status = false;
         }
-        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING2,crosscheck_status); // Crosscheck true means that the feature must match both ways
+        // AKAZE
+        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING,crosscheck_status);
+        // ORB
+        //Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING2,crosscheck_status); // Crosscheck true means that the feature must match both ways
+        // SIFT
+        //Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_L2,crosscheck_status);
         // Find matches
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
         brute_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches);
@@ -1227,8 +1234,8 @@ match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descri
             throw runtime_error("Could not perform crosscheck due to number of desired matches exeeding one.");
         }
     }
-    catch(string error){
-        cout << error << endl;
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
     }
     return matches;
 }
@@ -1317,10 +1324,59 @@ match_result feature_analyzer::position_match_filter(match_result match_results,
         filtered_matches.matches = filtered_best;
         filtered_matches.good_matches = accepted_matches;
     }
-    catch(string error){
-        cout << error << endl;
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
     }
     return filtered_matches;
 }
 
+// -- Method that filters matches using homography with RANSAC --
+match_result feature_analyzer::homography_match_filter(match_result match_results,int min_matches,vector<KeyPoint> keypoints_top, vector<KeyPoint> keypoints_bottom,double ransac_threshold){
+    match_result filtered_matches = match_results;
+    try{
+        // Count number of good matches
+        int match_count = count(match_results.good_matches.begin(),match_results.good_matches.end(),1);
+        cout << "Good matches: " << match_count << endl;
+        // Determine if enough matches are present
+        if(match_count < min_matches){
+            throw runtime_error("Not enough matches. Ignoring filtering.");
+        }
+        // Get good points
+        vector<Point2f> points_top, points_bottom;
+        vector<int> match_indexes;
+        for(size_t i = 0; i < match_results.good_matches.size(); i++){
+            if(match_results.good_matches[i] == 1){
+                // Get indexes
+                int top_index = filtered_matches.matches[i].queryIdx;
+                int bottom_index = filtered_matches.matches[i].trainIdx;
+                // Get points
+                points_top.push_back(keypoints_top[top_index].pt);
+                points_bottom.push_back(keypoints_bottom[bottom_index].pt);
+                // Store index
+                match_indexes.push_back(i);
+            }
+        }
+
+        // Find ransac mask
+        Mat mask;
+        Mat H = findHomography(points_top,points_bottom,RANSAC,ransac_threshold,mask);
+        cout << "Size of mask: " <<  mask.size << endl;
+        // Keep only inliers
+        vector<DMatch> good_matches;
+        for(size_t i = 0; i < match_indexes.size();i++){
+            if(mask.at<uchar>(i) > 0){
+                good_matches.push_back(match_results.matches[i]);
+            }
+            else{
+                // remove from good indexes
+                filtered_matches.good_matches[i] = 0;
+            }
+        }
+        cout << "Filtered match count: " << good_matches.size() << endl;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_matches;
+}
 

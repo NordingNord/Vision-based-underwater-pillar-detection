@@ -851,7 +851,7 @@ class preprocessing:
         return top, bottom
     
     # Method that handles entire preprocessing with combined frames
-    def combined_preprocess(self,path_top,path_bottom,save_path_top,save_path_bottom,fps,frame_limit,min_coef,max_coef,cutoff,min_size,prob_limit,kernel_size):
+    def combined_preprocess(self,path_top,path_bottom,save_path_top,save_path_bottom,fps,frame_limit,min_coef,max_coef,cutoff,min_size,prob_limit,kernel_size,align_lum,vertical_offset,horizontal_offset):
         capturer_top = cv.VideoCapture(path_top)
         capturer_bottom = cv.VideoCapture(path_bottom)
 
@@ -902,7 +902,6 @@ class preprocessing:
             # Revert frame
             homomorphic_frame = preprocessor.revert_frame(homomorphic_frame, combined_frame)
 
-            
             # Step 4: Apply brightness and contrast
             frame_luminance = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
             # add brightness based on the upper 75 perncentiles distance to 75.
@@ -925,6 +924,24 @@ class preprocessing:
 
             # Step 5: split frame
             frame_top,frame_bottom = preprocessor.split_frames(homomorphic_frame,cleaned_frame_top)
+
+            # Step 6: Align lum if desired
+            if(align_lum == True):
+                frame_luminance_top = cv.cvtColor(frame_top,cv.COLOR_BGR2YCrCb)
+                frame_luminance_bottom = cv.cvtColor(frame_bottom,cv.COLOR_BGR2YCrCb)
+                rows,cols,channels = frame_luminance_bottom.shape
+                frame_luminance_bottom[0:rows-vertical_offset,0:cols-horizontal_offset,0] = frame_luminance_top[vertical_offset:rows,horizontal_offset:cols,0]
+                frame_bottom = cv.cvtColor(frame_luminance_bottom,cv.COLOR_YCrCb2BGR)
+
+                # show cut made
+                # frame_bottom[rows-vertical_offset,:] = (0,0,255)
+                # frame_bottom[:,cols-horizontal_offset] = (0,0,255)
+                # frame_top[vertical_offset,:] = (0,0,255)
+                # frame_top[:,horizontal_offset] = (0,0,255)
+                # cv.imshow("top",frame_top)
+                # cv.imshow("bottom",frame_bottom)
+                # cv.waitKey(0)
+
 
             # Record frame
             writer_top.write(frame_top)
@@ -1152,9 +1169,9 @@ preprocessor = preprocessing()
 # ----- ORDER 5 combined test
 path_top = '../../Data/Video_Data/New_Pillar_Top.mkv'
 path_bottom = '../../Data/Video_Data/New_Pillar_Bottom.mkv'
-save_top = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_less_bright/combined_top_video.mkv'
-save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_less_bright/combined_bottom_video.mkv'
-preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7)
+save_top = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_top_video.mkv'
+save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_bottom_video.mkv'
+preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7,True,50,20)
 
 
 # Write all small images to directory

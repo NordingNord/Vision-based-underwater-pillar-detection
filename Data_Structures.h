@@ -34,6 +34,17 @@ struct orb_settings{
     int fast_threshold; // Low -> more features
 };
 
+// -- Stores all required akaze settings --
+struct akaze_settings{
+    cv::AKAZE::DescriptorType descriptor_type;
+    int descriptor_size; // 0 -> full size
+    int descriptor_channels;
+    float threshold; // repsonse threshold to accept point
+    int octaves; // max octave evolution
+    int octave_layers; // deffault number of sublevels per scale level
+    cv::KAZE::DiffusivityType diffusivity; // type of diffusivity
+};
+
 // -- Struct to help keep track of keypoints --
 struct keypoint_data{
     cv::KeyPoint keypoint;
