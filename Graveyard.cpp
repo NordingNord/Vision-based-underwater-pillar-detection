@@ -596,3 +596,106 @@
 //    }
 //    cout << endl;
 //}
+
+
+// Perform histogram equalization to hopefully make both images more similar
+//            Mat gray_top = finder.apply_grayscale(frame_top);
+//            Mat gray_bottom = finder.apply_grayscale(frame_bottom);
+//            Mat equalized_top, equalized_bottom;
+//            equalizeHist(gray_top,equalized_top);
+//            equalizeHist(gray_bottom,equalized_bottom);
+//            cvtColor(gray_top,frame_top,COLOR_GRAY2BGR);
+//            cvtColor(gray_bottom,frame_bottom,COLOR_GRAY2BGR);
+// Rotate frames 90 degrees to allign pillar
+//            rotate(frame_top, frame_top, ROTATE_90_CLOCKWISE);
+//            rotate(frame_bottom, frame_bottom, ROTATE_90_CLOCKWISE);
+
+
+//cout << "Top feature count: " << top_features.size() << endl;
+//cout << "Bottom feature count: " << bottom_features.size() << endl;
+//cout << "Features found" << endl;
+
+//match_result matches = analyzer.get_flann_matches(top_descriptors, bottom_descriptors,number_of_matches, lowes_threshold);
+//match_result matches = analyzer.get_brute_matches(top_descriptors, bottom_descriptors,number_of_matches,true);
+
+
+// Plotting positions of match on same image
+// Test print best results
+//                for(int i = 0; i < matches.matches.size(); i++){
+//                    if(matches.good_matches[i] == true){
+//                        cout << i << endl;
+//                        Mat test_image = frame_top.clone();
+//                        Point2f keypoint_top = top_features[matches.matches[i].queryIdx].pt;
+//                        Point2f keypoint_bottom = bottom_features[matches.matches[i].trainIdx].pt;
+//                        cout << "top = (" << keypoint_top.x << ", " << keypoint_top.y << ")" << endl;
+//                        cout << "bottom = (" << keypoint_bottom.x << ", " << keypoint_bottom.y << ")" << endl;
+//                        circle(test_image,keypoint_top,5,Scalar(0,0,255),-1);
+//                        circle(test_image,keypoint_bottom,5,Scalar(0,255,0),-1);
+//                        imshow("current point",test_image);
+//                        waitKey(0);
+//                    }
+//                }
+
+//                cout << matches.good_matches.size() << endl;
+//                cout << top_features.size() << endl;
+//                cout << bottom_features.size() << endl;
+//                Mat img_matches;
+//                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                Mat img_keypoints_top;
+//                drawKeypoints(frame_top, top_features, img_keypoints_top );
+//                Mat img_keypoints_bottom;
+//                drawKeypoints(frame_bottom, bottom_features, img_keypoints_bottom );
+//                imshow("matches",img_matches);
+//                imshow("Top features",img_keypoints_top);
+//                imshow("Bottom features",img_keypoints_bottom);
+//                waitKey(0);
+//                if(n_matches != top_features.size()){
+//                    cout << matches.good_matches.size() << endl;
+//                    cout << top_features.size() << endl;
+//                    cout << bottom_features.size() << endl;
+//                    Mat img_matches;
+//                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                    vector<DMatch> kept_matches;
+//                    for(int i = 0; i < matches.matches.size(); i++){
+//                        if(matches.good_matches[i] == true){
+//                            kept_matches.push_back(matches.matches[i]);
+//                        }
+//                    }
+//                    Mat img_kept_matches;
+//                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                    imshow("matches that went wrong",img_matches);
+//                    imshow("matches that survived",img_kept_matches);
+//                    waitKey(0);
+//                }
+
+
+//                // Add found feature to currently alive features
+//                current_top_features.insert(current_top_features.end(), top_features.begin(), top_features.end());
+//                current_bottom_features.insert(current_bottom_features.end(), bottom_features.begin(), bottom_features.end());
+
+
+// The manual test
+//                int approved_count = 0;
+//                for(int i = 0; i < kept_matches.size();i++){
+//                    Mat img_temp;
+//                    vector<DMatch> current_matches;
+//                    current_matches.push_back(kept_matches[i]);
+//                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, current_matches, img_temp, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                    imshow("Current match",img_temp);
+//                    waitKey(1);
+//                    cout << "y -> approved, n -> not approved" << endl;
+//                    string answer;
+//                    while(true){
+//                        cin >> answer;
+//                        if(answer == "y" || answer == "n"){
+//                            cout << "I know that letter" << endl;
+//                            break;
+//                        }
+//                        else{
+//                            cout << "Unrecognised input" << endl;
+//                        }
+//                    }
+//                    if(answer == "y"){
+//                        approved_count++;
+//                    }
+//                }

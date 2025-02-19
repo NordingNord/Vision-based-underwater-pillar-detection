@@ -29,7 +29,7 @@ public:
     obstacle_detection();
 
     // -- Multicam feature pipeline --
-    void multicam_pipeline(std::string video_path_top, std::string video_path_bottom,int feature_type, int feature_finding_gap);
+    void multicam_pipeline(std::string video_path_top, std::string video_path_bottom,int feature_type, int matching_type, int filter_type);
 
     // -- Performs optical flow on video --
     void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false, int cluster_setting = ON_FRAME, std::string recording_name = "Unnamed_optical_flow_recording", int frame_gap = 0);
@@ -58,6 +58,12 @@ private:
 
     // -- Lowes threshold --
     float lowes_threshold = 0.7;
+
+    // -- Min matches for ransac --
+    int min_matches = 10;
+
+    // -- Ransac threshold --
+    double ransac_threshold = 3;
 };
 
 #endif // OBSTACLE_DETECTION_H

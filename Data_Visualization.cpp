@@ -81,3 +81,74 @@ Mat data_visualization::mark_velocity(vector<keypoint_data> data, Mat frame){
         return frame;
     }
 }
+
+// -- Visualizes superpixel borders --
+Mat data_visualization::mark_super_pixel_borders(Mat frame, super_pixel_frame data, Vec3b color){
+    Mat visualized_frame = frame.clone();
+    try{
+        // Borders are indicated by the uchar of -1
+        uchar border = -1;
+        // Go through mask looking for border value
+        for(int row = 0; row < frame.rows; row++){
+            for(int col = 0; col < frame.cols; col++){
+                // If border -> mark on current visualization frame
+                if(data.border_mask.at<uchar>(row,col) == border){
+                    visualized_frame.at<Vec3b>(row,col) = color;
+                }
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return visualized_frame;
+}
+
+// -- Visualizes superpixels with means --
+Mat data_visualization::mark_super_pixels(Mat frame, super_pixel_frame data){
+    Mat visualized_frame = frame.clone();
+    try{
+        // Initialize vectors used to find superpixel means
+        vector<vector<int>> sums(data.super_pixel_count,{0,0,0});
+        vector<int> member_count(data.super_pixel_count,0);
+
+        // Go through every pixel to find its membership and update total membership sum and count
+        for(int row = 0; row < frame.rows; row++){
+            for(int col = 0; col < frame.cols; col++){
+                // Update color sums
+                sums.at(data.pixel_labels.at<int>(row,col)).at(0) += frame.at<Vec3b>(row,col)[0];
+                sums.at(data.pixel_labels.at<int>(row,col)).at(1) += frame.at<Vec3b>(row,col)[1];
+                sums.at(data.pixel_labels.at<int>(row,col)).at(2) += frame.at<Vec3b>(row,col)[2];
+                // update count
+                member_count[data.pixel_labels.at<int>(row,col)] += 1;
+            }
+        }
+        // Calculate medians
+        vector<Vec3b> medians(data.super_pixel_count,Vec3b(0,0,0));
+        for(int i = 0; i < data.super_pixel_count; i++){
+            vector<int> current = sums.at(i);
+            current.at(0) = current.at(0)/member_count.at(i);
+            current.at(1) = current.at(1)/member_count.at(i);
+            current.at(2) = current.at(2)/member_count.at(i);
+
+            Vec3b value;
+            value[0] = current.at(0);
+            value[1] = current.at(1);
+            value[2] = current.at(2);
+
+            medians.at(i) = value;
+        }
+        // Apply median to frame based on membership
+        for(int row = 0; row < frame.rows; row++){
+            for(int col = 0; col < frame.cols; col++){
+                int index = data.pixel_labels.at<int>(row,col);
+                visualized_frame.at<Vec3b>(row,col) = medians.at(index);
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return visualized_frame;
+
+}

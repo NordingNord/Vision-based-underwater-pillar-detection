@@ -14,26 +14,38 @@ feature_finder::feature_finder(int method){
 
 // -- Determines either SIFT or ORB descriptors based on input settings or base setting --
 Mat feature_finder::get_descriptors(Mat frame,vector<KeyPoint> keypoints){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
     // Initialize result Mat
     Mat descriptors;
     try{
+        string method;
         // Run feature detector based on base method
         if(base_method == METHOD_ORB){
             descriptors = get_descriptors(frame,keypoints,settings_orb);
+            method = "ORB";
         }
         else if(base_method == METHOD_SIFT){
             descriptors = get_descriptors(frame,keypoints,settings_sift);
+            method = "SIFT";
         }
         else if(base_method == METHOD_UNIFORM){
             descriptors = get_brief_descriptors(frame,keypoints);
+            method = "Uniform";
         }
         else if(base_method == METHOD_AKAZE){
             descriptors = get_descriptors(frame,keypoints,settings_akaze);
+            method = "AKAZE";
         }
         else{
             string error_message = "Error: Non valid base method of " + to_string(base_method);
             throw (error_message);
         }
+        // Timing and post execution rundown
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Descriptors was successfully found in " << duration.count() << " ms using " << method << "." << endl;
     }
     catch(string error){
         cout << error << endl;
@@ -124,27 +136,39 @@ Mat feature_finder::get_brief_descriptors(Mat frame,vector<KeyPoint> keypoints){
 
 // -- Finds either SIFT or ORB features based on input settings or base setting  --
 vector<KeyPoint> feature_finder::find_features(Mat frame){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
     // Initialize result vector
     vector<KeyPoint> keypoints;
     try{
+        string method;
         // Run feature detector based on base method
         if(base_method == METHOD_ORB){
             keypoints = find_features(frame,settings_orb);
+            method = "ORB";
         }
         else if(base_method == METHOD_SIFT){
             keypoints = find_features(frame,settings_sift);
+            method = "SIFT";
         }
         else if(base_method == METHOD_UNIFORM){
             keypoints = make_uniform_keypoints(frame, uniform_gap, uniform_keypoint_size);
+            method = "Uniform";
         }
         else if(base_method == METHOD_AKAZE){
             keypoints = find_features(frame,settings_akaze);
+            method = "AKAZE";
         }
         else{
             string error_message = "Error: Non valid base method of " + to_string(base_method);
             throw (error_message);
         }
-        return keypoints;
+
+        // Timing and post execution rundown
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Features was successfully found in " << duration.count() << " ms using " << method << "." << endl;
     }
     catch(string error){
         cout << error << endl;
@@ -158,14 +182,14 @@ vector<KeyPoint> feature_finder::find_features(Mat frame, orb_settings settings)
     try{
         // Initialize detector
         Ptr<ORB> orb_detector = ORB::create(settings.max_features, settings.scale_factor, settings.levels, settings.edge_threshold, settings.first_level, settings.wta_k, ORB::HARRIS_SCORE, settings.patch_size, settings.fast_threshold);
-        cout << "max features: " << orb_detector->getMaxFeatures() << endl;
-        cout << "scale factor: " << orb_detector->getScaleFactor() << endl;
-        cout << "levels: " << orb_detector->getNLevels() << endl;
-        cout << "edge threshold: " << orb_detector->getEdgeThreshold() << endl;
-        cout << "first level: " << orb_detector->getFirstLevel() << endl;
-        cout << "wta: " << orb_detector->getWTA_K() << endl;
-        cout << "patch size: " << orb_detector->getPatchSize() << endl;
-        cout << "fast threshold: " << orb_detector->getFastThreshold() << endl;
+//        cout << "max features: " << orb_detector->getMaxFeatures() << endl;
+//        cout << "scale factor: " << orb_detector->getScaleFactor() << endl;
+//        cout << "levels: " << orb_detector->getNLevels() << endl;
+//        cout << "edge threshold: " << orb_detector->getEdgeThreshold() << endl;
+//        cout << "first level: " << orb_detector->getFirstLevel() << endl;
+//        cout << "wta: " << orb_detector->getWTA_K() << endl;
+//        cout << "patch size: " << orb_detector->getPatchSize() << endl;
+//        cout << "fast threshold: " << orb_detector->getFastThreshold() << endl;
         // Grayscale frame
         Mat gray_frame = apply_grayscale(frame);
         // Find features

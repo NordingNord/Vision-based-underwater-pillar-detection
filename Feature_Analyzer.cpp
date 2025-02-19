@@ -1148,6 +1148,42 @@ cv::Point2f feature_analyzer::predict_kalman(){
     return point;
 }
 
+// -- Methods that gets matches, based on desired setting --
+match_result feature_analyzer::get_matches(Mat descriptors_top, Mat descriptors_bottom, int type, int number_of_best_matches, int feature_type){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
+    match_result matches;
+    try{
+        string method;
+        if(type == MATCH_FLANN){
+            matches = get_flann_matches(descriptors_top, descriptors_bottom,number_of_best_matches,FLANN_ratio); // Maybe change number of best matches to 2 for more stability
+            method = "FLANN";
+        }
+        else if(type == MATCH_BRUTE_CROSS){
+            matches = get_brute_matches(descriptors_top,descriptors_bottom,1,true,feature_type); // Crosscheck only works if one match is found per feature
+            method = "Brute Force with crosscheck";
+        }
+        else if(type == MATCH_BRUTE){
+            matches = get_brute_matches(descriptors_top,descriptors_bottom,number_of_best_matches,false,feature_type);
+            method = "Brute Force";
+        }
+        else{
+            throw runtime_error("Unknown matcher. Returning empty struct.");
+        }
+        // Timing and post execution rundown
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Matching was successfully conducted in " << duration.count() << " ms using " << method << "." << endl;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return matches;
+}
+
+
 // -- Perform FLANN feature matching --
 match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descriptors_bottom,int number_of_best_matches, float ratio_threshold){
     match_result matches;
@@ -1164,10 +1200,8 @@ match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descri
         // Create matcher
         Ptr<DescriptorMatcher> flann_matcher = DescriptorMatcher::create(DescriptorMatcher::FLANNBASED);
         // Find matches
-        cout << "Finding matches" << endl;
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
         flann_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches);
-        cout << "Found mathces" << endl;
         // Filter matches based on lowes ratio test
         vector<bool> valid_matches;
         vector<DMatch> best_matches;
@@ -1193,7 +1227,7 @@ match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descri
 }
 
 // -- Performs brute force matching --
-match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descriptors_bottom,int number_of_best_matches, bool do_crosscheck){
+match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descriptors_bottom,int number_of_best_matches, bool do_crosscheck, int feature_type){
     match_result matches;
     try{
         // Check if featuers are present in both frames
@@ -1205,16 +1239,23 @@ match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descri
         if(do_crosscheck == true && number_of_best_matches != 1){
             crosscheck_status = false;
         }
+        // Create matcher based on feature type
+        Ptr<DescriptorMatcher> brute_matcher;
         // AKAZE
-        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING,crosscheck_status);
+        if(feature_type == METHOD_AKAZE){
+            brute_matcher = BFMatcher::create(NORM_HAMMING,crosscheck_status);
+        }
         // ORB
-        //Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING2,crosscheck_status); // Crosscheck true means that the feature must match both ways
+        else if(feature_type == METHOD_ORB){
+            brute_matcher = BFMatcher::create(NORM_HAMMING2,crosscheck_status); // Crosscheck true means that the feature must match both ways
+        }
         // SIFT
-        //Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_L2,crosscheck_status);
+        else if(feature_type == METHOD_SIFT){
+            brute_matcher = BFMatcher::create(NORM_L2,crosscheck_status);
+        }
         // Find matches
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
         brute_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches);
-        cout << all_matches[0].size() << endl;
         // Prepare shortest distance
         vector<DMatch> best_matches;
         vector<bool> accepted_matches;
@@ -1239,6 +1280,37 @@ match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descri
     }
     return matches;
 }
+
+// -- Method that filter matches based on desired method --
+match_result feature_analyzer::filter_matches(match_result match_results,vector<KeyPoint> keypoints_top,vector<KeyPoint> keypoints_bottom, int method){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
+    match_result filtered_matches = match_results;
+    try{
+        string method_str;
+        if(method == FILTER_RANSAC){
+            filtered_matches = ransac_match_filter(match_results,min_matches,keypoints_top,keypoints_bottom,ransac_threshold);
+            method_str = "RANSAC";
+        }
+        else if(method == FILTER_DIRECTIONAL){
+            filtered_matches = position_match_filter(match_results,keypoints_top,keypoints_bottom,angle_limit,downward_camera,max_dist);
+            method_str = "Directional";
+        }
+        else{
+            throw runtime_error("Unknown filter. Returning unfiltered matches.");
+        }
+        // Timing and post execution rundown
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Match filtering was successfully conducted in " << duration.count() << " ms using " << method_str << "." << endl;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_matches;
+}
+
 
 // -- Method that filters matches based on vector between positions --
 match_result feature_analyzer::position_match_filter(match_result match_results, vector<KeyPoint> keypoints_top, vector<KeyPoint> keypoints_bottom, int good_limit, bool best_down,int max_dist){
@@ -1331,12 +1403,11 @@ match_result feature_analyzer::position_match_filter(match_result match_results,
 }
 
 // -- Method that filters matches using homography with RANSAC --
-match_result feature_analyzer::homography_match_filter(match_result match_results,int min_matches,vector<KeyPoint> keypoints_top, vector<KeyPoint> keypoints_bottom,double ransac_threshold){
+match_result feature_analyzer::ransac_match_filter(match_result match_results,int min_matches,vector<KeyPoint> keypoints_top, vector<KeyPoint> keypoints_bottom,double ransac_threshold){
     match_result filtered_matches = match_results;
     try{
         // Count number of good matches
         int match_count = count(match_results.good_matches.begin(),match_results.good_matches.end(),1);
-        cout << "Good matches: " << match_count << endl;
         // Determine if enough matches are present
         if(match_count < min_matches){
             throw runtime_error("Not enough matches. Ignoring filtering.");
@@ -1360,7 +1431,6 @@ match_result feature_analyzer::homography_match_filter(match_result match_result
         // Find ransac mask
         Mat mask;
         Mat H = findHomography(points_top,points_bottom,RANSAC,ransac_threshold,mask);
-        cout << "Size of mask: " <<  mask.size << endl;
         // Keep only inliers
         vector<DMatch> good_matches;
         for(size_t i = 0; i < match_indexes.size();i++){
@@ -1372,11 +1442,212 @@ match_result feature_analyzer::homography_match_filter(match_result match_result
                 filtered_matches.good_matches[i] = 0;
             }
         }
-        cout << "Filtered match count: " << good_matches.size() << endl;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
     return filtered_matches;
+}
+
+
+// -- Method that performs SLIC clustering (Simple Linear Iterative Clustering) --
+super_pixel_frame feature_analyzer::perform_slic(Mat frame,int algorithm, int region_size, float ruler, int iterations){
+    super_pixel_frame results;
+    try{
+        // Check if algorithm is valid
+        if(algorithm != ximgproc::SLICO && algorithm != ximgproc::SLIC && algorithm != ximgproc::MSLIC){
+             throw runtime_error("Invalid algorithm choise. Please choose SLIC (100), SLICO (101) or MSLIC (102).");
+        }
+        // Convert to CieLAB for best real world results
+        Mat cielab_frame;
+        cvtColor(frame,cielab_frame,COLOR_BGR2Lab); // input frane must currently be in BGR
+
+        // They recomend gaussian blurr, but currently avoided due to fear of smudging
+
+        // Create class
+        Ptr<ximgproc::SuperpixelSLIC> super_pixel_class = ximgproc::createSuperpixelSLIC(cielab_frame,algorithm,region_size,ruler); // region size is the size of superpixels in pixels. Ruler is the enforcement of superpixel smoothness factor
+
+        // Run for desired amount of iterations
+        super_pixel_class->iterate(iterations);
+
+        // Prepare results
+        Mat border;
+        super_pixel_class->getLabelContourMask(border); // Thick line setting is auto true, change if thinner lines better for visualization
+
+        Mat pixel_labels;
+        super_pixel_class->getLabels(pixel_labels);
+
+        int n_super_pixels = super_pixel_class->getNumberOfSuperpixels();
+
+        results.border_mask = border;
+        results.pixel_labels = pixel_labels;
+        results.super_pixel_count = n_super_pixels;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return results;
+}
+
+// -- Method that returns number of accepted matches --
+int feature_analyzer::match_survivor_count(match_result data){
+    int count = 0;
+    try{
+        for(int i = 0; i < data.good_matches.size(); i++){
+            if(data.good_matches[i] == true){
+                count++;
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return count;
+}
+
+// -- Method that returns surviving matches --
+vector<DMatch> feature_analyzer::get_surviving_matches(match_result data){
+    vector<DMatch> surviving_matches;
+    try{
+        for(int i = 0; i < data.good_matches.size(); i++){
+            if(data.good_matches[i] == true){
+                surviving_matches.push_back(data.matches[i]);
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return surviving_matches;
+}
+
+// -- Method that returns two lists of features based on valid matches --
+vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(match_result matches, vector<KeyPoint> features_top, vector<KeyPoint> features_bottom){
+    vector<vector<KeyPoint>> surviving_features = {{},{}}; // index 0 = top frame, index 1 = bottom frame
+    try{
+        // Get valid matches
+        vector<DMatch> surviving_matches = get_surviving_matches(matches);
+        // Go through matches and add features
+        vector<int> top_indexes;
+        vector<int> bottom_indexes;
+        for(int match = 0; match < surviving_matches.size(); match++){
+            // Get indexes
+            top_indexes.push_back(surviving_matches[match].queryIdx);
+            bottom_indexes.push_back(surviving_matches[match].trainIdx);
+        }
+        // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)
+        sort(top_indexes.begin(), top_indexes.end());
+        sort(bottom_indexes.begin(), bottom_indexes.end());
+
+        auto iterator_top = unique(top_indexes.begin(), top_indexes.end());
+        auto iterator_bottom = unique(bottom_indexes.begin(), bottom_indexes.end());
+
+        top_indexes.erase(iterator_top, top_indexes.end());
+        bottom_indexes.erase(iterator_bottom, bottom_indexes.end());
+
+        // Go through surviving indexes and append corresponding feature to output
+        for(int i = 0; i < max(top_indexes.size(),bottom_indexes.size());i++){
+            if(i < top_indexes.size()){
+                surviving_features.at(0).push_back(features_top.at(top_indexes.at(i)));
+            }
+            if(i < bottom_indexes.size()){
+                surviving_features.at(1).push_back(features_bottom.at(bottom_indexes.at(i)));
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return surviving_features;
+}
+
+vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(vector<DMatch> matches, vector<KeyPoint> features_top, vector<KeyPoint> features_bottom){
+    vector<vector<KeyPoint>> surviving_features; // index 0 = top frame, index 1 = bottom frame
+    try{
+        // Go through matches and find valid indexes
+        vector<int> top_indexes;
+        vector<int> bottom_indexes;
+        for(int match = 0; match < matches.size(); match++){
+            // Get indexes
+            top_indexes.push_back(matches[match].queryIdx);
+            bottom_indexes.push_back(matches[match].trainIdx);
+        }
+        // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)
+        sort(top_indexes.begin(), top_indexes.end());
+        sort(bottom_indexes.begin(), bottom_indexes.end());
+
+        auto iterator_top = unique(top_indexes.begin(), top_indexes.end());
+        auto iterator_bottom = unique(bottom_indexes.begin(), bottom_indexes.end());
+
+        top_indexes.erase(iterator_top, top_indexes.end());
+        bottom_indexes.erase(iterator_bottom, bottom_indexes.end());
+
+        // Go through surviving indexes and append corresponding feature to output
+        for(int i = 0; i < max(top_indexes.size(),bottom_indexes.size());i++){
+            if(i < top_indexes.size()){
+                surviving_features.at(0).push_back(features_top.at(top_indexes.at(i)));
+            }
+            if(i < bottom_indexes.size()){
+                surviving_features.at(1).push_back(features_bottom.at(bottom_indexes.at(i)));
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return surviving_features;
+}
+
+// -- Method that returns two lists of feature indexes based on valid matches --
+vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoint_indexes(match_result matches){
+    vector<vector<KeyPoint>> surviving_indexes = {{},{}}; // index 0 = top frame, index 1 = bottom frame
+    try{
+        // Get valid matches
+        vector<DMatch> surviving_matches = get_surviving_matches(matches);
+        // Go through matches get indexes
+        for(int match = 0; match < surviving_matches.size(); match++){
+            // Get indexes
+            surviving_indexes.at(0).push_back(surviving_matches[match].queryIdx);
+            surviving_indexes.at(1).push_back(surviving_matches[match].trainIdx);
+        }
+        // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)
+        sort(surviving_indexes.at(0).begin(), surviving_indexes.at(0).end());
+        sort(surviving_indexes.at(1).begin(), surviving_indexes.at(1).end());
+
+        auto iterator_top = unique(surviving_indexes.at(0).begin(), surviving_indexes.at(0).end());
+        auto iterator_bottom = unique(surviving_indexes.at(1).begin(), surviving_indexes.at(1).end());
+
+        surviving_indexes.at(0).erase(iterator_top, surviving_indexes.at(0).end());
+        surviving_indexes.at(1).erase(iterator_bottom, surviving_indexes.at(1).end());
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return surviving_indexes;
+}
+
+vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoint_indexes(vector<DMatch> matches){
+    vector<vector<KeyPoint>> surviving_indexes; // index 0 = top frame, index 1 = bottom frame
+    try{
+        // Go through matches get indexes
+        for(int match = 0; match < matches.size(); match++){
+            // Get indexes
+            surviving_indexes.at(0).push_back(matches[match].queryIdx);
+            surviving_indexes.at(1).push_back(matches[match].trainIdx);
+        }
+        // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)
+        sort(surviving_indexes.at(0).begin(), surviving_indexes.at(0).end());
+        sort(surviving_indexes.at(1).begin(), surviving_indexes.at(1).end());
+
+        auto iterator_top = unique(surviving_indexes.at(0).begin(), surviving_indexes.at(0).end());
+        auto iterator_bottom = unique(surviving_indexes.at(1).begin(), surviving_indexes.at(1).end());
+
+        surviving_indexes.at(0).erase(iterator_top, surviving_indexes.at(0).end());
+        surviving_indexes.at(1).erase(iterator_bottom, surviving_indexes.at(1).end());
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return surviving_indexes;
 }
 

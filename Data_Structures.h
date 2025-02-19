@@ -88,4 +88,11 @@ struct match_result{
     std::vector<bool> good_matches;
 };
 
+// Struct that stores a superpixel frame
+struct super_pixel_frame{
+    cv::Mat border_mask;
+    cv::Mat pixel_labels;
+    int super_pixel_count;
+};
+
 #endif

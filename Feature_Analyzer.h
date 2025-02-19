@@ -12,6 +12,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
+#include <opencv2/ximgproc/slic.hpp>
 #include "Data_Structures.h"
 #include "Feature_Finder.h"
 #include "Data_Visualization.h"
@@ -20,7 +21,15 @@
 static const int VELOCITY = 0;
 static const int VELOCITY_AND_POS = 1;
 static const int POSITION = 2;
+
 static const float ANGLE_ERROR = 400;
+
+static const int MATCH_FLANN = 0;
+static const int MATCH_BRUTE_CROSS = 1;
+static const int MATCH_BRUTE = 2;
+
+static const int FILTER_RANSAC = 0;
+static const int FILTER_DIRECTIONAL = 1;
 
 class feature_analyzer
 {
@@ -95,17 +104,40 @@ public:
     // -- prediction method for kalman filter --
     cv::Point2f predict_kalman();
 
+    // -- Methods that gets matches, based on desired setting --
+    match_result get_matches(cv::Mat descriptors_top, cv::Mat descriptors_bottom,int type,int number_of_best_matches, int feature_type);
+
     // -- Performs brute force matching --
-    match_result get_brute_matches(cv::Mat descriptors_top, cv::Mat descriptors_bottom,int number_of_best_matches,bool do_crosscheck);
+    match_result get_brute_matches(cv::Mat descriptors_top, cv::Mat descriptors_bottom,int number_of_best_matches,bool do_crosscheck, int feature_type);
 
     // -- Perform FLANN feature matching --
     match_result get_flann_matches(cv::Mat descriptors_top, cv::Mat descriptors_bottom,int number_of_best_matches, float ratio_threshold);
 
+    // -- Method that filter matches based on desired method --
+    match_result filter_matches(match_result match_results,std::vector<cv::KeyPoint> keypoints_top,std::vector<cv::KeyPoint> keypoints_bottom, int method);
+
     // -- Method that filters matches based on vector between positions --
     match_result position_match_filter(match_result match_results, std::vector<cv::KeyPoint> keypoints_top, std::vector<cv::KeyPoint> keypoints_bottom, int good_limit, bool best_down,int max_dist);
 
-    // -- Method that filters matches using homography with RANSAC --
-    match_result homography_match_filter(match_result match_results, int min_matches, std::vector<cv::KeyPoint> keypoints_top, std::vector<cv::KeyPoint> keypoints_bottom,double ransac_threshold);
+    // -- Method that filters matches using homography with RANSAC (Currently waste time and resources by during ransac through the homography functionality)--
+    match_result ransac_match_filter(match_result match_results, int min_matches, std::vector<cv::KeyPoint> keypoints_top, std::vector<cv::KeyPoint> keypoints_bottom,double ransac_threshold);
+
+    // -- Method that performs SLIC clustering (Simple Linear Iterative Clustering) --
+    super_pixel_frame perform_slic(cv::Mat frame,int algorithm, int region_size, float ruler, int iterations);
+
+    // -- Method that returns number of accepted matches --
+    int match_survivor_count(match_result data);
+
+    // -- Method that returns surviving matches --
+    std::vector<cv::DMatch> get_surviving_matches(match_result data);
+
+    // -- Method that returns two lists of features based on valid matches --
+    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoints(match_result matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom);
+    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoints(std::vector<cv::DMatch> matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom);
+
+    // -- Method that returns two lists of feature indexes based on valid matches --
+    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoint_indexes(match_result matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom);
+    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoint_indexes(std::vector<cv::DMatch> matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom);
 
 private:
     // Variables used for optical flow
@@ -124,6 +156,21 @@ private:
 
     // Kalman filter object
     cv::KalmanFilter kalman_filter;
+
+    // FLANN (Lowes ratio) threshold
+    float FLANN_ratio = 0.7; // Base value
+
+    // -- Min matches for ransac --
+    int min_matches = 10;
+
+    // -- Ransac threshold --
+    double ransac_threshold = 3;
+
+    // Variables for homebrew directional filter
+    int angle_limit = 45;
+    bool downward_camera = true;
+    int max_dist;
+
 
 };
 

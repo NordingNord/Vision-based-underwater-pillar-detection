@@ -11,7 +11,7 @@ obstacle_detection::obstacle_detection(){
 }
 
 // -- Multicam feature pipeline --
-void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int feature_finding_gap){
+void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int matching_type, int filter_type){
     try{
         // Initialize cameras
         camera_handler cam_top(video_path_top); // Prepares the top camera video
@@ -30,23 +30,21 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         vector<KeyPoint> current_top_features; // Features currently in use in top image
         vector<KeyPoint> current_bottom_features; // Features currently in use in bottom image
 
-        vector<KeyPoint> current_features; // Features that are kept after filtering
 
-        vector<keypoint_data> current_data; // Features currently in use with the addition of data like velocity past positions and more
+        vector<keypoint_data> current_top_data; // Features currently in use with the addition of data like velocity past positions and more
+        vector<keypoint_data> current_bottom_data;
 
         // Storage for current frames
         Mat frame_top, frame_bottom;
 
         // Go through all frames
-        cout << "Initialization complete" << endl;
         while(true){
+
+            // || Gather frame data ||
+
             // Read frames
             frame_top = cam_top.get_frame();
-            //frame_bottom = cam_top.get_frame();
             frame_bottom = cam_bottom.get_frame();
-            imshow("top",frame_top);
-            imshow("bottom",frame_bottom);
-            waitKey(0);
 
             // Break if no more frames any of the videos
             if(frame_top.empty() || frame_bottom.empty()){
@@ -60,162 +58,88 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 }
                 break;
             }
-            imshow("top", frame_top);
-            imshow("bottom",frame_bottom);
-            waitKey(0);
-            // Perform pipeline
 
+            // || Perform pipeline ||
+
+            // -- PREPROCESSING --
             // Most preprocessing done in python beforehand
 
-            // Perform histogram equalization to hopefully make both images more similar
-//            Mat gray_top = finder.apply_grayscale(frame_top);
-//            Mat gray_bottom = finder.apply_grayscale(frame_bottom);
-//            Mat equalized_top, equalized_bottom;
-//            equalizeHist(gray_top,equalized_top);
-//            equalizeHist(gray_bottom,equalized_bottom);
-//            cvtColor(gray_top,frame_top,COLOR_GRAY2BGR);
-//            cvtColor(gray_bottom,frame_bottom,COLOR_GRAY2BGR);
-            // Rotate frames 90 degrees to allign pillar
-//            rotate(frame_top, frame_top, ROTATE_90_CLOCKWISE);
-//            rotate(frame_bottom, frame_bottom, ROTATE_90_CLOCKWISE);
-
+            // -- FIND FEATURES --
             // Find features based on chosen method (if not exceeding maximum allowed features)
             if(find_features == true && current_features.size() < max_features){
+
                 // Find features based on method
                 vector<KeyPoint> top_features = finder.find_features(frame_top); // Find features using initialized detector
                 vector<KeyPoint> bottom_features = finder.find_features(frame_bottom); // Find features using initialized detector
-                cout << "Top feature count: " << top_features.size() << endl;
-                cout << "Bottom feature count: " << bottom_features.size() << endl;
-                cout << "Features found" << endl;
+
                 // Find descriptors based on method
                 Mat top_descriptors = finder.get_descriptors(frame_top,top_features); // Gets descriptors based on newly found top view features
                 Mat bottom_descriptors = finder.get_descriptors(frame_bottom,bottom_features); // Gets descriptors based on newly found bottom view features
-                cout << "Descriptors determiend" << endl;
+
+                // -- MATCH FEATURES --
                 // Match features between cameras
-                //match_result matches = analyzer.get_flann_matches(top_descriptors, bottom_descriptors,number_of_matches, lowes_threshold);
-                match_result matches = analyzer.get_brute_matches(top_descriptors, bottom_descriptors,number_of_matches,true);
-                cout << "matches found" << endl;
-                // Filter matches
-                //cout << matches.all_matches[0].size() << endl;
-                //matches = analyzer.position_match_filter(matches, top_features , bottom_features, 45, true,100);
-                cout << "Time for homography filter" << endl;
-                matches = analyzer.homography_match_filter(matches,10,top_features , bottom_features, 3);
+                match_result matches = analyzer.get_matches(top_descriptors,bottom_descriptors,matching_type,number_of_matches,feature_type);
 
-                // Test print best results
-//                for(int i = 0; i < matches.matches.size(); i++){
-//                    if(matches.good_matches[i] == true){
-//                        cout << i << endl;
-//                        Mat test_image = frame_top.clone();
-//                        Point2f keypoint_top = top_features[matches.matches[i].queryIdx].pt;
-//                        Point2f keypoint_bottom = bottom_features[matches.matches[i].trainIdx].pt;
-//                        cout << "top = (" << keypoint_top.x << ", " << keypoint_top.y << ")" << endl;
-//                        cout << "bottom = (" << keypoint_bottom.x << ", " << keypoint_bottom.y << ")" << endl;
-//                        circle(test_image,keypoint_top,5,Scalar(0,0,255),-1);
-//                        circle(test_image,keypoint_bottom,5,Scalar(0,255,0),-1);
-//                        imshow("current point",test_image);
-//                        waitKey(0);
-//                    }
-//                }
+                // -- MATCH FILTERING --
+                // Filter matches with RANSAC (Alternative is my homemade filter based on known camera displacement, but that is currently not tweaked and is most likely worse.)
+                matches = analyzer.filter_matches(matches,top_features, bottom_features, filter_type);
 
-                // Test show features
+                // -- KEEP ONLY MATCHED FEATURES --
+                vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features);
+                current_top_features = remaining_features.at(0);
+                current_bottom_features = remaining_features.at(1);
+
+                // -- CONVERT FEATURES TO FEATURE DATA --
+                current_top_data = analyzer.convert_to_data(current_top_features);
+                current_bottom_data = analyzer.convert_to_data(current_bottom_features);
+
+                // -- ADD COLOR IDENTITIES FOR VISUALIZATION --
+                vector<Scalar> top_colours = visualizer.generate_random_colours(current_top_features.size());
+                vector<Scalar> bottom_colours = visualizer.generate_random_colours(current_bottom_features.size());
+                current_top_data = analyzer.insert_data(current_top_data, top_colours);
+                current_bottom_data = analyzer.insert_data(current_bottom_data, bottom_colours);
+
+
+
+                // -- WARNING: ENTERING TEST AREA. THINGS ARE MESSY DOWN HERE --
+                // For test purposes i disable find features here so we can analyse the features using optical flow
+
+                // TEST SLIC
+                super_pixel_frame slic_results = analyzer.perform_slic(frame_top,ximgproc::MSLIC,10,10.0f,10);
+
+                Mat viz_top = visualizer.mark_super_pixel_borders(frame_top,slic_results);
+                imshow("top super pixels", viz_top);
+                waitKey(0);
+
+                Mat viz_median = visualizer.mark_super_pixels(frame_top,slic_results);
+                imshow("Medians", viz_median);
+                waitKey(0);
+
+                imwrite("superpixel_border.jpg",viz_top);
+                imwrite("superpixel.jpg",viz_median);
+
+                // Test show surviving features
                 Mat img_keypoints_top;
-                drawKeypoints(frame_top, top_features, img_keypoints_top );
+                drawKeypoints(frame_top, remaining_features.at(0), img_keypoints_top );
                 Mat img_keypoints_bottom;
-                drawKeypoints(frame_bottom, bottom_features, img_keypoints_bottom );
+                drawKeypoints(frame_bottom, remaining_features.at(1), img_keypoints_bottom );
                 imshow("Top features",img_keypoints_top);
                 imshow("Bottom features",img_keypoints_bottom);
                 waitKey(0);
 
+                // Show surviving matches
+                int survivor_count = analyzer.match_survivor_count(matches);
+                cout << "Surviving features: " << survivor_count << endl;
 
-                // Test show best matches
-//                Mat img_matches;
-//                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-//                imshow("matches that went wrong",img_matches);
-//                waitKey(0);
+                // Get surviving matches
+                vector<DMatch> kept_matches = analyzer.get_surviving_matches(matches);
 
-
-                    // Remove features that are not present on both cameras
-                int n_matches = 0;
-                for(int i = 0; i < matches.good_matches.size(); i++){
-                    if(matches.good_matches[i] == true){
-                        n_matches++;
-                    }
-                }
-                cout << "Surviving features: " << n_matches << endl;
-                vector<DMatch> kept_matches;
-                for(int i = 0; i < matches.good_matches.size(); i++){
-                    if(matches.good_matches[i] == true){
-                        kept_matches.push_back(matches.matches[i]);
-                    }
-                }
+                // Visualize surviving matches
                 Mat img_kept_matches;
                 drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
                 imshow("matches that survived",img_kept_matches);
                 imwrite("survivors.jpg",img_kept_matches);
-                cout << "written" << endl;
                 waitKey(0);
-
-                // The manual test
-                int approved_count = 0;
-                for(int i = 0; i < kept_matches.size();i++){
-                    Mat img_temp;
-                    vector<DMatch> current_matches;
-                    current_matches.push_back(kept_matches[i]);
-                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, current_matches, img_temp, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-                    imshow("Current match",img_temp);
-                    waitKey(0);
-                    cout << "y -> approved, n -> not approved" << endl;
-                    string answer;
-                    while(true){
-                        cin >> answer;
-                        if(answer == "y" || answer == "n"){
-                            cout << "I know that letter" << endl;
-                            break;
-                        }
-                        else{
-                            cout << "Unrecognised input" << endl;
-                        }
-                    }
-                    if(answer == "y"){
-                        approved_count++;
-                    }
-                }
-//                cout << matches.good_matches.size() << endl;
-//                cout << top_features.size() << endl;
-//                cout << bottom_features.size() << endl;
-//                Mat img_matches;
-//                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-//                Mat img_keypoints_top;
-//                drawKeypoints(frame_top, top_features, img_keypoints_top );
-//                Mat img_keypoints_bottom;
-//                drawKeypoints(frame_bottom, bottom_features, img_keypoints_bottom );
-//                imshow("matches",img_matches);
-//                imshow("Top features",img_keypoints_top);
-//                imshow("Bottom features",img_keypoints_bottom);
-//                waitKey(0);
-//                if(n_matches != top_features.size()){
-//                    cout << matches.good_matches.size() << endl;
-//                    cout << top_features.size() << endl;
-//                    cout << bottom_features.size() << endl;
-//                    Mat img_matches;
-//                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches.matches, img_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-//                    vector<DMatch> kept_matches;
-//                    for(int i = 0; i < matches.matches.size(); i++){
-//                        if(matches.good_matches[i] == true){
-//                            kept_matches.push_back(matches.matches[i]);
-//                        }
-//                    }
-//                    Mat img_kept_matches;
-//                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-//                    imshow("matches that went wrong",img_matches);
-//                    imshow("matches that survived",img_kept_matches);
-//                    waitKey(0);
-//                }
-
-
-//                // Add found feature to currently alive features
-//                current_top_features.insert(current_top_features.end(), top_features.begin(), top_features.end());
-//                current_bottom_features.insert(current_bottom_features.end(), bottom_features.begin(), bottom_features.end());
             }
         }
     }

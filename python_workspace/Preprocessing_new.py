@@ -850,6 +850,22 @@ class preprocessing:
 
         return top, bottom
     
+    # Method that allign luminosity between two frames, based on vertical and horizontal offset
+    def align_lum(self,frame_top,frame_bottom,vertical_offset, horizontal_offset):
+        # Convert frames to YCrCb
+        frame_luminance_top = cv.cvtColor(frame_top,cv.COLOR_BGR2YCrCb)
+        frame_luminance_bottom = cv.cvtColor(frame_bottom,cv.COLOR_BGR2YCrCb)
+        # Get size and ensure that they are the same
+        if(frame_luminance_bottom.shape == frame_luminance_top.shape):
+            rows,cols,channels = frame_luminance_bottom.shape
+            # Overide luminosities in bottom frame with those in upper frame, for matching areas.
+            frame_luminance_bottom[0:rows-vertical_offset,0:cols-horizontal_offset,0] = frame_luminance_top[vertical_offset:rows,horizontal_offset:cols,0]
+            # Return result
+            return cv.cvtColor(frame_luminance_bottom,cv.COLOR_YCrCb2BGR)
+        else:
+            print("Shapes do not align. Nothing have been done.")
+            return frame_bottom
+
     # Method that handles entire preprocessing with combined frames
     def combined_preprocess(self,path_top,path_bottom,save_path_top,save_path_bottom,fps,frame_limit,min_coef,max_coef,cutoff,min_size,prob_limit,kernel_size,align_lum,vertical_offset,horizontal_offset):
         capturer_top = cv.VideoCapture(path_top)
@@ -927,12 +943,12 @@ class preprocessing:
 
             # Step 6: Align lum if desired
             if(align_lum == True):
-                frame_luminance_top = cv.cvtColor(frame_top,cv.COLOR_BGR2YCrCb)
-                frame_luminance_bottom = cv.cvtColor(frame_bottom,cv.COLOR_BGR2YCrCb)
-                rows,cols,channels = frame_luminance_bottom.shape
-                frame_luminance_bottom[0:rows-vertical_offset,0:cols-horizontal_offset,0] = frame_luminance_top[vertical_offset:rows,horizontal_offset:cols,0]
-                frame_bottom = cv.cvtColor(frame_luminance_bottom,cv.COLOR_YCrCb2BGR)
-
+                frame_bottom = preprocessor.align_lum(frame_top,frame_bottom,vertical_offset, horizontal_offset)
+                # frame_luminance_top = cv.cvtColor(frame_top,cv.COLOR_BGR2YCrCb)
+                # frame_luminance_bottom = cv.cvtColor(frame_bottom,cv.COLOR_BGR2YCrCb)
+                # rows,cols,channels = frame_luminance_bottom.shape
+                # frame_luminance_bottom[0:rows-vertical_offset,0:cols-horizontal_offset,0] = frame_luminance_top[vertical_offset:rows,horizontal_offset:cols,0]
+                # frame_bottom = cv.cvtColor(frame_luminance_bottom,cv.COLOR_YCrCb2BGR)
                 # show cut made
                 # frame_bottom[rows-vertical_offset,:] = (0,0,255)
                 # frame_bottom[:,cols-horizontal_offset] = (0,0,255)
@@ -991,6 +1007,30 @@ preprocessor = preprocessing()
 
 # Step 6: Sharpen
 #preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_1/Normalized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1/Sharpened_video.mkv',30,150,1.0,1.5)
+
+# ---- ORDER 1 bottom ---- 
+# Observation: Resizing before haze removal, ruins image quality
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Bottom.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Resized_Video.mkv',30,10,384)
+
+# Step 1: Dehazing
+#preprocessor.haze_create('../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Resized_Video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Haze_Video.mkv',30,10,False,False,"low")
+
+# Step 2: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Haze_Video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Snow_Removal_video.mkv',30,10,0.6,7)
+
+# Step 3: Homomorphic filter
+#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Homomorphic_video.mkv',30,10,0.5,2.5,1.0)
+
+# Step 4: Remove snow
+#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Homomorphic_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Big_Snow_Removal_video.mkv',30,10,0.6,31)
+
+# Step 5: Normalize
+#preprocessor.normalized_create('../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Big_Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Normalized_video.mkv',30,10)
+
+# Step 6: Sharpen
+#preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Normalized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_1_bottom/Sharpened_video.mkv',30,10,1.0,1.5)
+
 
 # ---- ORDER 2 ----
 # Observation: It is the second snow removal that ruins image quality
@@ -1056,12 +1096,28 @@ preprocessor = preprocessing()
 # Step 1: Sharpen
 #preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_7/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_7/Sharpened_video.mkv',30,150,1.0,1.5)
 
+# ---- ORDER 7 bottom----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Bottom.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_7_bottom/Resized_video.mkv',30,10,384)
+
+# Step 1: Sharpen
+#preprocessor.sharpen_create('../../Data/Video_Data/New_Pillar_Videos/Order_7_bottom/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_7_bottom/Sharpened_video.mkv',30,10,1.0,1.5)
+
+
 # ---- ORDER 8 ----
 # Step 0: Resize
 #preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_8/Resized_video.mkv',30,150,384)
 
 # Step 1: Dehaze
 #preprocessor.haze_create('../../Data/Video_Data/New_Pillar_Videos/Order_8/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_8/Haze_Video.mkv',30,150,False,False,"low")
+
+# ---- ORDER 8 bottom ----
+# Step 0: Resize
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Bottom.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_8_bottom/Resized_video.mkv',30,10,384)
+
+# Step 1: Dehaze
+#preprocessor.haze_create('../../Data/Video_Data/New_Pillar_Videos/Order_8_bottom/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_8_bottom/Haze_Video.mkv',30,10,False,False,"low")
+
 
 # ---- ORDER 9 ----
 # Step 0: Resize
@@ -1141,7 +1197,7 @@ preprocessor = preprocessing()
 
 # --- Resized ----
 # Step 0: Resize
-#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Resized/Resized_video.mkv',30,150,384)
+#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Bottom.mkv','../../Data/Video_Data/New_Pillar_Videos/Resized_bottom/Resized_video.mkv',30,150,384)
 
 # ---- ORDER 5 full test (no light tweaking) ----
 
@@ -1167,15 +1223,15 @@ preprocessor = preprocessing()
 
 
 # ----- ORDER 5 combined test
-path_top = '../../Data/Video_Data/New_Pillar_Top.mkv'
-path_bottom = '../../Data/Video_Data/New_Pillar_Bottom.mkv'
-save_top = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_top_video.mkv'
-save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_bottom_video.mkv'
-preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7,True,50,20)
+# path_top = '../../Data/Video_Data/New_Pillar_Top.mkv'
+# path_bottom = '../../Data/Video_Data/New_Pillar_Bottom.mkv'
+# save_top = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_top_video.mkv'
+# save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_bottom_video.mkv'
+# preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7,True,50,20)
 
 
 # Write all small images to directory
-# cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Top.mkv')
+# cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Videos/Resized_bottom/Resized_video.mkv')
 # frame_i = 0
 # while(True):
 #     ret,frame = cap.read()
@@ -1183,7 +1239,7 @@ preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1
 #         break
 #     frame_i = frame_i+1
 #     print(frame_i)
-#     title = "../../Data/Video_Data/New_Pillar_Videos/Images/"+str(frame_i)+".jpg"
+#     title = "../../Data/Video_Data/New_Pillar_Videos/Resized_bottom/"+str(frame_i)+".jpg"
 #     cv.imwrite(title,frame)
 #     if(frame_i > 150):
 #         break
@@ -1202,6 +1258,19 @@ preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1
 #     path = "../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_Images/"+str(index)+".jpg"
 #     frame = cv.imread(path,cv.IMREAD_COLOR)
 
+# Write UIEC2Net frames bottom
+# frame = cv.imread("../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_Images/1.jpg",cv.IMREAD_COLOR)
+# rows,cols,_ = frame.shape
+# frame_size = (cols,rows)
+# index = 1
+# writer = cv.VideoWriter("../../Data/Video_Data/New_Pillar_Videos/UIEC2Net.mkv", cv.VideoWriter_fourcc('M','J','P','G'), 30, frame_size)
+# while(True):
+#     writer.write(frame)
+#     index = index+1
+#     if(index > 50):
+#         break
+#     path = "../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_Images/"+str(index)+".jpg"
+#     frame = cv.imread(path,cv.IMREAD_COLOR)
 
 
 
