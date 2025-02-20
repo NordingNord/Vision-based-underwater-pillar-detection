@@ -165,8 +165,8 @@ public:
     // -- Method that extracts features from data --
     std::vector<cv::KeyPoint> extract_features(std::vector<keypoint_data> data);
 
-    // -- Method that retrieves the mean of all superpixels --
-    std::vector<cv::Vec3b> get_superpixel_means(super_pixel_frame data, cv::Mat frame);
+    // -- Method that retrieves the median of all superpixels --
+    std::vector<cv::Vec3b> get_superpixel_medians(super_pixel_frame data, cv::Mat frame);
 
 private:
     // Variables used for optical flow
