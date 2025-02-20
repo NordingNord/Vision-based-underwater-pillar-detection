@@ -33,6 +33,9 @@ public:
     // -- Visualizes superpixels with means --
     cv::Mat mark_super_pixels(cv::Mat frame, super_pixel_frame data);
 
+    // -- Method that colors features based on matches --
+    std::vector<std::vector<keypoint_data>> color_based_on_matches(match_result matches,std::vector<keypoint_data> data_top, std::vector<keypoint_data> data_bottom);
+
 
 private:
     int circle_diameter = 4;

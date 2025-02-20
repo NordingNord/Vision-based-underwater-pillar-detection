@@ -63,6 +63,17 @@ vector<Point2f> feature_analyzer::keypoints_to_points(vector<KeyPoint> keypoints
     return points;
 }
 
+KeyPoint feature_analyzer::point_to_keypoint(Point2f point, int keypoint_size){
+    KeyPoint keypoint;
+    try{
+        keypoint = KeyPoint(point.x,point.y,keypoint_size);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return keypoint;
+}
+
 
 // -- Method for converting keypoints or points into keypoint data
 vector<keypoint_data> feature_analyzer::convert_to_data(std::vector<cv::Point2f> points){
@@ -108,6 +119,7 @@ vector<keypoint_data> feature_analyzer::convert_to_data(std::vector<cv::KeyPoint
             current_data.id = i;
             current_data.distance = 0;
             current_data.velocity = 0;
+            current_data.valid = true;
             keypoints_data.push_back(current_data);
         }
         if(keypoints_data.size() != keypoints.size()){
@@ -187,6 +199,21 @@ float feature_analyzer::determine_velocity(vector<Point2f> positions, float fps,
     return velocity;
 }
 
+vector<keypoint_data> feature_analyzer::determine_velocity(vector<keypoint_data> data,float fps, int frames){
+    vector<keypoint_data> updated_data = data;
+    try{
+        // for each data point, calculate velocity
+        for(int i = 0; i < data.size(); i++){
+            updated_data.at(i).velocity = determine_velocity(data.at(i).positions,fps,frames);
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return updated_data;
+}
+
 
 // -- Method for calculating distance between two points --
 float feature_analyzer::determine_distance(cv::Point2f point_old, cv::Point2f point_new){
@@ -227,6 +254,34 @@ vector<keypoint_data> feature_analyzer::remove_invalid_data(vector<keypoint_data
     }
     return remaining_keypoints;
 }
+
+// -- Method for removing invalid keypoints in stereo data based on optical flow --
+vector<vector<keypoint_data>> feature_analyzer::remove_invalid_data_stereo(vector<keypoint_data> data_top,vector<keypoint_data> data_bottom, optical_flow_results results_top, optical_flow_results results_bottom){
+    vector<vector<keypoint_data>> remaining_keypoints = {{},{}};
+    try{
+        // Check if data matches
+//        cout << data_top.size() << endl;
+//        cout << results_top.points.size() << endl;
+//        cout << data_bottom.size() << endl;
+//        cout << results_bottom.points.size() << endl;
+        if(data_top.size() != results_top.points.size() || data_bottom.size() != results_bottom.points.size() || data_top.size() != data_bottom.size()){
+            throw runtime_error("Error: Data sizes do not match");
+        }
+
+        // Go through results and update kept data
+        for(int i = 0; i < results_top.status.size(); i++){
+            if(results_top.status.at(i) == 1 && results_bottom.status.at(i) == 1){
+                remaining_keypoints.at(0).push_back(data_top.at(i));
+                remaining_keypoints.at(1).push_back(data_bottom.at(i));
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return remaining_keypoints;
+}
+
 
 
 // -- Method for inserting data into keypoint data list based on input --
@@ -1452,6 +1507,9 @@ match_result feature_analyzer::ransac_match_filter(match_result match_results,in
 
 // -- Method that performs SLIC clustering (Simple Linear Iterative Clustering) --
 super_pixel_frame feature_analyzer::perform_slic(Mat frame,int algorithm, int region_size, float ruler, int iterations){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
     super_pixel_frame results;
     try{
         // Check if algorithm is valid
@@ -1482,6 +1540,22 @@ super_pixel_frame feature_analyzer::perform_slic(Mat frame,int algorithm, int re
         results.border_mask = border;
         results.pixel_labels = pixel_labels;
         results.super_pixel_count = n_super_pixels;
+
+        string method;
+        if(algorithm == ximgproc::SLICO){
+            method = "SLICO";
+        }
+        else if(algorithm == ximgproc::SLIC){
+            method = "SLIC";
+        }
+        else if(algorithm == ximgproc::MSLIC){
+            method = "MSLIC";
+        }
+
+        // Timing and post execution rundown
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Superpixels found in " << duration.count() << " ms using " << method << "." << endl;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -1522,7 +1596,7 @@ vector<DMatch> feature_analyzer::get_surviving_matches(match_result data){
 }
 
 // -- Method that returns two lists of features based on valid matches --
-vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(match_result matches, vector<KeyPoint> features_top, vector<KeyPoint> features_bottom){
+vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(match_result matches, vector<KeyPoint> features_top, vector<KeyPoint> features_bottom, bool unique_indexes){
     vector<vector<KeyPoint>> surviving_features = {{},{}}; // index 0 = top frame, index 1 = bottom frame
     try{
         // Get valid matches
@@ -1535,15 +1609,17 @@ vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(match_result matc
             top_indexes.push_back(surviving_matches[match].queryIdx);
             bottom_indexes.push_back(surviving_matches[match].trainIdx);
         }
-        // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)
-        sort(top_indexes.begin(), top_indexes.end());
-        sort(bottom_indexes.begin(), bottom_indexes.end());
+        if(unique_indexes == true){
+            // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)
+            sort(top_indexes.begin(), top_indexes.end());
+            sort(bottom_indexes.begin(), bottom_indexes.end());
 
-        auto iterator_top = unique(top_indexes.begin(), top_indexes.end());
-        auto iterator_bottom = unique(bottom_indexes.begin(), bottom_indexes.end());
+            auto iterator_top = unique(top_indexes.begin(), top_indexes.end());
+            auto iterator_bottom = unique(bottom_indexes.begin(), bottom_indexes.end());
 
-        top_indexes.erase(iterator_top, top_indexes.end());
-        bottom_indexes.erase(iterator_bottom, bottom_indexes.end());
+            top_indexes.erase(iterator_top, top_indexes.end());
+            bottom_indexes.erase(iterator_bottom, bottom_indexes.end());
+        }
 
         // Go through surviving indexes and append corresponding feature to output
         for(int i = 0; i < max(top_indexes.size(),bottom_indexes.size());i++){
@@ -1561,7 +1637,7 @@ vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(match_result matc
     return surviving_features;
 }
 
-vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(vector<DMatch> matches, vector<KeyPoint> features_top, vector<KeyPoint> features_bottom){
+vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(vector<DMatch> matches, vector<KeyPoint> features_top, vector<KeyPoint> features_bottom, bool unique_indexes){
     vector<vector<KeyPoint>> surviving_features; // index 0 = top frame, index 1 = bottom frame
     try{
         // Go through matches and find valid indexes
@@ -1572,15 +1648,17 @@ vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(vector<DMatch> ma
             top_indexes.push_back(matches[match].queryIdx);
             bottom_indexes.push_back(matches[match].trainIdx);
         }
-        // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)
-        sort(top_indexes.begin(), top_indexes.end());
-        sort(bottom_indexes.begin(), bottom_indexes.end());
+        if(unique_indexes == true){
+            // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)
+            sort(top_indexes.begin(), top_indexes.end());
+            sort(bottom_indexes.begin(), bottom_indexes.end());
 
-        auto iterator_top = unique(top_indexes.begin(), top_indexes.end());
-        auto iterator_bottom = unique(bottom_indexes.begin(), bottom_indexes.end());
+            auto iterator_top = unique(top_indexes.begin(), top_indexes.end());
+            auto iterator_bottom = unique(bottom_indexes.begin(), bottom_indexes.end());
 
-        top_indexes.erase(iterator_top, top_indexes.end());
-        bottom_indexes.erase(iterator_bottom, bottom_indexes.end());
+            top_indexes.erase(iterator_top, top_indexes.end());
+            bottom_indexes.erase(iterator_bottom, bottom_indexes.end());
+        }
 
         // Go through surviving indexes and append corresponding feature to output
         for(int i = 0; i < max(top_indexes.size(),bottom_indexes.size());i++){
@@ -1599,8 +1677,8 @@ vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(vector<DMatch> ma
 }
 
 // -- Method that returns two lists of feature indexes based on valid matches --
-vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoint_indexes(match_result matches){
-    vector<vector<KeyPoint>> surviving_indexes = {{},{}}; // index 0 = top frame, index 1 = bottom frame
+vector<vector<int>> feature_analyzer::get_valid_keypoint_indexes(match_result matches){
+    vector<vector<int>> surviving_indexes = {{},{}}; // index 0 = top frame, index 1 = bottom frame
     try{
         // Get valid matches
         vector<DMatch> surviving_matches = get_surviving_matches(matches);
@@ -1626,8 +1704,8 @@ vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoint_indexes(match_resu
     return surviving_indexes;
 }
 
-vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoint_indexes(vector<DMatch> matches){
-    vector<vector<KeyPoint>> surviving_indexes; // index 0 = top frame, index 1 = bottom frame
+vector<vector<int>> feature_analyzer::get_valid_keypoint_indexes(vector<DMatch> matches){
+    vector<vector<int>> surviving_indexes; // index 0 = top frame, index 1 = bottom frame
     try{
         // Go through matches get indexes
         for(int match = 0; match < matches.size(); match++){
@@ -1651,3 +1729,194 @@ vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoint_indexes(vector<DMa
     return surviving_indexes;
 }
 
+// -- Method that removes features with far away from chosen percentile --
+vector<keypoint_data> feature_analyzer::velocity_filter(vector<keypoint_data> data, int percentile, int threshold){
+    vector<keypoint_data> filtered_data = data;
+    try{
+        // Make velocity vector
+        vector<float> velocities;
+        for(int i = 0; i < data.size(); i++){
+            if(data.at(i).valid == true){
+                velocities.push_back(data.at(i).velocity);
+            }
+        }
+        // Sort vector
+        sort(velocities.begin(), velocities.end());
+        // Get desired percentile
+        int index = (percentile*velocities.size())/100; // If percentile is inbetween two values, the lowest is taken.
+        // Get percentile velocity
+        float compare_velocity = velocities.at(index);
+        // Keep features that satisfy velocity goal
+        for(int i = 0; i < data.size(); i++){
+            // calculate diff
+            int diff = abs(compare_velocity-data.at(i).velocity);
+            // Use diff to assess feature and if the velocity is bigger
+            if(diff > threshold && data.at(i).velocity > compare_velocity){
+                filtered_data.at(i).valid = false;
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_data;
+}
+
+// -- Method that average velocity based on results from both frames
+vector<float> feature_analyzer::combine_velocities(vector<keypoint_data> data_top, vector<keypoint_data> data_bottom){
+    vector<float> velocities;
+    try{
+        // Only continue if data is of same size
+        if(data_top.size() != data_bottom.size()){
+            throw runtime_error("Feature sizes does not match");
+        }
+        // Go through all features and calculate average velocity
+        for(int i = 0; i < data_top.size(); i++){
+            float average = (data_top.at(i).velocity+data_bottom.at(i).velocity)/2;
+            velocities.push_back(average);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return velocities;
+}
+
+// -- Method that adds velocities to data --
+vector<keypoint_data> feature_analyzer::add_velocities(vector<keypoint_data> data, vector<float> velocities){
+    vector<keypoint_data> updated_data = data;
+    try{
+        // Only continue if data is of same size
+        if(data.size() != velocities.size()){
+            throw runtime_error("Sizes does not match");
+        }
+        // Go through all features and assign velocities
+        for(int i = 0; i < data.size(); i++){
+            updated_data.at(i).velocity = velocities.at(i);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return updated_data;
+}
+
+// -- Method for assigning a vector of keypoints with keypoints from data --
+vector<KeyPoint> feature_analyzer::get_keypoints(vector<keypoint_data> data){
+    vector<KeyPoint> keypoints;
+    try{
+        // Go through all features and append keypoints
+        for(int i = 0; i < data.size(); i++){
+            keypoints.push_back(data.at(i).keypoint);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return keypoints;
+}
+
+// -- Method that updates data based on optical flow --
+vector<keypoint_data> feature_analyzer::flow_update(vector<keypoint_data> data, optical_flow_results results){
+    vector<keypoint_data> updated_data = data;
+    try{
+        // Go through each data point
+        for(int i = 0; i < data.size(); i++){
+            // Update validity
+            if(results.status.at(i) == 1){
+                updated_data.at(i).valid = true;
+                // Update current location
+                updated_data.at(i).point = results.points.at(i);
+                // Append position to past movements
+                updated_data.at(i).positions.push_back(results.points.at(i));
+            }
+            else{
+                updated_data.at(i).valid = false;
+                // Dont update other factors if data is invalid
+            }
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return updated_data;
+}
+
+// -- Method that invalidates features that do not do well in both frames --
+vector<vector<keypoint_data>> feature_analyzer::ensure_matching_performance(vector<keypoint_data> data_top, vector<keypoint_data> data_bottom){
+    vector<vector<keypoint_data>> updated_data =  {data_top,data_bottom};
+    try{
+        // ensure that there is the same amount of features
+        if(data_top.size() != data_bottom.size()){
+            throw runtime_error("Data does not match in size.");
+        }
+        // Go through data and ensure both are valid
+        for(int i = 0; i < data_top.size(); i++){
+            if(data_top.at(i).valid == false || data_bottom.at(i).valid == false){
+                updated_data.at(0).at(i).valid = false;
+                updated_data.at(1).at(i).valid = false;
+            }
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return updated_data;
+}
+
+// -- Method that extracts features from data --
+vector<KeyPoint> feature_analyzer::extract_features(vector<keypoint_data> data){
+    vector<KeyPoint> keypoints;
+    try{
+        for(int i = 0; i < data.size(); i++){
+            keypoints.push_back(data.at(i).keypoint);
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return keypoints;
+}
+
+// -- Method that retrieves the median of all superpixels --
+vector<Vec3b> get_superpixel_medians(super_pixel_frame data, Mat frame){
+    vector<Vec3b> medians(data.super_pixel_count,Vec3b(0,0,0));
+    try{
+        // Initialize vectors used to find superpixel means
+        vector<vector<int>> sums(data.super_pixel_count,{0,0,0});
+        vector<int> member_count(data.super_pixel_count,0);
+
+        // Go through every pixel to find its membership and update total membership sum and count
+        for(int row = 0; row < frame.rows; row++){
+            for(int col = 0; col < frame.cols; col++){
+                // Update color sums
+                sums.at(data.pixel_labels.at<int>(row,col)).at(0) += frame.at<Vec3b>(row,col)[0];
+                sums.at(data.pixel_labels.at<int>(row,col)).at(1) += frame.at<Vec3b>(row,col)[1];
+                sums.at(data.pixel_labels.at<int>(row,col)).at(2) += frame.at<Vec3b>(row,col)[2];
+                // update count
+                member_count[data.pixel_labels.at<int>(row,col)] += 1;
+            }
+        }
+        // Calculate medians
+        for(int i = 0; i < data.super_pixel_count; i++){
+            vector<int> current = sums.at(i);
+            current.at(0) = current.at(0)/member_count.at(i);
+            current.at(1) = current.at(1)/member_count.at(i);
+            current.at(2) = current.at(2)/member_count.at(i);
+
+            Vec3b value;
+            value[0] = current.at(0);
+            value[1] = current.at(1);
+            value[2] = current.at(2);
+
+            medians.at(i) = value;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return medians;
+}

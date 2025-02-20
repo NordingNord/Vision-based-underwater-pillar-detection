@@ -34,8 +34,17 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         vector<keypoint_data> current_top_data; // Features currently in use with the addition of data like velocity past positions and more
         vector<keypoint_data> current_bottom_data;
 
+        // Frame storage for time based filtering
+        vector<Mat> top_frames, bottom_frames;
+
         // Storage for current frames
         Mat frame_top, frame_bottom;
+
+        // Storage of frame where matching occured
+        Mat match_frame_top, match_frame_bottom;
+
+        // Current matches
+        match_result matches;
 
         // Go through all frames
         while(true){
@@ -58,6 +67,9 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 }
                 break;
             }
+            // Add frames to vectors
+            top_frames.push_back(frame_top);
+            bottom_frames.push_back(frame_bottom);
 
             // || Perform pipeline ||
 
@@ -66,7 +78,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
 
             // -- FIND FEATURES --
             // Find features based on chosen method (if not exceeding maximum allowed features)
-            if(find_features == true && current_features.size() < max_features){
+            if(find_features == true && current_top_features.size() < max_features && current_bottom_features.size() < max_features){
 
                 // Find features based on method
                 vector<KeyPoint> top_features = finder.find_features(frame_top); // Find features using initialized detector
@@ -78,14 +90,14 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
 
                 // -- MATCH FEATURES --
                 // Match features between cameras
-                match_result matches = analyzer.get_matches(top_descriptors,bottom_descriptors,matching_type,number_of_matches,feature_type);
+                matches = analyzer.get_matches(top_descriptors,bottom_descriptors,matching_type,number_of_matches,feature_type);
 
                 // -- MATCH FILTERING --
                 // Filter matches with RANSAC (Alternative is my homemade filter based on known camera displacement, but that is currently not tweaked and is most likely worse.)
                 matches = analyzer.filter_matches(matches,top_features, bottom_features, filter_type);
 
                 // -- KEEP ONLY MATCHED FEATURES --
-                vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features);
+                vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features,keep_unique); // Index 0 means features that a contained in match 0
                 current_top_features = remaining_features.at(0);
                 current_bottom_features = remaining_features.at(1);
 
@@ -94,10 +106,17 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 current_bottom_data = analyzer.convert_to_data(current_bottom_features);
 
                 // -- ADD COLOR IDENTITIES FOR VISUALIZATION --
-                vector<Scalar> top_colours = visualizer.generate_random_colours(current_top_features.size());
-                vector<Scalar> bottom_colours = visualizer.generate_random_colours(current_bottom_features.size());
-                current_top_data = analyzer.insert_data(current_top_data, top_colours);
-                current_bottom_data = analyzer.insert_data(current_bottom_data, bottom_colours);
+                vector<Scalar> colours = visualizer.generate_random_colours(current_top_features.size());
+                current_top_data = analyzer.insert_data(current_top_data, colours);
+                current_bottom_data = analyzer.insert_data(current_bottom_data, colours);
+
+                // -- PERFORM SLIC --
+                super_pixel_frame top_slic_results = analyzer.perform_slic(frame_top,slic_method,region_size,ruler,slic_iterations);
+                super_pixel_frame bottom_slic_results = analyzer.perform_slic(frame_bottom,slic_method,region_size,ruler,slic_iterations);
+
+                // -- UPDATE FRAMES AT TIME OF MATCHING --
+                match_frame_top = frame_top;
+                match_frame_bottom = frame_bottom;
 
 
 
@@ -105,13 +124,11 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 // For test purposes i disable find features here so we can analyse the features using optical flow
 
                 // TEST SLIC
-                super_pixel_frame slic_results = analyzer.perform_slic(frame_top,ximgproc::MSLIC,10,10.0f,10);
-
-                Mat viz_top = visualizer.mark_super_pixel_borders(frame_top,slic_results);
+                Mat viz_top = visualizer.mark_super_pixel_borders(frame_top,top_slic_results);
                 imshow("top super pixels", viz_top);
                 waitKey(0);
 
-                Mat viz_median = visualizer.mark_super_pixels(frame_top,slic_results);
+                Mat viz_median = visualizer.mark_super_pixels(frame_top,top_slic_results);
                 imshow("Medians", viz_median);
                 waitKey(0);
 
@@ -119,10 +136,8 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 imwrite("superpixel.jpg",viz_median);
 
                 // Test show surviving features
-                Mat img_keypoints_top;
-                drawKeypoints(frame_top, remaining_features.at(0), img_keypoints_top );
-                Mat img_keypoints_bottom;
-                drawKeypoints(frame_bottom, remaining_features.at(1), img_keypoints_bottom );
+                Mat img_keypoints_top = visualizer.mark_keypoints(current_top_data,frame_top);
+                Mat img_keypoints_bottom = visualizer.mark_keypoints(current_bottom_data,frame_top);
                 imshow("Top features",img_keypoints_top);
                 imshow("Bottom features",img_keypoints_bottom);
                 waitKey(0);
@@ -140,6 +155,20 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 imshow("matches that survived",img_kept_matches);
                 imwrite("survivors.jpg",img_kept_matches);
                 waitKey(0);
+
+                // With this we have our initial surviving keypoints.
+                find_features = false;
+            }
+            // -- WHAT SHOULD BE DONE IF NO NEW FEATURES SHOULD BE FOUND --
+            else{
+                // -- IF ENOUGH DATA PERFORM OPTICAL FLOW FILTERING --
+                if(top_frames.size() == filter_frames){
+                    // -- PERFORM FILTERING --
+                    matches = optical_flow_filter(top_frames, bottom_frames, matches, current_top_data, current_bottom_data);
+                    // -- CLEAN VECTORS --
+                    top_frames = {};
+                    bottom_frames = {};
+                }
             }
         }
     }
@@ -147,6 +176,143 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         cout << error.what() << endl;
     }
 }
+
+// -- Filters matches based on optical flow --
+match_result obstacle_detection::optical_flow_filter(vector<Mat> frames_top, vector<Mat> frames_bottom, match_result matches, vector<keypoint_data> top_data, vector<keypoint_data> bottom_data){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
+    match_result updated_matches = matches;
+    try{
+        // Initialize needed classes
+        feature_analyzer analyzer; // Analyzes features
+        data_visualization visualizer; // Handles color consistensies between features and visualization
+
+        // Initialize variables
+        Mat frame_top, frame_bottom, last_top_frame, last_bottom_frame;
+        vector<KeyPoint> current_top_features = analyzer.get_keypoints(top_data);
+        vector<KeyPoint> current_bottom_features = analyzer.get_keypoints(bottom_data);
+
+        vector<keypoint_data> current_top_data = top_data;
+        vector<keypoint_data> current_bottom_data = bottom_data;
+
+        // Go through each frame except the first one
+        for(int i = 1; i < frames_top.size(); i++){
+            // -- Prepare data --
+            frame_top = frames_top.at(i);
+            frame_bottom = frames_bottom.at(i);
+            last_top_frame = frames_top.at(i-1);
+            last_bottom_frame = frames_bottom.at(i-1);
+
+            // -- PERFORM OPTICAL FLOW --
+            optical_flow_results top_flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_top_features), last_top_frame, frame_top);
+            optical_flow_results bottom_flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_bottom_features), last_bottom_frame, frame_bottom);
+
+            // -- UPDATE DATA BASED ON OPTICAL FLOW --
+            current_top_data = analyzer.flow_update(current_top_data,top_flow_results);
+            current_bottom_data = analyzer.flow_update(current_bottom_data,bottom_flow_results);
+            vector<vector<keypoint_data>> cleaned_data = analyzer.ensure_matching_performance(current_top_data, current_bottom_data);
+            current_top_data = cleaned_data.at(0);
+            current_bottom_data = cleaned_data.at(1);
+
+            // -- CHECK IF FLOW LIMIT IS REACHED --
+            if(i == frames_top.size()-1){
+                // -- CALCULATE VELOCITY --
+                current_top_data = analyzer.determine_velocity(current_top_data, fps, frames_top.size());
+                current_bottom_data = analyzer.determine_velocity(current_bottom_data, fps, frames_top.size());
+                // -- AVERAGE VELOCITIES --
+                vector<float> velocities = analyzer.combine_velocities(current_top_data,current_bottom_data);
+                current_top_data = analyzer.add_velocities(current_top_data,velocities);
+                current_bottom_data = analyzer.add_velocities(current_bottom_data,velocities);
+                // -- FILTER VELOCITIES --
+                current_top_data = analyzer.velocity_filter(current_top_data,percentile,flow_threshold);
+                current_bottom_data = analyzer.velocity_filter(current_bottom_data,percentile,flow_threshold);
+                // -- UPDATE MATCHES --
+                for(int j = 0; j < current_top_data.size(); j++){
+                    if(current_top_data.at(j).valid == false && updated_matches.good_matches.at(j) == true){
+                        updated_matches.good_matches.at(j) = false;
+                    }
+                }
+
+                // -- VISUALIZE RESULTS FOR FUN--
+                Mat top_viz,bottom_viz;
+                // Mark points
+                Mat circle_top_frame = visualizer.mark_keypoints(current_top_data,frame_top);
+                Mat circle_bottom_frame = visualizer.mark_keypoints(current_bottom_data,frame_bottom);
+                // Draw lines for alive features
+                Mat line_top_frame = visualizer.mark_lines(current_top_data,frame_top);
+                Mat line_bottom_frame = visualizer.mark_lines(current_bottom_data,frame_bottom);
+                // Combine mask and frame
+                add(line_top_frame,circle_top_frame,top_viz);
+                add(line_bottom_frame,circle_bottom_frame,bottom_viz);
+                // Add velocity text
+                top_viz = visualizer.mark_velocity(current_top_data,top_viz);
+                bottom_viz = visualizer.mark_velocity(current_bottom_data,bottom_viz);
+                imshow("top vel", top_viz);
+                imshow("bottom vel", bottom_viz);
+                waitKey(0);
+            }
+            // -- UPDATE SURVIVING FEATURES --
+            current_top_features = analyzer.get_keypoints(current_top_data);
+            current_bottom_features = analyzer.get_keypoints(current_bottom_data);
+        }
+    }
+    catch(const exception& error){
+        cout << error.what() << endl;
+    }
+    // Timing and post execution rundown
+    auto stop = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+    cout << "Optical flow filtering conducted in " << duration.count() << " ms using " << frames_top.size() << " frames." << endl;
+
+    return updated_matches;
+}
+
+// -- Filter that tries to segment image based on superpixels --
+super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame data, Mat frame){
+    super_pixel_frame updated_data = data;
+    try{
+        // Initialize needed classes
+        feature_analyzer analyzer; // Analyzes features
+
+        // Get superpixel identifier
+        vector<Vec3b> medians = analyzer.get_superpixel_medians(data,frame);
+
+        // Initialize vector of labels similar to each other label
+        vector<vector<int>> label_clusters;
+
+        // Find distance from all medians to all other medians
+        for(int i = 0; i < medians.size(); i++){
+            int val_1 = medians.at(i)[0];
+            int val_2 = medians.at(i)[1];
+            int val_3 = medians.at(i)[2];
+            int comp_1,comp_2,comp_3;
+            for(int j = (i+1); j < medians.size(); j++){
+                comp_1 = medians.at(j)[0];
+                comp_2 = medians.at(j)[1];
+                comp_3 = medians.at(j)[2];
+            }
+            int diff_1 = abs(val_1-comp_1);
+            int diff_2 = abs(val_2-comp_2);
+            int diff_3 = abs(val_3-comp_3);
+            int total_diff = diff_1+diff_2+diff_3;
+        }
+        // INSTEAD MAYBE JUST CLUSTER WITH K-MEANS
+
+        // Go through every pixel to find its membership
+        for(int row = 0; row < frame.rows; row++){
+            for(int col = 0; col < frame.cols; col++){
+
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << error.what() << endl;
+    }
+    return updated_data
+}
+
+// ----------------------- OUTDATED -------------------------------------------------------
 
 // -- The data gathering part of the pipeline with focus on optical flow --
 void obstacle_detection::get_detection_data(string video_path, int feature_type, int frame_gap, bool continuous){
@@ -289,9 +455,6 @@ void obstacle_detection::get_detection_data(string video_path, int feature_type,
         cout << error.what() << endl;
     }
 }
-
-
-
 
 
 // -- Performs optical flow on video --

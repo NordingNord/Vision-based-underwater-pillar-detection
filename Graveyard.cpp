@@ -699,3 +699,57 @@
 //                        approved_count++;
 //                    }
 //                }
+
+
+// -- PERFORM OPTICAL FLOW --
+//optical_flow_results top_flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_top_features), last_top_frame, frame_top);
+//optical_flow_results bottom_flow_results = analyzer.optical_flow(analyzer.keypoints_to_points(current_bottom_features), last_bottom_frame, frame_bottom);
+
+//// -- UPDATE DATA BASED ON OPTICAL FLOW --
+//current_top_data = analyzer.flow_update(current_top_data,top_flow_results);
+//current_bottom_data = analyzer.flow_update(current_bottom_data,bottom_flow_results);
+//vector<vector<keypoint_data>> cleaned_data = analyzer.ensure_matching_performance(current_top_data, current_bottom_data);
+//current_top_data = cleaned_data.at(0);
+//current_bottom_data = cleaned_data.at(1);
+
+// -- KEEP ONLY FEATURES THAT DO WELL IN BOTH FRAMES --
+
+
+//// increase count of frames processed since last feature matching process
+//frames_since_match++;
+
+//// -- CHECK IF FLOW LIMIT IS REACHED --
+//if(frames_since_match >= max_frame_gap-1){
+//    // -- CALCULATE VELOCITY --
+//    current_top_data = analyzer.determine_velocity(current_top_data, fps, max_frame_gap);
+//    current_bottom_data = analyzer.determine_velocity(current_bottom_data, fps, max_frame_gap);
+//    // -- AVERAGE VELOCITIES --
+//    vector<float> velocities = analyzer.combine_velocities(current_top_data,current_bottom_data);
+//    current_top_data = analyzer.add_velocities(current_top_data,velocities);
+//    current_bottom_data = analyzer.add_velocities(current_bottom_data,velocities);
+//    // -- FILTER VELOCITIES
+//    current_top_data = analyzer.velocity_filter(current_top_data,percentile,flow_threshold);
+//    current_bottom_data = analyzer.velocity_filter(current_bottom_data,percentile,flow_threshold);
+//    // -- VISUALIZE RESULTS --
+//    Mat top_viz,bottom_viz;
+//    // Mark points
+//    Mat circle_top_frame = visualizer.mark_keypoints(current_top_data,frame_top);
+//    Mat circle_bottom_frame = visualizer.mark_keypoints(current_bottom_data,frame_bottom);
+//    // Draw lines for alive features
+//    Mat line_top_frame = visualizer.mark_lines(current_top_data,frame_top);
+//    Mat line_bottom_frame = visualizer.mark_lines(current_bottom_data,frame_bottom);
+//    // Combine mask and frame
+//    add(line_top_frame,circle_top_frame,top_viz);
+//    add(line_bottom_frame,circle_bottom_frame,bottom_viz);
+//    // Add velocity text
+//    top_viz = visualizer.mark_velocity(current_top_data,top_viz);
+//    bottom_viz = visualizer.mark_velocity(current_bottom_data,bottom_viz);
+//    imshow("top vel", top_viz);
+//    imshow("bottom vel", bottom_viz);
+//    waitKey(0);
+//    frames_since_match = 0;
+//}
+
+//// -- UPDATE SURVIVING FEATURES --
+//current_top_features = analyzer.get_keypoints(current_top_data);
+//current_bottom_features = analyzer.get_keypoints(current_bottom_data);

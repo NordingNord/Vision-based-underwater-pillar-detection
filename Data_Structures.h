@@ -55,6 +55,7 @@ struct keypoint_data{
     int distance;
     float velocity;
     std::vector<cv::Point2f> estimate_positions;
+    bool valid;
 
 };
 

@@ -40,6 +40,11 @@ public:
     // -- The data gathering part of the pipeline with focus on optical flow --
     void get_detection_data(std::string video_path, int feature_type = 0, int frame_gap = 0, bool continuous = true);
 
+    // -- Filters matches based on optical flow --
+    match_result optical_flow_filter(std::vector<cv::Mat> frames_top, std::vector<cv::Mat> frames_bottom, match_result matches, std::vector<keypoint_data> top_data, std::vector<keypoint_data> bottom_data);
+
+    // -- Filter that tries to segment image based on superpixels --
+    super_pixel_frame superpixel_segmentation(super_pixel_frame data, cv::Mat frame);
 private:
     // -- Minimum number of features required for optical flow to continue --
     int min_points = 5;
@@ -64,6 +69,33 @@ private:
 
     // -- Ransac threshold --
     double ransac_threshold = 3;
+
+    // -- SLIC method --
+    int slic_method = cv::ximgproc::MSLIC;
+
+    // -- SLIC region size
+    int region_size = 10;
+
+    // -- SLIC ruler --
+    float ruler = 10.0f;
+
+    // -- SLIC iterations --
+    int slic_iterations = 5;
+
+    // -- keep only unique features --
+    bool keep_unique = false;
+
+    // -- optical flow filter percentile --
+    int percentile = 25;
+
+    // -- optical flow filter threshold --
+    int flow_threshold = 30;
+
+    // -- frames per second of video feed --
+    float fps = 30;
+
+    // -- number of frames needed for optical flow filtering --
+    int filter_frames = 5;
 };
 
 #endif // OBSTACLE_DETECTION_H

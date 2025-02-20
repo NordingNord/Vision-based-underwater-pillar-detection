@@ -44,6 +44,7 @@ public:
     // -- Convertion methods between Point2f and KeyPoint --
     std::vector<cv::KeyPoint> points_to_keypoints(std::vector<cv::Point2f> points, int keypoint_size = 1);
     std::vector<cv::Point2f> keypoints_to_points(std::vector<cv::KeyPoint> keypoints);
+    cv::KeyPoint point_to_keypoint(cv::Point2f point, int keypoint_size = 1);
 
     // -- Method for converting keypoints or points into keypoint data
     std::vector<keypoint_data> convert_to_data(std::vector<cv::Point2f> points);
@@ -54,6 +55,7 @@ public:
 
     // -- Method for determining velocity of a point
     float determine_velocity(std::vector<cv::Point2f> positions, float fps, int frames);
+    std::vector<keypoint_data> determine_velocity(std::vector<keypoint_data> data,float fps, int frames);
 
     // -- Method for calculating distance between two points --
     float determine_distance(cv::Point2f point_old, cv::Point2f point_new);
@@ -61,7 +63,10 @@ public:
     // -- Method for removing invalid keypoints in data based on optical flow --
     std::vector<keypoint_data> remove_invalid_data(std::vector<keypoint_data> data, optical_flow_results results);
 
-    // -- Method for inserting data into keypoint data list based on input --
+    // -- Method for removing invalid keypoints in stereo data based on optical flow --
+    std::vector<std::vector<keypoint_data>> remove_invalid_data_stereo(std::vector<keypoint_data> data_top,std::vector<keypoint_data> data_bottom, optical_flow_results results_top, optical_flow_results results_bottom);
+
+    // -- Method for inserting data into keypoint data list based on input --optical_flow_results results_top
     std::vector<keypoint_data> insert_data(std::vector<keypoint_data> list, std::vector<cv::Scalar> colours);
 
     // -- Method for clustering keypoints based on velocity --
@@ -132,12 +137,36 @@ public:
     std::vector<cv::DMatch> get_surviving_matches(match_result data);
 
     // -- Method that returns two lists of features based on valid matches --
-    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoints(match_result matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom);
-    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoints(std::vector<cv::DMatch> matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom);
+    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoints(match_result matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom, bool unique_indexes);
+    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoints(std::vector<cv::DMatch> matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom, bool unique_indexes);
 
     // -- Method that returns two lists of feature indexes based on valid matches --
-    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoint_indexes(match_result matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom);
-    std::vector<std::vector<cv::KeyPoint>> get_valid_keypoint_indexes(std::vector<cv::DMatch> matches, std::vector<cv::KeyPoint> features_top, std::vector<cv::KeyPoint> features_bottom);
+    std::vector<std::vector<int>> get_valid_keypoint_indexes(match_result matches);
+    std::vector<std::vector<int>> get_valid_keypoint_indexes(std::vector<cv::DMatch> matches);
+
+    // -- Method that removes features with far away from chosen percentile --
+    std::vector<keypoint_data> velocity_filter(std::vector<keypoint_data> data, int percentile, int threshold);
+
+    // -- Method that average velocity based on results from both frames
+    std::vector<float> combine_velocities(std::vector<keypoint_data> data_top, std::vector<keypoint_data> data_bottom);
+
+    // -- Method that adds velocities to data --
+    std::vector<keypoint_data> add_velocities(std::vector<keypoint_data> data, std::vector<float> velocities);
+
+    // -- Method for assigning a vector of keypoints with keypoints from data --
+    std::vector<cv::KeyPoint> get_keypoints(std::vector<keypoint_data> data);
+
+    // -- Method that updates data based on optical flow --
+    std::vector<keypoint_data> flow_update(std::vector<keypoint_data> data, optical_flow_results results);
+
+    // -- Method that invalidates features that do not do well in both frames --
+    std::vector<std::vector<keypoint_data>> ensure_matching_performance(std::vector<keypoint_data> data_top, std::vector<keypoint_data> data_bottom);
+
+    // -- Method that extracts features from data --
+    std::vector<cv::KeyPoint> extract_features(std::vector<keypoint_data> data);
+
+    // -- Method that retrieves the mean of all superpixels --
+    std::vector<cv::Vec3b> get_superpixel_means(super_pixel_frame data, cv::Mat frame);
 
 private:
     // Variables used for optical flow

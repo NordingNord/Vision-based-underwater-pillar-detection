@@ -1259,18 +1259,18 @@ preprocessor = preprocessing()
 #     frame = cv.imread(path,cv.IMREAD_COLOR)
 
 # Write UIEC2Net frames bottom
-# frame = cv.imread("../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_Images/1.jpg",cv.IMREAD_COLOR)
-# rows,cols,_ = frame.shape
-# frame_size = (cols,rows)
-# index = 1
-# writer = cv.VideoWriter("../../Data/Video_Data/New_Pillar_Videos/UIEC2Net.mkv", cv.VideoWriter_fourcc('M','J','P','G'), 30, frame_size)
-# while(True):
-#     writer.write(frame)
-#     index = index+1
-#     if(index > 50):
-#         break
-#     path = "../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_Images/"+str(index)+".jpg"
-#     frame = cv.imread(path,cv.IMREAD_COLOR)
+frame = cv.imread("../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_resized_images_bottom/1.jpg",cv.IMREAD_COLOR)
+rows,cols,_ = frame.shape
+frame_size = (cols,rows)
+index = 1
+writer = cv.VideoWriter("../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_resized_bottom.mkv", cv.VideoWriter_fourcc('M','J','P','G'), 30, frame_size)
+while(True):
+    writer.write(frame)
+    index = index+1
+    if(index > 10):
+        break
+    path = "../../Data/Video_Data/New_Pillar_Videos/UIEC2Net_resized_images_bottom/"+str(index)+".jpg"
+    frame = cv.imread(path,cv.IMREAD_COLOR)
 
 
 

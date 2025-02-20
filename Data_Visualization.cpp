@@ -38,7 +38,9 @@ Mat data_visualization::mark_keypoints(vector<keypoint_data> data, Mat frame){
     try{
         // go through each point and mark them on frame
         for(int i = 0; i < data.size(); i++){
-           circle(result,data[i].point,circle_diameter,data[i].colour,-1);
+            if(data.at(i).valid == true){
+                circle(result,data[i].point,circle_diameter,data[i].colour,-1);
+            }
         }
     }
     catch(const exception& error){
@@ -53,8 +55,10 @@ Mat data_visualization::mark_lines(vector<keypoint_data> data, Mat frame){
         // go through each point and and draw lines between all its past positions
         Mat result = Mat::zeros(frame.size(), frame.type());
         for(int i = 0; i < data.size(); i++){
-            for(int j = 0; j < data[i].positions.size()-1;j++){
-                line(result,data[i].positions[j],data[i].positions[j+1],data[i].colour,2);
+            if(data.at(i).valid == true){
+                for(int j = 0; j < data[i].positions.size()-1;j++){
+                    line(result,data[i].positions[j],data[i].positions[j+1],data[i].colour,2);
+                }
             }
         }
         return result;
@@ -71,8 +75,10 @@ Mat data_visualization::mark_velocity(vector<keypoint_data> data, Mat frame){
         // go through each point and mark them on frame
         Mat result = frame.clone();
         for(int i = 0; i < data.size(); i++){
-            string vel_text = to_string(int(data[i].velocity));
-            putText(result,vel_text,data[i].point,FONT_HERSHEY_SCRIPT_COMPLEX,1.0,data[i].colour,1,LINE_AA);
+            if(data.at(i).valid == true){
+                string vel_text = to_string(int(data[i].velocity));
+                putText(result,vel_text,data[i].point,FONT_HERSHEY_SCRIPT_COMPLEX,1.0,data[i].colour,1,LINE_AA);
+            }
         }
         return result;
     }
@@ -150,5 +156,24 @@ Mat data_visualization::mark_super_pixels(Mat frame, super_pixel_frame data){
         cout << "Error: " << error.what() << endl;
     }
     return visualized_frame;
-
 }
+
+// -- Method that colors features based on matches --
+vector<vector<keypoint_data>> data_visualization::color_based_on_matches(match_result matches,vector<keypoint_data> data_top, vector<keypoint_data> data_bottom){
+    vector<vector<keypoint_data>> colored_results = {data_top,data_bottom};
+    try{
+        // Generate colors for each match
+        vector<Scalar> colors = generate_random_colours(matches.matches.size());
+        // Assign color for each match
+
+        // METHOD NOT NEEDED ANYWAYS DUE TO FEATURES BEING ALIGNED WITH MATCHES
+
+
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return colored_results;
+}
+
