@@ -123,6 +123,12 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 // -- WARNING: ENTERING TEST AREA. THINGS ARE MESSY DOWN HERE --
                 // For test purposes i disable find features here so we can analyse the features using optical flow
 
+                // Test 3d estimation
+                Mat top_projection_matrix = cam_top.get_projection_matrix(TOP_CAM);
+                Mat bottom_projection_matrix = cam_bottom.get_projection_matrix(BOTTOM_CAM);
+                Point3f point_3d =  direct_linear_transform(top_projection_matrix,bottom_projection_matrix,current_top_data.at(0).point, current_bottom_data.at(0).point);
+                cout << point_3d << endl;
+
                 // TEST SLIC
                 Mat viz_top = visualizer.mark_super_pixel_borders(frame_top,top_slic_results);
                 imshow("top super pixels", viz_top);
@@ -268,7 +274,7 @@ match_result obstacle_detection::optical_flow_filter(vector<Mat> frames_top, vec
     return updated_matches;
 }
 
-// -- Filter that tries to segment image based on superpixels --
+// -- Filter that tries to segment image based on superpixels -- (WORK IN PROGRESS)
 super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame data, Mat frame){
     super_pixel_frame updated_data = data;
     try{
@@ -276,7 +282,8 @@ super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame 
         feature_analyzer analyzer; // Analyzes features
 
         // Get superpixel identifier
-        vector<Vec3b> medians = analyzer.get_superpixel_medians(data,frame);
+        //vector<Vec3b> medians = analyzer.get_superpixel_medians(data,frame);
+        vector<Vec3b> medians;
 
         // Initialize vector of labels similar to each other label
         vector<vector<int>> label_clusters;
@@ -296,6 +303,7 @@ super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame 
             int diff_2 = abs(val_2-comp_2);
             int diff_3 = abs(val_3-comp_3);
             int total_diff = diff_1+diff_2+diff_3;
+            cout << total_diff << endl;
         }
         // INSTEAD MAYBE JUST CLUSTER WITH K-MEANS
 
@@ -309,7 +317,89 @@ super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame 
     catch(const exception& error){
         cout << error.what() << endl;
     }
-    return updated_data
+    return updated_data;
+}
+
+
+// -- Triangulate points based on stereo camera system --
+Point3f obstacle_detection::direct_linear_transform(Mat projection_matrix_top, Mat projection_matrix_bottom, Point2f top_placement, Point2f bottom_placement){
+    Point3f position_3d;
+    try{
+        // Extract rows
+        vector<vector<double>> projection_rows_top;
+        vector<vector<double>> projection_rows_bottom;
+        // Ensure correct amount of rows
+        while(projection_rows_bottom.size() < projection_matrix_top.rows){
+            projection_rows_bottom.push_back({});
+            projection_rows_top.push_back({});
+        }
+        // Fill rows with all column values in that row
+        for(int i = 0; i < projection_matrix_top.cols; i++){
+            for(int j = 0; j < projection_matrix_top.rows; j++){
+                projection_rows_bottom.at(j).push_back(projection_matrix_bottom.at<double>(j,i));
+                projection_rows_top.at(j).push_back(projection_matrix_top.at<double>(j,i));
+            }
+        }
+        // Convert row vectors to valarrays
+        vector<valarray<double>> projection_rows_top_array;
+        vector<valarray<double>> projection_rows_bottom_array;
+
+        for(int i = 0; i < projection_rows_top.size(); i++){
+            valarray<double> val_array_top(projection_rows_top.at(i).data(),projection_rows_top.at(i).size());
+            valarray<double> val_array_bottom(projection_rows_bottom.at(i).data(),projection_rows_bottom.at(i).size());
+            projection_rows_top_array.push_back(val_array_top);
+            projection_rows_bottom_array.push_back(val_array_bottom);
+        }
+
+        // Define for equations that make up the A matrix
+        valarray<double> eq_1 = bottom_placement.y * projection_rows_bottom_array.at(2) - projection_rows_bottom_array.at(1);
+        valarray<double> eq_2 = projection_rows_bottom_array.at(0) - bottom_placement.x * projection_rows_bottom_array.at(2);
+        valarray<double> eq_3 = top_placement.y * projection_rows_top_array.at(2) - projection_rows_top_array.at(1);
+        valarray<double> eq_4 = projection_rows_top_array.at(0) - top_placement.x * projection_rows_top_array.at(2);
+
+        // Turn into A matrix
+        Mat_<double> A_temp(4,4);
+        A_temp << eq_1[0], eq_1[1], eq_1[2], eq_1[3], eq_2[0], eq_2[1], eq_2[2], eq_2[3], eq_3[0], eq_3[1], eq_3[2], eq_3[3], eq_4[0], eq_4[1], eq_4[2], eq_4[3];
+        Mat A = A_temp;
+        // Get transposed A
+        Mat A_T;
+        transpose(A,A_T);
+        // get product
+        Mat B = A_T*A;
+        cout << B << endl;
+        // CORRECT HERE
+
+        // Convert to matrix from eigen library
+        cout << "Time to matrix conversion" << endl;
+        Eigen::Matrix4d B_eigen;
+        B_eigen <<  B.at<double>(0,0), B.at<double>(0,1), B.at<double>(0,2), B.at<double>(0,3), B.at<double>(1,0), B.at<double>(1,1), B.at<double>(1,2), B.at<double>(1,3), B.at<double>(2,0), B.at<double>(2,1), B.at<double>(2,2), B.at<double>(2,3), B.at<double>(3,0), B.at<double>(3,1), B.at<double>(3,2), B.at<double>(3,3);
+        Eigen::Matrix4d A_T_eigen;
+        A_T_eigen << A_T.at<double>(0,0), A_T.at<double>(0,1), A_T.at<double>(0,2), A_T.at<double>(0,3), A_T.at<double>(1,0), A_T.at<double>(1,1), A_T.at<double>(1,2), A_T.at<double>(1,3), A_T.at<double>(2,0), A_T.at<double>(2,1), A_T.at<double>(2,2), A_T.at<double>(2,3), A_T.at<double>(3,0), A_T.at<double>(3,1), A_T.at<double>(3,2), A_T.at<double>(3,3);
+        Eigen::Matrix4d A_eigen;
+        A_eigen << A.at<double>(0,0), A.at<double>(0,1), A.at<double>(0,2), A.at<double>(0,3), A.at<double>(1,0), A.at<double>(1,1), A.at<double>(1,2), A.at<double>(1,3), A.at<double>(2,0), A.at<double>(2,1), A.at<double>(2,2), A.at<double>(2,3), A.at<double>(3,0), A.at<double>(3,1), A.at<double>(3,2), A.at<double>(3,3);
+
+//        for(int row = 0; row < A_T.rows; row++){
+//            for(int col = 0; col < A_T.cols; col++){
+//                A_T_eigen << A_T.at<double>(row,col);
+//                A_eigen << A.at<double>(row,col);
+//            }
+//        }
+        cout << "Time to SVD it up" << endl;
+        // Perform single value decomposition (Jacobi better for small matrices)
+        Eigen::JacobiSVD<Eigen::Matrix4d,  Eigen::ComputeFullU | Eigen::ComputeFullV> svd_result(B_eigen,Eigen::ComputeFullU | Eigen::ComputeFullV);
+        //auto U = svd_result.matrixU(); // Left singular vectors of A
+        auto V = svd_result.matrixV(); // Right singular vectors of A
+        //auto singular_values = svd_result.singularValues().asDiagonal().toDenseMatrix();
+        cout << "V = \n" << V.real() << "\n\n";
+        position_3d.x = V.coeff(3,0)/V.coeff(3,3);
+        position_3d.y = V.coeff(3,1)/V.coeff(3,3);
+        position_3d.z = V.coeff(3,2)/V.coeff(3,3);
+
+    }
+    catch(const exception& error){
+        cout << error.what() << endl;
+    }
+    return position_3d;
 }
 
 // ----------------------- OUTDATED -------------------------------------------------------
@@ -900,3 +990,4 @@ void obstacle_detection::detect_obstacles_video(string video_path, int feature_t
         cout << error.what() << endl;
     }
 }
+

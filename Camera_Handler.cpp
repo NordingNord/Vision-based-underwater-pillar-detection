@@ -155,3 +155,82 @@ vector<int> camera_handler::get_dim(){
     return dim;
 
 }
+
+// -- converts intrinsic parameters into matrix --
+void camera_handler::create_intrinsic_matrix(){
+    try{
+        // Prepare matrices
+        Mat_<double> parameter_matrix_top(3,3);
+        Mat_<double> parameter_matrix_bottom(3,3);
+
+        // Write data to matrices
+        parameter_matrix_top << top_cam_intrinsic.focal_length_u,0.0,top_cam_intrinsic.projection_center_u,0.0,top_cam_intrinsic.focal_length_v,top_cam_intrinsic.projection_center_v,0.0,0.0,1.0;
+        parameter_matrix_bottom << bottom_cam_intrinsic.focal_length_u,0.0,bottom_cam_intrinsic.projection_center_u,0.0,bottom_cam_intrinsic.focal_length_v,bottom_cam_intrinsic.projection_center_v,0.0,0.0,1.0;
+
+        // Update camera parameters
+        top_cam_intrinsic.matrix = parameter_matrix_top;
+        bottom_cam_intrinsic.matrix = parameter_matrix_bottom;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+intrinsic camera_handler::create_intrinsic_matrix(intrinsic parameters){
+    intrinsic updated_parameters = parameters;
+    try{
+        // Prepare matrices
+        Mat_<double> parameter_matrix(3,3);
+
+        // Write data to matrices
+        parameter_matrix << parameters.focal_length_u,0.0,parameters.projection_center_u,0.0,parameters.focal_length_v,parameters.projection_center_v,0.0,0.0,1.0;
+
+        // Update result
+        updated_parameters.matrix = parameter_matrix;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return updated_parameters;
+}
+
+// -- gets projection matrix --
+Mat camera_handler::get_projection_matrix(int cam){
+    Mat projection_matrix;
+    try{
+        // Ensure matrix intrensics are ready
+        create_intrinsic_matrix();
+        // Get used rotation, translation and intrensic parameters
+        intrinsic intrinsic_parameters;
+        Mat rotation;
+        Mat translation;
+
+        if(cam == TOP_CAM){
+            intrinsic_parameters = top_cam_intrinsic;
+            rotation = rotation_top;
+            translation = translation_top;
+        }
+        else if(cam  == BOTTOM_CAM){
+            intrinsic_parameters = bottom_cam_intrinsic;
+            rotation = rotation_bottom;
+            translation = translation_bottom;
+        }
+        // Ensure that camera is known
+        else{
+            throw runtime_error("Unknwon camera.");
+        }
+
+        // Combine rotation and translation
+        Mat extrensic_matrix;
+        hconcat(rotation,translation,extrensic_matrix);
+
+        // Multiply intrensix matrix and extrensic matrix
+        projection_matrix = intrinsic_parameters.matrix * extrensic_matrix;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return projection_matrix;
+}
+

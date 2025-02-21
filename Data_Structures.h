@@ -96,4 +96,13 @@ struct super_pixel_frame{
     int super_pixel_count;
 };
 
+// Intrinsic parameters
+struct intrinsic{
+    double focal_length_u;
+    double focal_length_v;
+    double projection_center_u;
+    double projection_center_v;
+    cv::Mat matrix;
+};
+
 #endif

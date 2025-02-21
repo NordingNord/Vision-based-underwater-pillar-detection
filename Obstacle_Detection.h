@@ -5,9 +5,11 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <valarray>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
+#include <eigen3/Eigen/SVD>
 #include "Data_Structures.h"
 #include "Camera_Handler.h"
 #include "Data_Collector.h"
@@ -15,6 +17,7 @@
 #include "Feature_Finder.h"
 #include "Feature_Analyzer.h"
 #include "Preprocessing.h"
+
 
 // -- Define cluster settings --
 static const int ON_FRAME = 0;
@@ -45,6 +48,10 @@ public:
 
     // -- Filter that tries to segment image based on superpixels --
     super_pixel_frame superpixel_segmentation(super_pixel_frame data, cv::Mat frame);
+
+    // -- Triangulate points based on stereo camera system --
+    cv::Point3f direct_linear_transform(cv::Mat projection_matrix_top, cv::Mat projection_matrix_bottom, cv::Point2f top_placement, cv::Point2f bottom_placement);
+
 private:
     // -- Minimum number of features required for optical flow to continue --
     int min_points = 5;

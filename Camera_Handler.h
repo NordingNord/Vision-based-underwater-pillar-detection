@@ -8,6 +8,10 @@
 #include <opencv2/opencv.hpp>
 #include "Data_Structures.h"
 
+// Some defined names
+static const int TOP_CAM = 0;
+static const int BOTTOM_CAM = 1;
+
 // -- Class --
 class camera_handler{
 public:
@@ -47,6 +51,13 @@ public:
     // -- gets dimensions of video --
     std::vector<int> get_dim();
 
+    // -- converts intrinsic parameters into matrix --
+    void create_intrinsic_matrix();
+    intrinsic create_intrinsic_matrix(intrinsic parameters);
+
+    // -- gets projection matrix --
+    cv::Mat get_projection_matrix(int cam);
+
 
 private:
     // Frame data
@@ -60,6 +71,18 @@ private:
     // Scaling variables
     double width_scaling = 1;
     double height_scaling = 1;
+
+    // Currently hard coded camera parameters.
+    intrinsic bottom_cam_intrinsic = {1.4573042096686729e+03,1.4571772302602453e+03,5.6118918886024528e+02,9.4238009607042807e+02};
+    intrinsic top_cam_intrinsic = {1.4559082053767202e+03,1.4557162795186625e+03,5.6422591354649398e+02,9.4971024389872707e+02};
+
+    // Currently hard coded translation and rotation from left to right (bottom to top)
+    cv::Mat translation_bottom = (cv::Mat_<double>(3,1) << 0.0, 0.0, 0.0);
+    cv::Mat rotation_bottom = (cv::Mat_<double>(3,3) << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0); // Eye matrix since rotation and translation is from this cam to the next, so this is the basis.
+
+    cv::Mat translation_top = (cv::Mat_<double>(3,1) << -6.0232602731165007e-02, 5.0696392732741975e-04, -2.1759794874252371e-04);
+    cv::Mat rotation_top = (cv::Mat_<double>(3,3) << 9.9999025308859502e-01, 1.3210364715320931e-03, -4.2129076003026055e-03, -1.3230173719132052e-03, 9.9999901555929249e-01, -4.6744569710903378e-04, 4.2122859401305226e-03, 4.7301489089870296e-04, 9.9999101641168364e-01);
+
 };
 
 #endif // CAMERA_HANDLER_H
