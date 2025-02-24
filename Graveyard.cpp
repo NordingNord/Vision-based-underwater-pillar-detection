@@ -753,3 +753,64 @@
 //// -- UPDATE SURVIVING FEATURES --
 //current_top_features = analyzer.get_keypoints(current_top_data);
 //current_bottom_features = analyzer.get_keypoints(current_bottom_data);
+
+
+//        for(int row = 0; row < A_T.rows; row++){
+//            for(int col = 0; col < A_T.cols; col++){
+//                A_T_eigen << A_T.at<double>(row,col);
+//                A_eigen << A.at<double>(row,col);
+//            }
+//        }
+
+// Stop when window is closed (else just continue forever and ever)
+//        while(!frame_3d.wasStopped()){
+//        }
+
+
+// -- WARNING: ENTERING TEST AREA. THINGS ARE MESSY DOWN HERE --
+// For test purposes i disable find features here so we can analyse the features using optical flow
+
+//// TEST 3D ESTIMATION
+//visualizer.visualize_3d_points(point_estimates);
+
+//// TEST SLIC
+//Mat viz_top = visualizer.mark_super_pixel_borders(frame_top,top_slic_results);
+//imshow("top super pixels", viz_top);
+//waitKey(0);
+
+//Mat viz_median = visualizer.mark_super_pixels(frame_top,top_slic_results);
+//imshow("Medians", viz_median);
+//waitKey(0);
+
+//imwrite("superpixel_border.jpg",viz_top);
+//imwrite("superpixel.jpg",viz_median);
+
+//// Test show surviving features
+//Mat img_keypoints_top = visualizer.mark_keypoints(current_top_data,frame_top);
+//Mat img_keypoints_bottom = visualizer.mark_keypoints(current_bottom_data,frame_top);
+//imshow("Top features",img_keypoints_top);
+//imshow("Bottom features",img_keypoints_bottom);
+//waitKey(0);
+
+//// Show surviving matches
+//int survivor_count = analyzer.match_survivor_count(matches);
+//cout << "Surviving features: " << survivor_count << endl;
+
+//// Get surviving matches
+//vector<DMatch> kept_matches = analyzer.get_surviving_matches(matches);
+
+//// Visualize surviving matches
+//Mat img_kept_matches;
+//drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//imshow("matches that survived",img_kept_matches);
+//imwrite("survivors.jpg",img_kept_matches);
+//waitKey(0);
+
+//                for(int j = 0; j < current_top_data.size(); j++){
+//                    for(int j2= j; j2 < updated_matches.good_matches.size(); j2++){
+//                        if(current_top_data.at(j).valid == false && updated_matches.good_matches.at(j2) == true){
+//                            updated_matches.good_matches.at(j2) = false;
+//                            break;
+//                        }
+//                    }
+//                }

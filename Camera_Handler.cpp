@@ -234,3 +234,55 @@ Mat camera_handler::get_projection_matrix(int cam){
     return projection_matrix;
 }
 
+
+// -- Fixes intrensic parameters based on resizing --
+void camera_handler::resize_intrensic(double scale_factor,int center_placement){
+    try{
+        // Initialize new intrinsic parameters
+        intrinsic new_bottom_intrinsic, new_top_intrinsic;
+        // Update based on location of origin
+        if(center_placement == CENTER_TOP_LEFT){
+            // Update focal lengths
+            new_bottom_intrinsic.focal_length_u = scale_factor*bottom_cam_intrinsic.focal_length_u;
+            new_top_intrinsic.focal_length_u = scale_factor*top_cam_intrinsic.focal_length_u;
+
+            new_bottom_intrinsic.focal_length_v = scale_factor*bottom_cam_intrinsic.focal_length_v;
+            new_top_intrinsic.focal_length_v = scale_factor*top_cam_intrinsic.focal_length_v;
+
+            // Update pixel centers (All the 0.5 shenanigans are dure to orgin being in the center of the pixel and not the top left of the pixel)
+            new_bottom_intrinsic.projection_center_u = scale_factor*(bottom_cam_intrinsic.projection_center_u+0.5)-0.5;
+            new_top_intrinsic.projection_center_u = scale_factor*(top_cam_intrinsic.projection_center_u+0.5)-0.5;
+
+            new_bottom_intrinsic.projection_center_v = scale_factor*(bottom_cam_intrinsic.projection_center_v+0.5)-0.5;
+            new_top_intrinsic.projection_center_v = scale_factor*(top_cam_intrinsic.projection_center_v+0.5)-0.5;
+        }
+        else if(center_placement == LEFT_TOP_LEFT){
+            // Update focal lengths
+            new_bottom_intrinsic.focal_length_u = scale_factor*bottom_cam_intrinsic.focal_length_u;
+            new_top_intrinsic.focal_length_u = scale_factor*top_cam_intrinsic.focal_length_u;
+
+            new_bottom_intrinsic.focal_length_v = scale_factor*bottom_cam_intrinsic.focal_length_v;
+            new_top_intrinsic.focal_length_v = scale_factor*top_cam_intrinsic.focal_length_v;
+
+            // Update pixel centers
+            new_bottom_intrinsic.projection_center_u = scale_factor*bottom_cam_intrinsic.projection_center_u;
+            new_top_intrinsic.projection_center_u = scale_factor*top_cam_intrinsic.projection_center_u;
+
+            new_bottom_intrinsic.projection_center_v = scale_factor*bottom_cam_intrinsic.projection_center_v;
+            new_top_intrinsic.projection_center_v = scale_factor*top_cam_intrinsic.projection_center_v;
+        }
+        else{
+            throw runtime_error("Unknown origing setting.");
+        }
+        // Overwrite paramters
+        bottom_cam_intrinsic = new_bottom_intrinsic;
+        top_cam_intrinsic = new_top_intrinsic;
+        // Recreate matrix form
+        bottom_cam_intrinsic = create_intrinsic_matrix(bottom_cam_intrinsic);
+        top_cam_intrinsic = create_intrinsic_matrix(top_cam_intrinsic);
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}

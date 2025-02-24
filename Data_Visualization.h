@@ -6,8 +6,10 @@
 #include <vector>
 #include <string>
 #include <opencv2/opencv.hpp>
+#include <opencv2/highgui.hpp>
 #include "Data_Structures.h"
 #include "Feature_Analyzer.h"
+#include <pcl/visualization/cloud_viewer.h>
 
 // -- Class --
 class data_visualization{
@@ -36,6 +38,8 @@ public:
     // -- Method that colors features based on matches --
     std::vector<std::vector<keypoint_data>> color_based_on_matches(match_result matches,std::vector<keypoint_data> data_top, std::vector<keypoint_data> data_bottom);
 
+    // -- Visualize 3D points --
+    void visualize_3d_points(std::vector<cv::Point3f> points, std::vector<keypoint_data> keypoints, cv::Mat frame);
 
 private:
     int circle_diameter = 4;

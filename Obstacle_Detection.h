@@ -93,7 +93,7 @@ private:
     bool keep_unique = false;
 
     // -- optical flow filter percentile --
-    int percentile = 25;
+    int percentile = 5;
 
     // -- optical flow filter threshold --
     int flow_threshold = 30;
@@ -103,6 +103,9 @@ private:
 
     // -- number of frames needed for optical flow filtering --
     int filter_frames = 5;
+
+    // -- currently hardcoded scale factor, due to resizing happening in python script --
+    double frame_scale_factor = 0.35520833333;
 };
 
 #endif // OBSTACLE_DETECTION_H

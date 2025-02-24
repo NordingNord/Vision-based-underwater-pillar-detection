@@ -177,3 +177,45 @@ vector<vector<keypoint_data>> data_visualization::color_based_on_matches(match_r
     return colored_results;
 }
 
+// -- Visualize 3D points --
+void data_visualization::visualize_3d_points(vector<Point3f> points, vector<keypoint_data> keypoints, Mat frame){
+    try{
+        // Initialize point cloud
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+
+        // Add all points to point cloud
+        for(int i = 0; i < points.size(); i++){
+            // Get current point
+            Point3f point = points[i];
+            // Initialize cloud point
+            pcl::PointXYZRGB cloud_point;
+            // Assign 3D coordinates
+            cloud_point.x = point.x;
+            cloud_point.y = point.y;
+            cloud_point.z = point.z;
+            // Assign color
+            int row = keypoints.at(i).point.x;
+            int col = keypoints.at(i).point.y;
+            Vec3b color = frame.at<Vec3b>(Point(row,col));
+            cloud_point.r = color[2];
+            cloud_point.g = color[1];
+            cloud_point.b = color[0];
+            // add to point cloud
+            point_cloud->push_back(cloud_point);
+        }
+
+        // Make visualizer
+        pcl::visualization::PCLVisualizer frame_3d ("3D point visualization");
+        // Add point cloud
+        frame_3d.addPointCloud(point_cloud, "The point cloud");
+        // Make visualization environment look better
+        frame_3d.setBackgroundColor(0,0,0);
+        frame_3d.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "The point cloud");
+        // Visualize point cloud
+        frame_3d.spin();
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+

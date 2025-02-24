@@ -12,6 +12,9 @@
 static const int TOP_CAM = 0;
 static const int BOTTOM_CAM = 1;
 
+static const int CENTER_TOP_LEFT = 0;
+static const int LEFT_TOP_LEFT = 1;
+
 // -- Class --
 class camera_handler{
 public:
@@ -57,6 +60,9 @@ public:
 
     // -- gets projection matrix --
     cv::Mat get_projection_matrix(int cam);
+
+    // -- Fixes intrensic parameters based on resizing --
+    void resize_intrensic(double scale_factor,int center_placement = CENTER_TOP_LEFT);
 
 
 private:

@@ -30,9 +30,13 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         vector<KeyPoint> current_top_features; // Features currently in use in top image
         vector<KeyPoint> current_bottom_features; // Features currently in use in bottom image
 
+        vector<KeyPoint> top_features,bottom_features;
+
 
         vector<keypoint_data> current_top_data; // Features currently in use with the addition of data like velocity past positions and more
         vector<keypoint_data> current_bottom_data;
+
+        vector<keypoint_data> top_data,bottom_data;
 
         // Frame storage for time based filtering
         vector<Mat> top_frames, bottom_frames;
@@ -45,6 +49,9 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
 
         // Current matches
         match_result matches;
+
+        // Storage for triangulation
+        Mat top_projection_matrix, bottom_projection_matrix;
 
         // Go through all frames
         while(true){
@@ -67,6 +74,9 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 }
                 break;
             }
+            // -- TRANSPOSE FRAMES TO MATCH WITH CALLIBRATION --
+            transpose(frame_top, frame_top);
+            transpose(frame_bottom, frame_bottom);
             // Add frames to vectors
             top_frames.push_back(frame_top);
             bottom_frames.push_back(frame_bottom);
@@ -79,22 +89,55 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
             // -- FIND FEATURES --
             // Find features based on chosen method (if not exceeding maximum allowed features)
             if(find_features == true && current_top_features.size() < max_features && current_bottom_features.size() < max_features){
+                // -- VISUALIZE FRAMES --
+                Mat combined;
+                hconcat(frame_top,frame_bottom,combined);
+                imshow("Preprocessed images",combined);
+                waitKey(0);
 
-                // Find features based on method
-                vector<KeyPoint> top_features = finder.find_features(frame_top); // Find features using initialized detector
-                vector<KeyPoint> bottom_features = finder.find_features(frame_bottom); // Find features using initialized detector
+                //  -- FIND FEATURES --
+                top_features = finder.find_features(frame_top); // Find features using initialized detector
+                bottom_features = finder.find_features(frame_bottom); // Find features using initialized detector
 
-                // Find descriptors based on method
+                // -- FIND DESCRIPTORS --
                 Mat top_descriptors = finder.get_descriptors(frame_top,top_features); // Gets descriptors based on newly found top view features
                 Mat bottom_descriptors = finder.get_descriptors(frame_bottom,bottom_features); // Gets descriptors based on newly found bottom view features
+
+                // -- CONVERT FEATURES TO DATA --
+                top_data = analyzer.convert_to_data(top_features);
+                bottom_data = analyzer.convert_to_data(bottom_features);
+                vector<Scalar> colours_top = visualizer.generate_random_colours(top_features.size());
+                vector<Scalar> colours_bottom = visualizer.generate_random_colours(bottom_features.size());
+                top_data = analyzer.insert_data(top_data, colours_top);
+                bottom_data = analyzer.insert_data(bottom_data, colours_bottom);
+
+                // -- VISUALIZE FEATURES --
+                Mat frame_keypoints_top = visualizer.mark_keypoints(top_data,frame_top);
+                Mat frame_keypoints_bottom = visualizer.mark_keypoints(bottom_data,frame_bottom);
+                hconcat(frame_keypoints_top,frame_keypoints_bottom,combined);
+                imshow("Features found",combined);
+                waitKey(0);
 
                 // -- MATCH FEATURES --
                 // Match features between cameras
                 matches = analyzer.get_matches(top_descriptors,bottom_descriptors,matching_type,number_of_matches,feature_type);
 
+                // -- VISUALIZE MATCHES --
+                Mat frame_matches;
+                vector<DMatch> matches_vec = analyzer.get_surviving_matches(matches);
+                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+                imshow("All matches found",frame_matches);
+                waitKey(0);
+
                 // -- MATCH FILTERING --
                 // Filter matches with RANSAC (Alternative is my homemade filter based on known camera displacement, but that is currently not tweaked and is most likely worse.)
                 matches = analyzer.filter_matches(matches,top_features, bottom_features, filter_type);
+
+                // -- VISUALIZE FILTERED MATCHES --
+                matches_vec = analyzer.get_surviving_matches(matches);
+                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+                imshow("Filtered matches",frame_matches);
+                waitKey(0);
 
                 // -- KEEP ONLY MATCHED FEATURES --
                 vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features,keep_unique); // Index 0 means features that a contained in match 0
@@ -110,57 +153,41 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 current_top_data = analyzer.insert_data(current_top_data, colours);
                 current_bottom_data = analyzer.insert_data(current_bottom_data, colours);
 
+                // -- VISUALIZE REMAINING FEATURES --
+                frame_keypoints_top = visualizer.mark_keypoints(current_top_data,frame_top);
+                frame_keypoints_bottom = visualizer.mark_keypoints(current_bottom_data,frame_bottom);
+                hconcat(frame_keypoints_top,frame_keypoints_bottom,combined);
+                imshow("Filtered features",combined);
+                waitKey(0);
+
                 // -- PERFORM SLIC --
                 super_pixel_frame top_slic_results = analyzer.perform_slic(frame_top,slic_method,region_size,ruler,slic_iterations);
                 super_pixel_frame bottom_slic_results = analyzer.perform_slic(frame_bottom,slic_method,region_size,ruler,slic_iterations);
+
+                // -- VISUALIZE SUPERPIXELS --
+                Mat super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,top_slic_results);
+                Mat super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,bottom_slic_results);
+                hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
+                imshow("Superpixel borders", combined);
+                waitKey(0);
+
+                Mat super_pixel_median_top = visualizer.mark_super_pixels(frame_top,top_slic_results);
+                Mat super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,bottom_slic_results);
+                hconcat(super_pixel_median_top,super_pixel_median_bottom,combined);
+                imshow("Superpixel medians", combined);
+                waitKey(0);
 
                 // -- UPDATE FRAMES AT TIME OF MATCHING --
                 match_frame_top = frame_top;
                 match_frame_bottom = frame_bottom;
 
+                // -- FIX CAMERA MATRIX BASED ON RESIZING --
+                cam_top.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
+                cam_bottom.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
 
-
-                // -- WARNING: ENTERING TEST AREA. THINGS ARE MESSY DOWN HERE --
-                // For test purposes i disable find features here so we can analyse the features using optical flow
-
-                // Test 3d estimation
-                Mat top_projection_matrix = cam_top.get_projection_matrix(TOP_CAM);
-                Mat bottom_projection_matrix = cam_bottom.get_projection_matrix(BOTTOM_CAM);
-                Point3f point_3d =  direct_linear_transform(top_projection_matrix,bottom_projection_matrix,current_top_data.at(0).point, current_bottom_data.at(0).point);
-                cout << point_3d << endl;
-
-                // TEST SLIC
-                Mat viz_top = visualizer.mark_super_pixel_borders(frame_top,top_slic_results);
-                imshow("top super pixels", viz_top);
-                waitKey(0);
-
-                Mat viz_median = visualizer.mark_super_pixels(frame_top,top_slic_results);
-                imshow("Medians", viz_median);
-                waitKey(0);
-
-                imwrite("superpixel_border.jpg",viz_top);
-                imwrite("superpixel.jpg",viz_median);
-
-                // Test show surviving features
-                Mat img_keypoints_top = visualizer.mark_keypoints(current_top_data,frame_top);
-                Mat img_keypoints_bottom = visualizer.mark_keypoints(current_bottom_data,frame_top);
-                imshow("Top features",img_keypoints_top);
-                imshow("Bottom features",img_keypoints_bottom);
-                waitKey(0);
-
-                // Show surviving matches
-                int survivor_count = analyzer.match_survivor_count(matches);
-                cout << "Surviving features: " << survivor_count << endl;
-
-                // Get surviving matches
-                vector<DMatch> kept_matches = analyzer.get_surviving_matches(matches);
-
-                // Visualize surviving matches
-                Mat img_kept_matches;
-                drawMatches(frame_top, top_features, frame_bottom, bottom_features, kept_matches, img_kept_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-                imshow("matches that survived",img_kept_matches);
-                imwrite("survivors.jpg",img_kept_matches);
-                waitKey(0);
+                // -- CALCULATE PROJECTION MATRIX --
+                top_projection_matrix = cam_top.get_projection_matrix(TOP_CAM);
+                bottom_projection_matrix = cam_bottom.get_projection_matrix(BOTTOM_CAM);
 
                 // With this we have our initial surviving keypoints.
                 find_features = false;
@@ -174,6 +201,35 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                     // -- CLEAN VECTORS --
                     top_frames = {};
                     bottom_frames = {};
+
+                    // -- VISUALIZE REAMAINING MATCHES --
+                    vector<DMatch> final_matches = analyzer.get_surviving_matches(matches);
+                    Mat frame_matches;
+                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, final_matches, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+                    imshow("Flow filtered matches",frame_matches);
+                    waitKey(0);
+
+                    // -- CLEAN CURRENT DATA BASED ON FILTER ---
+                    vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features,keep_unique); // Index 0 means features that a contained in match 0
+                    current_top_features = remaining_features.at(0);
+                    current_bottom_features = remaining_features.at(1);
+
+                    current_top_data = analyzer.convert_to_data(current_top_features);
+                    current_bottom_data = analyzer.convert_to_data(current_bottom_features);
+
+                    vector<Scalar> colours = visualizer.generate_random_colours(current_top_features.size());
+                    current_top_data = analyzer.insert_data(current_top_data, colours);
+                    current_bottom_data = analyzer.insert_data(current_bottom_data, colours);
+
+                    // -- ESTIMATE 3D POINTS USING TRIANGULATION --
+                    vector<Point3f> point_estimates;
+                    for(int i = 0; i < current_top_data.size(); i++){
+                        Point3f point_3d = direct_linear_transform(top_projection_matrix,bottom_projection_matrix,current_top_data.at(i).point, current_bottom_data.at(i).point);
+                        point_estimates.push_back(point_3d);
+                    }
+
+                    // -- VISUALIZE POINT CLOUD --
+                    visualizer.visualize_3d_points(point_estimates,current_top_data,frame_top);
                 }
             }
         }
@@ -201,6 +257,10 @@ match_result obstacle_detection::optical_flow_filter(vector<Mat> frames_top, vec
 
         vector<keypoint_data> current_top_data = top_data;
         vector<keypoint_data> current_bottom_data = bottom_data;
+
+//        vector<keypoint_data> current_top_data = all_top;
+//        vector<keypoint_data> current_bottom_data = all_bottom;
+
 
         // Go through each frame except the first one
         for(int i = 1; i < frames_top.size(); i++){
@@ -234,9 +294,14 @@ match_result obstacle_detection::optical_flow_filter(vector<Mat> frames_top, vec
                 current_top_data = analyzer.velocity_filter(current_top_data,percentile,flow_threshold);
                 current_bottom_data = analyzer.velocity_filter(current_bottom_data,percentile,flow_threshold);
                 // -- UPDATE MATCHES --
-                for(int j = 0; j < current_top_data.size(); j++){
-                    if(current_top_data.at(j).valid == false && updated_matches.good_matches.at(j) == true){
-                        updated_matches.good_matches.at(j) = false;
+                int valid_index = 0;
+                for(int j = 0; j < updated_matches.matches.size(); j++){
+                    // Only continue if match is seen as good
+                    if(updated_matches.good_matches.at(j) == true){
+                        if(current_top_data.at(valid_index).valid == false || current_bottom_data.at(valid_index).valid == false){
+                            updated_matches.good_matches.at(j) = false;
+                        }
+                        valid_index++;
                     }
                 }
 
@@ -254,8 +319,9 @@ match_result obstacle_detection::optical_flow_filter(vector<Mat> frames_top, vec
                 // Add velocity text
                 top_viz = visualizer.mark_velocity(current_top_data,top_viz);
                 bottom_viz = visualizer.mark_velocity(current_bottom_data,bottom_viz);
-                imshow("top vel", top_viz);
-                imshow("bottom vel", bottom_viz);
+                Mat combined;
+                hconcat(top_viz,bottom_viz,combined);
+                imshow("Filtered velocities", combined);
                 waitKey(0);
             }
             // -- UPDATE SURVIVING FEATURES --
@@ -320,7 +386,6 @@ super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame 
     return updated_data;
 }
 
-
 // -- Triangulate points based on stereo camera system --
 Point3f obstacle_detection::direct_linear_transform(Mat projection_matrix_top, Mat projection_matrix_bottom, Point2f top_placement, Point2f bottom_placement){
     Point3f position_3d;
@@ -366,11 +431,8 @@ Point3f obstacle_detection::direct_linear_transform(Mat projection_matrix_top, M
         transpose(A,A_T);
         // get product
         Mat B = A_T*A;
-        cout << B << endl;
-        // CORRECT HERE
 
         // Convert to matrix from eigen library
-        cout << "Time to matrix conversion" << endl;
         Eigen::Matrix4d B_eigen;
         B_eigen <<  B.at<double>(0,0), B.at<double>(0,1), B.at<double>(0,2), B.at<double>(0,3), B.at<double>(1,0), B.at<double>(1,1), B.at<double>(1,2), B.at<double>(1,3), B.at<double>(2,0), B.at<double>(2,1), B.at<double>(2,2), B.at<double>(2,3), B.at<double>(3,0), B.at<double>(3,1), B.at<double>(3,2), B.at<double>(3,3);
         Eigen::Matrix4d A_T_eigen;
@@ -378,23 +440,18 @@ Point3f obstacle_detection::direct_linear_transform(Mat projection_matrix_top, M
         Eigen::Matrix4d A_eigen;
         A_eigen << A.at<double>(0,0), A.at<double>(0,1), A.at<double>(0,2), A.at<double>(0,3), A.at<double>(1,0), A.at<double>(1,1), A.at<double>(1,2), A.at<double>(1,3), A.at<double>(2,0), A.at<double>(2,1), A.at<double>(2,2), A.at<double>(2,3), A.at<double>(3,0), A.at<double>(3,1), A.at<double>(3,2), A.at<double>(3,3);
 
-//        for(int row = 0; row < A_T.rows; row++){
-//            for(int col = 0; col < A_T.cols; col++){
-//                A_T_eigen << A_T.at<double>(row,col);
-//                A_eigen << A.at<double>(row,col);
-//            }
-//        }
-        cout << "Time to SVD it up" << endl;
         // Perform single value decomposition (Jacobi better for small matrices)
         Eigen::JacobiSVD<Eigen::Matrix4d,  Eigen::ComputeFullU | Eigen::ComputeFullV> svd_result(B_eigen,Eigen::ComputeFullU | Eigen::ComputeFullV);
         //auto U = svd_result.matrixU(); // Left singular vectors of A
         auto V = svd_result.matrixV(); // Right singular vectors of A
         //auto singular_values = svd_result.singularValues().asDiagonal().toDenseMatrix();
-        cout << "V = \n" << V.real() << "\n\n";
-        position_3d.x = V.coeff(3,0)/V.coeff(3,3);
-        position_3d.y = V.coeff(3,1)/V.coeff(3,3);
-        position_3d.z = V.coeff(3,2)/V.coeff(3,3);
+        // Transpose V
+        auto Vh = Eigen::Transpose(V);
 
+        // Retrieve position
+        position_3d.x = Vh.coeff(3,0)/Vh.coeff(3,3);
+        position_3d.y = Vh.coeff(3,1)/Vh.coeff(3,3);
+        position_3d.z = Vh.coeff(3,2)/Vh.coeff(3,3);
     }
     catch(const exception& error){
         cout << error.what() << endl;
