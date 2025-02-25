@@ -117,7 +117,6 @@ Mat data_visualization::mark_super_pixels(Mat frame, super_pixel_frame data){
         // Initialize vectors used to find superpixel means
         vector<vector<int>> sums(data.super_pixel_count,{0,0,0});
         vector<int> member_count(data.super_pixel_count,0);
-
         // Go through every pixel to find its membership and update total membership sum and count
         for(int row = 0; row < frame.rows; row++){
             for(int col = 0; col < frame.cols; col++){
@@ -129,7 +128,7 @@ Mat data_visualization::mark_super_pixels(Mat frame, super_pixel_frame data){
                 member_count[data.pixel_labels.at<int>(row,col)] += 1;
             }
         }
-        // Calculate medians
+        // Calculate means
         vector<Vec3b> medians(data.super_pixel_count,Vec3b(0,0,0));
         for(int i = 0; i < data.super_pixel_count; i++){
             vector<int> current = sums.at(i);
@@ -144,7 +143,7 @@ Mat data_visualization::mark_super_pixels(Mat frame, super_pixel_frame data){
 
             medians.at(i) = value;
         }
-        // Apply median to frame based on membership
+        // Apply mean to frame based on membership
         for(int row = 0; row < frame.rows; row++){
             for(int col = 0; col < frame.cols; col++){
                 int index = data.pixel_labels.at<int>(row,col);

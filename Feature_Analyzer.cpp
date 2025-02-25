@@ -404,17 +404,27 @@ vector<cluster> feature_analyzer::k_mean_cluster_keypoints(vector<keypoint_data>
 
 
 // -- Method that calculates "Euclidean" distance based on n values --
-float feature_analyzer::calc_euclidean(vector<float> values, vector<float> compare_values){
+float feature_analyzer::calc_euclidean(vector<float> values, vector<float> compare_values, vector<float> weights){
     float distance = 0;
     try{
         if(values.size() != compare_values.size()){
             throw runtime_error("Vectors are of unequal size.");
         }
+        // Fix weights
+        vector<float> final_weights;
+        if(weights.size() < values.size()){
+            for(int i = 0; i < values.size(); i++){
+                final_weights.push_back(1.0);
+            }
+        }
+        else{
+            final_weights = weights;
+        }
 
         // Calculate the sum of squares based on all values
         float sum_of_square = 0;
         for(int i = 0; i < values.size(); i++){
-            sum_of_square += pow(compare_values[i]-values[i],2);
+            sum_of_square += pow(compare_values[i]-values[i],2)*final_weights.at(i);
         }
         // Take square root
         distance = sqrt(sum_of_square);
@@ -485,24 +495,29 @@ cluster feature_analyzer::update_center(cluster input_cluster){
         for(int i = 0; i < input_cluster.center.size();i++){
             input_cluster.center[i] = 0;
         }
-
-        // Go through every keypoint in cluster and sum center
-        for(int i = 0; i < input_cluster.keypoints.size(); i++){
-            if(input_cluster.center.size() == 1){
-                input_cluster.center[0] += input_cluster.keypoints[i].velocity;
+        // If keypoint clustering:
+        if(input_cluster.keypoints.size() > 0){
+            // Go through every keypoint in cluster and sum center
+            for(int i = 0; i < input_cluster.keypoints.size(); i++){
+                if(input_cluster.center.size() == 1){
+                    input_cluster.center[0] += input_cluster.keypoints[i].velocity;
+                }
+                else if(input_cluster.center.size() == 2){
+                    input_cluster.center[0] += input_cluster.keypoints[i].point.x;
+                    input_cluster.center[1] += input_cluster.keypoints[i].point.y;
+                }
+                else if(input_cluster.center.size() == 3){
+                    input_cluster.center[0] += input_cluster.keypoints[i].point.x;
+                    input_cluster.center[1] += input_cluster.keypoints[i].point.y;
+                    input_cluster.center[2] += input_cluster.keypoints[i].velocity;
+                }
+                else{
+                    throw runtime_error("Center is not defined yet. Returning input cluster.");
+                }
             }
-            else if(input_cluster.center.size() == 2){
-                input_cluster.center[0] += input_cluster.keypoints[i].point.x;
-                input_cluster.center[1] += input_cluster.keypoints[i].point.y;
-            }
-            else if(input_cluster.center.size() == 3){
-                input_cluster.center[0] += input_cluster.keypoints[i].point.x;
-                input_cluster.center[1] += input_cluster.keypoints[i].point.y;
-                input_cluster.center[2] += input_cluster.keypoints[i].velocity;
-            }
-            else{
-                throw runtime_error("Center is not defined yet. Returning input cluster.");
-            }
+        }
+        else{
+            throw runtime_error("No data points to calculate center from.");
         }
 
         // Go through center and calculate mean
@@ -1881,7 +1896,7 @@ vector<KeyPoint> feature_analyzer::extract_features(vector<keypoint_data> data){
     return keypoints;
 }
 
-// -- Method that retrieves the median of all superpixels --
+// -- Method that retrieves the means of all superpixels --
 vector<Vec3b> get_superpixel_medians(super_pixel_frame data, Mat frame){
     vector<Vec3b> medians(data.super_pixel_count,Vec3b(0,0,0));
     try{
@@ -1900,7 +1915,7 @@ vector<Vec3b> get_superpixel_medians(super_pixel_frame data, Mat frame){
                 member_count[data.pixel_labels.at<int>(row,col)] += 1;
             }
         }
-        // Calculate medians
+        // Calculate mean
         for(int i = 0; i < data.super_pixel_count; i++){
             vector<int> current = sums.at(i);
             current.at(0) = current.at(0)/member_count.at(i);
@@ -1919,4 +1934,160 @@ vector<Vec3b> get_superpixel_medians(super_pixel_frame data, Mat frame){
         cout << "Error: " << error.what() << endl;
     }
     return medians;
+}
+
+
+// -- Mehtod that initializes n clusters with random superpixel centers --
+vector<cluster> feature_analyzer::initialize_clusters(super_pixel_frame superpixels, int initial_cluster_count, Mat frame){
+    vector<cluster> initial_clusters;
+    try{
+        // Prepare random distribution for random superpixel selection
+        random_device ran_dev;
+        mt19937 gen(ran_dev());// Generate seed
+        uniform_int_distribution<> distribution(0,superpixels.super_pixel_count-1);// Get random uniformly distributed number
+
+        // Select random superpixel
+        vector<int> superpixel_labels; // keypoints used as centers
+        for(int i = 0; i < initial_cluster_count; i++){
+            int index = distribution(gen); // Generate random index
+            if(superpixel_labels.size() == 0){
+                superpixel_labels.push_back(index);
+            }
+            else{
+                // Ensure that it is not already used
+                while(count(superpixel_labels.begin(), superpixel_labels.end(), index) != 0){
+                    index = distribution(gen);
+                }
+                superpixel_labels.push_back(index);
+            }
+            // Calculate center pixel
+            Vec2f center = get_superpixel_center(superpixels,index);
+            // Get median color of superpixel
+            Vec3f color = get_superpixel_mean(superpixels,index,frame);
+
+            // Prepare cluster
+            cluster new_cluster;
+            new_cluster.id = i;
+            new_cluster.superpixels.push_back(index);
+            new_cluster.center = {center[0],center[1],color[0],color[1],color[2]}; // x,y and median color
+            // Push back cluster
+            initial_clusters.push_back(new_cluster);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return initial_clusters;
+}
+
+// -- Method that calculates superpixel center --
+Vec2f feature_analyzer::get_superpixel_center(super_pixel_frame data, int superpixel_id){
+    Vec2f center;
+    try{
+        // Initialize sum of rows and columns belonging to the super pixel
+        int superpixel_row_sum = 0;
+        int superpixel_col_sum = 0;
+        int pixel_count = 0;
+        // Go through matrix finding the correct id
+        for(int row = 0; row < data.pixel_labels.rows; row++){
+            for(int col = 0; col < data.pixel_labels.cols; col++){
+                if(data.pixel_labels.at<int>(row,col) == superpixel_id){
+                    pixel_count++;
+                    superpixel_col_sum += col;
+                    superpixel_row_sum += row;
+                }
+            }
+        }
+        // Calculate center
+        if(pixel_count == 0){
+            cout << superpixel_id << endl;
+        }
+        else{
+            center[0] = superpixel_row_sum/pixel_count;
+            center[1] = superpixel_col_sum/pixel_count;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return center;
+}
+
+// -- Method that calculated superpixel mean color --
+Vec3f feature_analyzer::get_superpixel_mean(super_pixel_frame data, int superpixel_id, Mat frame){
+    Vec3f color;
+    try{
+        // Initialize vector of color sums for given ID
+        vector<int> color_sum = {0,0,0};
+        int pixel_count = 0;
+        // Go through pixels searching for ID
+        for(int row = 0; row < data.pixel_labels.rows; row++){
+            for(int col = 0; col < data.pixel_labels.cols; col++){
+                if(data.pixel_labels.at<int>(row,col) == superpixel_id){
+                    pixel_count++;
+                    color_sum.at(0) += frame.at<Vec3b>(row,col)[0];
+                    color_sum.at(1) += frame.at<Vec3b>(row,col)[1];
+                    color_sum.at(2) += frame.at<Vec3b>(row,col)[2];
+                }
+            }
+        }
+        // Calculate mean
+        if(pixel_count == 0){
+            cout << superpixel_id << endl;
+            cout << data.super_pixel_count << endl;
+        }
+        else{
+            color[0] = color_sum.at(0)/pixel_count;
+            color[1] = color_sum.at(1)/pixel_count;
+            color[2] = color_sum.at(2)/pixel_count;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return color;
+}
+
+// -- Method that updates center in a cluster based on superpixels--
+cluster feature_analyzer::update_center(cluster input_cluster, super_pixel_frame data, Mat frame){
+    cluster output_cluster = input_cluster;
+    try{
+        // Reset current center
+        for(int i = 0; i < input_cluster.center.size();i++){
+            input_cluster.center[i] = 0;
+        }
+        // If superpixel clustering
+        if(input_cluster.superpixels.size() > 0){
+            // Go through every superpixel in cluster and sum center
+            for(int i = 0; i < input_cluster.superpixels.size(); i++){
+                // Calculate position and color
+                Vec2f position = get_superpixel_center(data,i);
+                Vec3f color = get_superpixel_mean(data,i,frame);
+                // Update cluster sum
+                if(input_cluster.center.size() == 5){
+                    input_cluster.center[0] += position[0];
+                    input_cluster.center[1] += position[1];
+                    input_cluster.center[2] += color[0];
+                    input_cluster.center[3] += color[1];
+                    input_cluster.center[4] += color[2];
+                }
+                else{
+                    throw runtime_error("Center is not of correct size. Returning input cluster.");
+                }
+            }
+        }
+        else{
+            cout << input_cluster.superpixels.size() << endl;
+            throw runtime_error("No data points to calculate center from.");
+        }
+
+        // Go through center and calculate mean
+        for(int i = 0; i < input_cluster.center.size();i++){
+            output_cluster.center[i] = input_cluster.center[i]/input_cluster.superpixels.size();
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return output_cluster;
 }

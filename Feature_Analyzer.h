@@ -74,10 +74,13 @@ public:
     //std::vector<std::vector<keypoint_data>> k_mean_cluster_keypoints_vel(std::vector<keypoint_data> keypoints, int initial_cluster_count = 3, bool allow_more_clusters = false); // Settings defines what data is used for clustering
 
     // -- Method that calculates "Euclidean" distance based on n values --
-    float calc_euclidean(std::vector<float> values, std::vector<float> compare_values);
+    float calc_euclidean(std::vector<float> values, std::vector<float> compare_values, std::vector<float> weights = {});
 
     // -- Mehtod that initializes n clusters with random centers --
     std::vector<cluster> initialize_clusters(std::vector<keypoint_data> keypoints, int initial_cluster_count = 3, int setting = VELOCITY);
+
+    // -- Method that initializes n clusters with random centers based on superpixels
+    std::vector<cluster> initialize_clusters(super_pixel_frame superpixels, int initial_cluster_count, cv::Mat frame);
 
     // -- Method that updates center in a cluster --
     cluster update_center(cluster input_cluster);
@@ -167,6 +170,15 @@ public:
 
     // -- Method that retrieves the median of all superpixels --
     std::vector<cv::Vec3b> get_superpixel_medians(super_pixel_frame data, cv::Mat frame);
+
+    // -- Method that calculates superpixel center --
+    cv::Vec2f get_superpixel_center(super_pixel_frame data, int superpixel_id);
+
+    // -- Method that calculated superpixel mean color --
+    cv::Vec3f get_superpixel_mean(super_pixel_frame data, int superpixel_id, cv::Mat frame);
+
+    // -- Method that updates center in a cluster based on superpixels--
+    cluster update_center(cluster input_cluster, super_pixel_frame data, cv::Mat frame);
 
 private:
     // Variables used for optical flow

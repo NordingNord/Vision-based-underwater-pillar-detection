@@ -49,6 +49,9 @@ public:
     // -- Filter that tries to segment image based on superpixels --
     super_pixel_frame superpixel_segmentation(super_pixel_frame data, cv::Mat frame);
 
+    // -- Filter that tries to segment image based on superpixels using variance --
+    super_pixel_frame superpixel_segmentation_variance(super_pixel_frame data, cv::Mat frame);
+
     // -- Triangulate points based on stereo camera system --
     cv::Point3f direct_linear_transform(cv::Mat projection_matrix_top, cv::Mat projection_matrix_bottom, cv::Point2f top_placement, cv::Point2f bottom_placement);
 

@@ -177,6 +177,31 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 imshow("Superpixel medians", combined);
                 waitKey(0);
 
+                // -- PERFORM SUPERPIXEL SEGMENTATION --
+                //super_pixel_frame segmented_slic_top = superpixel_segmentation(top_slic_results,frame_top);
+                super_pixel_frame segmented_slic_top = superpixel_segmentation_variance(top_slic_results,frame_top);
+                segmented_slic_top = superpixel_segmentation_variance(segmented_slic_top,frame_top);
+                cout << "top done" << endl;
+                //super_pixel_frame segmented_slic_bottom = superpixel_segmentation(bottom_slic_results,frame_bottom);
+                super_pixel_frame segmented_slic_bottom = superpixel_segmentation_variance(bottom_slic_results,frame_bottom);
+                cout << "bottom done" << endl;
+
+                // -- VISUALIZE SEGMENTED SUPERPIXELS --
+//                super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,segmented_slic_top);
+//                super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,segmented_slic_bottom);
+//                hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
+//                imshow("Segmented superpixel borders", combined);
+//                waitKey(0);
+
+                super_pixel_median_top = visualizer.mark_super_pixels(frame_top,segmented_slic_top);
+                cout << "drawing top done" << endl;
+                super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,segmented_slic_bottom);
+                cout << "drawing bototm done" << endl;
+                hconcat(super_pixel_median_top,super_pixel_median_bottom,combined);
+                imshow("Segmented superpixel medians", combined);
+                waitKey(0);
+
+
                 // -- UPDATE FRAMES AT TIME OF MATCHING --
                 match_frame_top = frame_top;
                 match_frame_bottom = frame_bottom;
@@ -342,46 +367,336 @@ match_result obstacle_detection::optical_flow_filter(vector<Mat> frames_top, vec
 
 // -- Filter that tries to segment image based on superpixels -- (WORK IN PROGRESS)
 super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame data, Mat frame){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
+    // Prepare output
     super_pixel_frame updated_data = data;
     try{
-        // Initialize needed classes
-        feature_analyzer analyzer; // Analyzes features
+        // Initialize analyzer class
+        feature_analyzer analyzer;
 
-        // Get superpixel identifier
-        //vector<Vec3b> medians = analyzer.get_superpixel_medians(data,frame);
-        vector<Vec3b> medians;
-
-        // Initialize vector of labels similar to each other label
-        vector<vector<int>> label_clusters;
-
-        // Find distance from all medians to all other medians
-        for(int i = 0; i < medians.size(); i++){
-            int val_1 = medians.at(i)[0];
-            int val_2 = medians.at(i)[1];
-            int val_3 = medians.at(i)[2];
-            int comp_1,comp_2,comp_3;
-            for(int j = (i+1); j < medians.size(); j++){
-                comp_1 = medians.at(j)[0];
-                comp_2 = medians.at(j)[1];
-                comp_3 = medians.at(j)[2];
-            }
-            int diff_1 = abs(val_1-comp_1);
-            int diff_2 = abs(val_2-comp_2);
-            int diff_3 = abs(val_3-comp_3);
-            int total_diff = diff_1+diff_2+diff_3;
-            cout << total_diff << endl;
+        // Initialize clusters
+        vector<cluster> clusters;
+        // Initialize variables
+        int cluster_count = 3; // Two since we need to seperate background from objects
+        if(frame.cols*frame.rows < cluster_count){
+            throw runtime_error("Not enough data points compared to clusters");
         }
-        // INSTEAD MAYBE JUST CLUSTER WITH K-MEANS
+        // Initialize clusters using random pixel coordinates
+        clusters = analyzer.initialize_clusters(data, cluster_count, frame);
 
-        // Go through every pixel to find its membership
-        for(int row = 0; row < frame.rows; row++){
-            for(int col = 0; col < frame.cols; col++){
+        // Initialize weights
+        vector<float> weights = {1.0,1.0,1.0,1.0,1.0};
 
+        // Initialize variable that keeps track of changes in clusters
+        bool changes = false;
+
+        // Timing and post execution rundown
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Initialization done in " << duration.count() << " ms using " <<  endl;
+        start = chrono::high_resolution_clock::now();
+
+
+        // Assign clusters until all superpixels are at the closest cluster
+        while(true){
+            // Go through all superpixel and calcualte closest distance.
+            for(int i = 0; i < data.super_pixel_count; i++){
+                // Calculate euclidean distance to each cluster center
+                vector<float> distances;
+                for(int j = 0; j < clusters.size(); j++){
+                    // Get values of current superpixel
+                    Vec2f position = analyzer.get_superpixel_center(data,i);
+                    Vec3f color = analyzer.get_superpixel_mean(data,i,frame);
+                    vector<float> values = {position[0],position[1],color[0],color[1],color[2]};
+
+                    // Remember distance
+                    float distance = analyzer.calc_euclidean(values,clusters[j].center, weights);
+                    distances.push_back(distance);
+                }
+
+                // Assign cluster based on distances
+                auto closest_cluster = min_element(distances.begin(), distances.end());
+                int closest_cluster_index = closest_cluster - distances.begin();
+
+                // Go through cluster to add / remove superpixels where needed
+                for(int j = 0; j < clusters.size(); j++){
+                    // Count occurences of feature
+                    int occurences = count(clusters[j].superpixels.begin(),clusters[j].superpixels.end(),i);
+                    // Remove if not correct index
+                    if(occurences > 0 && j != closest_cluster_index){
+                        clusters[j].superpixels.erase(remove(clusters[j].superpixels.begin(),clusters[j].superpixels.end(),i), clusters[j].superpixels.end());
+                        changes = true;
+                    }
+                    // Add if correct index
+                    else if(occurences == 0 && j == closest_cluster_index){
+                        clusters[j].superpixels.push_back(i);
+                        changes = true;
+                    }
+                }
+            }
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Main loop done in " << duration.count() << " ms using " << endl;
+            start = chrono::high_resolution_clock::now();
+
+            // Break if nothing was changed
+            if(changes == false){
+                break;
+            }
+            // Update centers before next iteration
+            else{
+                for(int i = 0; i < clusters.size(); i++){
+                    if(clusters.at(i).superpixels.size() == 0){
+                        // remove cluster since it is not needed
+                        cout << "Cluster removed" << endl; // Happens due to some aspects of the super pixel having a weight of zero and by the fact that averages are used.
+                        clusters.erase(clusters.begin()+i);
+                        i--;
+                    }
+                    else{
+                        clusters[i] = analyzer.update_center(clusters[i], data, frame);
+                    }
+                }
+                changes = false;
+            }
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Update done in " << duration.count() << " ms using " << endl;
+        }
+        start = chrono::high_resolution_clock::now();
+        // With clustering done update superpixels
+        for(int row = 0; row < data.pixel_labels.rows; row++){
+            for(int col = 0; col < data.pixel_labels.cols; col++){
+                vector<int> counts;
+                for(int cluster = 0; cluster < clusters.size(); cluster++){
+                    int cluster_count = count(clusters[cluster].superpixels.begin(), clusters[cluster].superpixels.end(), data.pixel_labels.at<int>(row,col));
+                    counts.push_back(cluster_count);
+                }
+                // Find index of max count
+                int max_val = *max_element(counts.begin(), counts.end());
+                int best_cluster = find(counts.begin(),counts.end(),max_val)-counts.begin();
+                updated_data.pixel_labels.at<int>(row,col) = best_cluster;
             }
         }
+        updated_data.super_pixel_count = clusters.size();
+        stop = chrono::high_resolution_clock::now();
+        duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Data update done in " << duration.count() << " ms using " << endl;
     }
     catch(const exception& error){
-        cout << error.what() << endl;
+        cout << "Error: " << error.what() << endl;
+    }
+    return updated_data;
+}
+
+// -- Filter that tries to segment image based on superpixels using variance --
+super_pixel_frame obstacle_detection::superpixel_segmentation_variance(super_pixel_frame data, Mat frame){
+    // Prepare output
+    super_pixel_frame updated_data = data;
+    try{
+        // Initialize analyzer class
+        feature_analyzer analyzer;
+        // Calculate mean color and center coordinate for each superpixel
+        vector<Vec2f> positions;
+        vector<Vec3f> colors;
+        for(int i = 0; i < data.super_pixel_count; i++){
+            Vec2f position = analyzer.get_superpixel_center(data,i);
+            Vec3f color = analyzer.get_superpixel_mean(data,i,frame);
+            positions.push_back(position);
+            colors.push_back(color);
+        }
+        // Find all neighboring superpixels using their centers
+        vector<vector<int>> neighbors;
+        for(int superpixel = 0; superpixel < data.super_pixel_count; superpixel++){
+            // Get initial col and row
+            int row = int(positions.at(superpixel)[0]);
+            int col = int(positions.at(superpixel)[1]);
+            // Find leftmost neighbor
+            int left_index = col;
+            int left_label = superpixel;
+            while(left_index > 0){
+                left_index--;
+                // Get label
+                left_label = data.pixel_labels.at<int>(row,left_index);
+                if(left_label != superpixel){
+                    break;
+                }
+            }
+            // Find rightmost neighbor
+            int right_index = col;
+            int right_label = superpixel;
+            while(right_index < data.pixel_labels.cols-1){
+                right_index++;
+                // Get label
+                right_label = data.pixel_labels.at<int>(row,right_index);
+                if(right_label != superpixel){
+                    break;
+                }
+            }
+            // Find topmost neighbor
+            int top_index = row;
+            int top_label = superpixel;
+            while(top_index > 0){
+                top_index--;
+                // Get label
+                top_label = data.pixel_labels.at<int>(top_index,col);
+                if(top_label != superpixel){
+                    break;
+                }
+            }
+            // Find bottommost neighbor
+            int bottom_index = row;
+            int bottom_label = superpixel;
+            while(bottom_index < data.pixel_labels.rows-1){
+                bottom_index++;
+                // Get label
+                bottom_label = data.pixel_labels.at<int>(bottom_index,col);
+                if(bottom_label != superpixel){
+                    break;
+                }
+            }
+            // Add neighbors
+            neighbors.push_back({left_label,right_label,top_label,bottom_label});
+        }
+
+        // Determine what neighbor is the closest match
+        vector<int> closest_match;
+        for(int superpixel = 0; superpixel < data.super_pixel_count; superpixel++){
+            // Prepare value data for superpixel
+            vector<float> values = {positions.at(superpixel)[0],positions.at(superpixel)[1],colors.at(superpixel)[0],colors.at(superpixel)[1],colors.at(superpixel)[2]};
+            // Calculate euclidean distance to all neighbors
+            float best_distance;
+            int best_neighbor = -1;
+            for(int neighbor = 0; neighbor < neighbors.at(superpixel).size(); neighbor++){
+                // Get neighbor label
+                int neighbor_label = neighbors.at(superpixel).at(neighbor);
+                if(neighbor_label != superpixel){
+                    // Prepare values of current neighbor
+                    vector<float> neighbor_values = {positions.at(neighbor_label)[0],positions.at(neighbor_label)[1],colors.at(neighbor_label)[0],colors.at(neighbor_label)[1],colors.at(neighbor_label)[2]};
+                    // Determine distance
+                    float distance = analyzer.calc_euclidean(values,neighbor_values);
+                    // Update best neighbor
+                    if(best_neighbor == -1){
+                        best_distance = distance;
+                        best_neighbor = neighbor_label;
+                    }
+                    else if(best_distance > distance){
+                        best_distance = distance;
+                        best_neighbor = neighbor_label;
+                    }
+                }
+            }
+            // Add to closest match
+            closest_match.push_back(best_neighbor);
+        }
+
+        // Make new clusters for each superpixel with all their matches
+        vector<vector<int>> clusters;
+        for(int superpixel = 0; superpixel < data.super_pixel_count; superpixel++){
+            // Start with its own match
+            vector<int> temp_cluster {superpixel,closest_match.at(superpixel)};
+            // Add matches if found in other matches
+            vector<int>::iterator iterator = closest_match.begin();
+            vector<int> match_indexes;
+            while((iterator = find_if(iterator, closest_match.end(),[&superpixel](int x){return x == superpixel;} )) != closest_match.end())
+            {
+                // Do something with iter
+                match_indexes.push_back(distance(closest_match.begin(), iterator));
+                iterator++;
+            }
+            // Add all match indexes to cluster if not already present.
+            for(int match = 0; match < match_indexes.size(); match++){
+                // Ensure not already added
+                int cluster_count = count(temp_cluster.begin(), temp_cluster.end(), match_indexes.at(match));
+                if(cluster_count == 0){
+                    temp_cluster.push_back(match_indexes.at(match));
+                }
+            }
+            clusters.push_back(temp_cluster);
+        }
+        // Combine clusters that share elements
+        vector<vector<int>> final_clusters = {};
+        vector<int> used_clusters = {};
+        for(int cluster = 0; cluster < clusters.size(); cluster++){
+            // Only continue if cluster not already used
+            int used_count = count(used_clusters.begin(), used_clusters.end(), cluster);
+            if(used_count == 0){
+                vector<int> temp_cluster = clusters.at(cluster);
+                used_clusters.push_back(cluster);
+                // Match wih all other clusters
+                cout << "new cluster" << endl;
+                for(int comp_cluster = cluster+1; comp_cluster < clusters.size(); comp_cluster++){
+                    int second_used_count = count(used_clusters.begin(), used_clusters.end(), comp_cluster);
+                    if(second_used_count == 0){
+                        cout << "new compare cluster" << endl;
+                        int count_comp = 0;
+                        bool valid = true;
+                        // Go throug elements and count them in second cluster
+                        for(int element = 0; element < clusters.at(cluster).size(); element++){
+                            cout << "new element" << endl;
+                            // ensure no duplicates
+                            if(count(used_clusters.begin(), used_clusters.end(), clusters.at(comp_cluster).at(element)) > 0){ // ISSUE HAPPENS HERE
+                                valid = false;
+                            }
+                            cout << "done with duplicate check" << endl;
+                            int superpixel = clusters.at(cluster).at(element);
+                            int count_comp_temp = count(clusters.at(comp_cluster).begin(), clusters.at(comp_cluster).end(),superpixel);
+                            if(count_comp_temp > count_comp){
+                                count_comp = count_comp_temp;
+                            }
+
+                        }
+                        if(count_comp > 0 && valid == true){
+                            cout << "do i make it here" << endl;
+                            temp_cluster.insert(temp_cluster.end(),clusters.at(comp_cluster).begin(),clusters.at(comp_cluster).end());
+                            // add all labels in comp cluster to used clusters
+                            used_clusters.push_back(comp_cluster);
+                            for(int k = 0; k < clusters.at(comp_cluster).size();k++){
+                                used_clusters.push_back(clusters.at(comp_cluster).at(k));
+                            }
+                        }
+                    }
+                }
+                if(temp_cluster.size() == 0){
+                    cout << "Empty cluster accepted: " << final_clusters.size() << endl;
+                }
+                // Remove duplicates from vector
+                sort(temp_cluster.begin(), temp_cluster.end());
+                auto it = unique(temp_cluster.begin(), temp_cluster.end());
+                temp_cluster.erase(it, temp_cluster.end());
+                // Add cluster to final
+                final_clusters.push_back(temp_cluster);
+            }
+        }
+        cout << "Number of clusters: " << final_clusters.size() << endl;
+        for(int i = 0; i < final_clusters.size(); i++){
+            cout << "Cluster " << i << " size: " << final_clusters.at(i).size() << endl;
+            for(int j = 0; j < final_clusters.at(i).size();j++){
+                cout << final_clusters.at(i).at(j) << ", ";
+            }
+            cout << endl;
+        }
+        // Update superpixels
+        for(int row = 0; row < data.pixel_labels.rows; row++){
+            for(int col = 0; col < data.pixel_labels.cols; col++){
+                // Go through clusters until matching cluster is found
+                for(int cluster = 0; cluster < final_clusters.size(); cluster++){
+                    // Count if label is present
+                    int cluster_count = count(final_clusters.at(cluster).begin(), final_clusters.at(cluster).end(), data.pixel_labels.at<int>(row,col));
+                    // Finish up if data matches
+                    if(cluster_count > 0){
+                        updated_data.pixel_labels.at<int>(row,col) = cluster;
+                        break;
+                    }
+                }
+            }
+        }
+        updated_data.super_pixel_count = final_clusters.size();
+        cout << updated_data.super_pixel_count << endl;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
     }
     return updated_data;
 }

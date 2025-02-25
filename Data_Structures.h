@@ -72,6 +72,7 @@ struct cluster{
     int id;
     std::vector<float> center;
     std::vector<keypoint_data> keypoints;
+    std::vector<int> superpixels;
     float silhouette_score;
 };
 

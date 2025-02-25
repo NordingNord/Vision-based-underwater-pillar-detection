@@ -814,3 +814,47 @@
 //                        }
 //                    }
 //                }
+
+
+//super_pixel_frame updated_data = data;
+//try{
+//    // Initialize needed classes
+//    feature_analyzer analyzer; // Analyzes features
+
+//    // Get superpixel identifier
+//    //vector<Vec3b> medians = analyzer.get_superpixel_medians(data,frame);
+//    vector<Vec3b> medians;
+
+//    // Initialize vector of labels similar to each other label
+//    vector<vector<int>> label_clusters;
+
+//    // Find distance from all medians to all other medians
+//    for(int i = 0; i < medians.size(); i++){
+//        int val_1 = medians.at(i)[0];
+//        int val_2 = medians.at(i)[1];
+//        int val_3 = medians.at(i)[2];
+//        int comp_1,comp_2,comp_3;
+//        for(int j = (i+1); j < medians.size(); j++){
+//            comp_1 = medians.at(j)[0];
+//            comp_2 = medians.at(j)[1];
+//            comp_3 = medians.at(j)[2];
+//        }
+//        int diff_1 = abs(val_1-comp_1);
+//        int diff_2 = abs(val_2-comp_2);
+//        int diff_3 = abs(val_3-comp_3);
+//        int total_diff = diff_1+diff_2+diff_3;
+//        cout << total_diff << endl;
+//    }
+//    // INSTEAD MAYBE JUST CLUSTER WITH K-MEANS
+
+//    // Go through every pixel to find its membership
+//    for(int row = 0; row < frame.rows; row++){
+//        for(int col = 0; col < frame.cols; col++){
+
+//        }
+//    }
+//}
+//catch(const exception& error){
+//    cout << error.what() << endl;
+//}
+//return updated_data;
