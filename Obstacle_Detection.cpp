@@ -177,27 +177,32 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 imshow("Superpixel medians", combined);
                 waitKey(0);
 
+
                 // -- PERFORM SUPERPIXEL SEGMENTATION --
                 //super_pixel_frame segmented_slic_top = superpixel_segmentation(top_slic_results,frame_top);
-                super_pixel_frame segmented_slic_top = superpixel_segmentation_euclidean(top_slic_results,frame_top);
-                segmented_slic_top = superpixel_segmentation_euclidean(segmented_slic_top,frame_top);
-                segmented_slic_top = superpixel_segmentation_euclidean(segmented_slic_top,frame_top);
+
+                super_pixel_frame segmented_slic_top = superpixel_segmentation_euclidean(top_slic_results,frame_top,100.0);
+                cout << "top done" << endl;
+                //segmented_slic_top = superpixel_segmentation_euclidean(segmented_slic_top,frame_top,100.0);
+
                 //super_pixel_frame segmented_slic_bottom = superpixel_segmentation(bottom_slic_results,frame_bottom);
-                super_pixel_frame segmented_slic_bottom = superpixel_segmentation_euclidean(bottom_slic_results,frame_bottom);
-                segmented_slic_bottom = superpixel_segmentation_euclidean(segmented_slic_bottom,frame_bottom);
-                segmented_slic_bottom = superpixel_segmentation_euclidean(segmented_slic_bottom,frame_bottom);
+
+                super_pixel_frame segmented_slic_bottom = superpixel_segmentation_euclidean(bottom_slic_results,frame_bottom,100.0);
+                cout << "bottom done" << endl;
+                //segmented_slic_bottom = superpixel_segmentation_euclidean(segmented_slic_bottom,frame_bottom,100.0);
 
                 // -- VISUALIZE SEGMENTED SUPERPIXELS --
-//                super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,segmented_slic_top);
-//                super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,segmented_slic_bottom);
-//                hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
-//                imshow("Segmented superpixel borders", combined);
-//                waitKey(0);
+                super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,segmented_slic_top);
+                super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,segmented_slic_bottom);
+                hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
+                imshow("Segmented superpixel borders", combined);
+                waitKey(0);
                 super_pixel_median_top = visualizer.mark_super_pixels(frame_top,segmented_slic_top);
                 super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,segmented_slic_bottom);
                 hconcat(super_pixel_median_top,super_pixel_median_bottom,combined);
                 imshow("Segmented superpixel medians", combined);
                 waitKey(0);
+
 
 
                 // -- UPDATE FRAMES AT TIME OF MATCHING --
@@ -489,7 +494,7 @@ super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame 
 }
 
 // -- Filter that tries to segment image based on superpixels using variance --
-super_pixel_frame obstacle_detection::superpixel_segmentation_euclidean(super_pixel_frame data, Mat frame){
+super_pixel_frame obstacle_detection::superpixel_segmentation_euclidean(super_pixel_frame data, Mat frame, float dist_thresh){
     // Timing
     auto start = chrono::high_resolution_clock::now();
 
@@ -578,18 +583,20 @@ super_pixel_frame obstacle_detection::superpixel_segmentation_euclidean(super_pi
                     // Determine distance
                     float distance = analyzer.calc_euclidean(values,neighbor_values);
                     // Update best neighbor
-                    if(best_neighbor == -1){
+                    if(best_neighbor == -1 && distance <= dist_thresh){
                         best_distance = distance;
                         best_neighbor = neighbor_label;
                     }
-                    else if(best_distance > distance){
+                    else if(best_distance > distance && distance <= dist_thresh){
                         best_distance = distance;
                         best_neighbor = neighbor_label;
                     }
                 }
             }
             // Add to closest match
-            closest_match.push_back(best_neighbor);
+            if(best_neighbor != -1){
+                closest_match.push_back(best_neighbor);
+            }
         }
 
         // Make new clusters for each superpixel with closest match
@@ -676,6 +683,47 @@ super_pixel_frame obstacle_detection::superpixel_segmentation_euclidean(super_pi
             }
         }
         updated_data.super_pixel_count = final_clusters.size();
+        // Update borders
+        vector<int> labels;
+        uchar border = -1;
+        uchar nothing = 0;
+        for(int row = 0; row < data.pixel_labels.rows; row++){
+            for(int col = 0; col < data.pixel_labels.cols; col++){
+                // Compare sorounding labels
+                labels = {};
+                if(row != 0){
+                    labels.push_back(updated_data.pixel_labels.at<int>(row-1,col));
+                }
+                if(col != 0){
+                    labels.push_back(updated_data.pixel_labels.at<int>(row,col-1));
+                }
+                if(row != data.pixel_labels.rows-1){
+                    labels.push_back(updated_data.pixel_labels.at<int>(row+1,col));
+                }
+                if(col != data.pixel_labels.cols-1){
+                    labels.push_back(updated_data.pixel_labels.at<int>(row,col+1));
+                }
+                if(row != 0 && col != 0){
+                    labels.push_back(updated_data.pixel_labels.at<int>(row-1,col-1));
+                }
+                if(row != data.pixel_labels.rows-1 && col != data.pixel_labels.cols-1){
+                    labels.push_back(updated_data.pixel_labels.at<int>(row+1,col+1));
+                }
+                if(row != 0 && col != data.pixel_labels.cols-1){
+                    labels.push_back(updated_data.pixel_labels.at<int>(row-1,col+1));
+                }
+                if(col != 0 && row != data.pixel_labels.rows-1){
+                    labels.push_back(updated_data.pixel_labels.at<int>(row+1,col-1));
+                }
+                int compare_count = count(labels.begin(),labels.end(),updated_data.pixel_labels.at<int>(row,col));
+                if(compare_count < labels.size()){
+                    updated_data.border_mask.at<uchar>(row,col) = border;
+                }
+                else{
+                    updated_data.border_mask.at<uchar>(row,col) = nothing;
+                }
+            }
+        }
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

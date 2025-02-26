@@ -50,7 +50,7 @@ public:
     super_pixel_frame superpixel_segmentation(super_pixel_frame data, cv::Mat frame);
 
     // -- Filter that tries to segment image based on superpixels using variance --
-    super_pixel_frame superpixel_segmentation_euclidean(super_pixel_frame data, cv::Mat frame);
+    super_pixel_frame superpixel_segmentation_euclidean(super_pixel_frame data, cv::Mat frame, float dist_thresh);
 
     // -- Triangulate points based on stereo camera system --
     cv::Point3f direct_linear_transform(cv::Mat projection_matrix_top, cv::Mat projection_matrix_bottom, cv::Point2f top_placement, cv::Point2f bottom_placement);
@@ -84,7 +84,7 @@ private:
     int slic_method = cv::ximgproc::MSLIC;
 
     // -- SLIC region size
-    int region_size = 10;
+    int region_size = 10; // original 10
 
     // -- SLIC ruler --
     float ruler = 10.0f;
