@@ -179,12 +179,13 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
 
                 // -- PERFORM SUPERPIXEL SEGMENTATION --
                 //super_pixel_frame segmented_slic_top = superpixel_segmentation(top_slic_results,frame_top);
-                super_pixel_frame segmented_slic_top = superpixel_segmentation_variance(top_slic_results,frame_top);
-                segmented_slic_top = superpixel_segmentation_variance(segmented_slic_top,frame_top);
-                cout << "top done" << endl;
+                super_pixel_frame segmented_slic_top = superpixel_segmentation_euclidean(top_slic_results,frame_top);
+                segmented_slic_top = superpixel_segmentation_euclidean(segmented_slic_top,frame_top);
+                segmented_slic_top = superpixel_segmentation_euclidean(segmented_slic_top,frame_top);
                 //super_pixel_frame segmented_slic_bottom = superpixel_segmentation(bottom_slic_results,frame_bottom);
-                super_pixel_frame segmented_slic_bottom = superpixel_segmentation_variance(bottom_slic_results,frame_bottom);
-                cout << "bottom done" << endl;
+                super_pixel_frame segmented_slic_bottom = superpixel_segmentation_euclidean(bottom_slic_results,frame_bottom);
+                segmented_slic_bottom = superpixel_segmentation_euclidean(segmented_slic_bottom,frame_bottom);
+                segmented_slic_bottom = superpixel_segmentation_euclidean(segmented_slic_bottom,frame_bottom);
 
                 // -- VISUALIZE SEGMENTED SUPERPIXELS --
 //                super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,segmented_slic_top);
@@ -192,11 +193,8 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
 //                hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
 //                imshow("Segmented superpixel borders", combined);
 //                waitKey(0);
-
                 super_pixel_median_top = visualizer.mark_super_pixels(frame_top,segmented_slic_top);
-                cout << "drawing top done" << endl;
                 super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,segmented_slic_bottom);
-                cout << "drawing bototm done" << endl;
                 hconcat(super_pixel_median_top,super_pixel_median_bottom,combined);
                 imshow("Segmented superpixel medians", combined);
                 waitKey(0);
@@ -491,7 +489,10 @@ super_pixel_frame obstacle_detection::superpixel_segmentation(super_pixel_frame 
 }
 
 // -- Filter that tries to segment image based on superpixels using variance --
-super_pixel_frame obstacle_detection::superpixel_segmentation_variance(super_pixel_frame data, Mat frame){
+super_pixel_frame obstacle_detection::superpixel_segmentation_euclidean(super_pixel_frame data, Mat frame){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
     // Prepare output
     super_pixel_frame updated_data = data;
     try{
@@ -591,93 +592,75 @@ super_pixel_frame obstacle_detection::superpixel_segmentation_variance(super_pix
             closest_match.push_back(best_neighbor);
         }
 
-        // Make new clusters for each superpixel with all their matches
+        // Make new clusters for each superpixel with closest match
         vector<vector<int>> clusters;
         for(int superpixel = 0; superpixel < data.super_pixel_count; superpixel++){
             // Start with its own match
             vector<int> temp_cluster {superpixel,closest_match.at(superpixel)};
-            // Add matches if found in other matches
-            vector<int>::iterator iterator = closest_match.begin();
-            vector<int> match_indexes;
-            while((iterator = find_if(iterator, closest_match.end(),[&superpixel](int x){return x == superpixel;} )) != closest_match.end())
-            {
-                // Do something with iter
-                match_indexes.push_back(distance(closest_match.begin(), iterator));
-                iterator++;
-            }
-            // Add all match indexes to cluster if not already present.
-            for(int match = 0; match < match_indexes.size(); match++){
-                // Ensure not already added
-                int cluster_count = count(temp_cluster.begin(), temp_cluster.end(), match_indexes.at(match));
-                if(cluster_count == 0){
-                    temp_cluster.push_back(match_indexes.at(match));
-                }
-            }
             clusters.push_back(temp_cluster);
         }
         // Combine clusters that share elements
         vector<vector<int>> final_clusters = {};
-        vector<int> used_clusters = {};
-        for(int cluster = 0; cluster < clusters.size(); cluster++){
-            // Only continue if cluster not already used
-            int used_count = count(used_clusters.begin(), used_clusters.end(), cluster);
-            if(used_count == 0){
-                vector<int> temp_cluster = clusters.at(cluster);
-                used_clusters.push_back(cluster);
-                // Match wih all other clusters
-                cout << "new cluster" << endl;
-                for(int comp_cluster = cluster+1; comp_cluster < clusters.size(); comp_cluster++){
-                    int second_used_count = count(used_clusters.begin(), used_clusters.end(), comp_cluster);
-                    if(second_used_count == 0){
-                        cout << "new compare cluster" << endl;
-                        int count_comp = 0;
-                        bool valid = true;
-                        // Go throug elements and count them in second cluster
-                        for(int element = 0; element < clusters.at(cluster).size(); element++){
-                            cout << "new element" << endl;
-                            // ensure no duplicates
-                            if(count(used_clusters.begin(), used_clusters.end(), clusters.at(comp_cluster).at(element)) > 0){ // ISSUE HAPPENS HERE
-                                valid = false;
-                            }
-                            cout << "done with duplicate check" << endl;
-                            int superpixel = clusters.at(cluster).at(element);
-                            int count_comp_temp = count(clusters.at(comp_cluster).begin(), clusters.at(comp_cluster).end(),superpixel);
-                            if(count_comp_temp > count_comp){
-                                count_comp = count_comp_temp;
-                            }
 
-                        }
-                        if(count_comp > 0 && valid == true){
-                            cout << "do i make it here" << endl;
-                            temp_cluster.insert(temp_cluster.end(),clusters.at(comp_cluster).begin(),clusters.at(comp_cluster).end());
-                            // add all labels in comp cluster to used clusters
-                            used_clusters.push_back(comp_cluster);
-                            for(int k = 0; k < clusters.at(comp_cluster).size();k++){
-                                used_clusters.push_back(clusters.at(comp_cluster).at(k));
-                            }
+        // go through clusters
+        for(int cluster = 0; cluster < clusters.size(); cluster++){
+            // Initialize current combined cluster
+            vector<int> temp_cluster = clusters.at(cluster);
+            // Go through every other cluster
+            for(int comp_cluster = 0; comp_cluster < clusters.size(); comp_cluster++){
+                // If comparative cluster is not the same as initial cluster: analyze similarities
+                if(comp_cluster != cluster){
+                    // Retrieve vectors
+                    vector<int> original_vector = clusters.at(cluster);
+                    vector<int> comparitive_vector = clusters.at(comp_cluster);
+                    // Find common elements
+                    vector<int> common_vector;
+                    set_intersection(original_vector.begin(), original_vector.end(), comparitive_vector.begin(), comparitive_vector.end(), back_inserter(common_vector));
+                    // Continue if common elements are found
+                    if(common_vector.size() != 0){
+                        // add comparative cluster to temp
+                        temp_cluster.insert(temp_cluster.end(),comparitive_vector.begin(),comparitive_vector.end());
+                    }
+                }
+            }
+            final_clusters.push_back(temp_cluster);
+        }
+
+        bool change = true;
+        while(change == true){
+            change = false;
+            // Go through all clusters looking for similarities. Appending if found
+            vector<vector<int>> temp_final = final_clusters;
+            for(int cluster = 0; cluster < final_clusters.size(); cluster++){
+                vector<int> temp_cluster = final_clusters.at(cluster);
+                for(int comp_cluster = 0; comp_cluster < final_clusters.size(); comp_cluster++){
+                    if(comp_cluster != cluster){
+                        // Retrieve vectors
+                        vector<int> original_vector = final_clusters.at(cluster);
+                        vector<int> comparitive_vector = final_clusters.at(comp_cluster);
+                        // Find common elements
+                        vector<int> common_vector;
+                        set_intersection(original_vector.begin(), original_vector.end(), comparitive_vector.begin(), comparitive_vector.end(), back_inserter(common_vector));
+                        if(common_vector.size() > 0 && (common_vector.size() < original_vector.size() || common_vector.size() < comparitive_vector.size())){
+                            temp_cluster.insert(temp_cluster.end(),comparitive_vector.begin(),comparitive_vector.end());
+                            change = true;
                         }
                     }
                 }
-                if(temp_cluster.size() == 0){
-                    cout << "Empty cluster accepted: " << final_clusters.size() << endl;
-                }
-                // Remove duplicates from vector
-                sort(temp_cluster.begin(), temp_cluster.end());
-                auto it = unique(temp_cluster.begin(), temp_cluster.end());
-                temp_cluster.erase(it, temp_cluster.end());
-                // Add cluster to final
-                final_clusters.push_back(temp_cluster);
+                // clean data
+                sort(temp_cluster.begin(),temp_cluster.end());
+                auto iterator = unique(temp_cluster.begin(), temp_cluster.end());
+                temp_cluster.erase(iterator, temp_cluster.end());
+                // Overwride temp
+                temp_final.at(cluster) = temp_cluster;
             }
+            final_clusters = temp_final;
         }
-        cout << "Number of clusters: " << final_clusters.size() << endl;
-        for(int i = 0; i < final_clusters.size(); i++){
-            cout << "Cluster " << i << " size: " << final_clusters.at(i).size() << endl;
-            for(int j = 0; j < final_clusters.at(i).size();j++){
-                cout << final_clusters.at(i).at(j) << ", ";
-            }
-            cout << endl;
-        }
-        // Update superpixels
+        // Remove duplicates
+        sort(final_clusters.begin(),final_clusters.end());
+        auto iterator = unique(final_clusters.begin(), final_clusters.end());
+        final_clusters.erase(iterator, final_clusters.end());
+
         for(int row = 0; row < data.pixel_labels.rows; row++){
             for(int col = 0; col < data.pixel_labels.cols; col++){
                 // Go through clusters until matching cluster is found
@@ -693,11 +676,15 @@ super_pixel_frame obstacle_detection::superpixel_segmentation_variance(super_pix
             }
         }
         updated_data.super_pixel_count = final_clusters.size();
-        cout << updated_data.super_pixel_count << endl;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
+    // Timing and post execution rundown
+    auto stop = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+    cout << "Superpixel segmentation conducted in " << duration.count() << " ms using euclidean distance." << endl;
+
     return updated_data;
 }
 

@@ -858,3 +858,98 @@
 //    cout << error.what() << endl;
 //}
 //return updated_data;
+
+//vector<vector<int>> final_clusters = {};
+//vector<int> used_clusters = {};
+
+//for(int cluster = 0; cluster < clusters.size(); cluster++){
+//    // Only continue if cluster not already used
+//    int used_count = count(used_clusters.begin(), used_clusters.end(), cluster);
+//    if(used_count == 0){
+//        vector<int> temp_cluster = clusters.at(cluster);
+//        used_clusters.push_back(cluster);
+//        // Match wih all other clusters
+//        for(int comp_cluster = cluster+1; comp_cluster < clusters.size(); comp_cluster++){
+//            int second_used_count = count(used_clusters.begin(), used_clusters.end(), comp_cluster);
+//            if(second_used_count == 0){
+//                int count_comp = 0;
+//                bool valid = true;
+//                // Go through elements and count them in second cluster
+//                for(int element = 0; element < clusters.at(cluster).size(); element++){
+//                    // ensure no duplicates
+//                    if(count(used_clusters.begin(), used_clusters.end(), clusters.at(cluster).at(element)) > 0){ // ISSUE HAPPENS HERE (More elements in previous cluster than new one)
+//                        valid = false;
+//                    }
+//                    int superpixel = clusters.at(cluster).at(element);
+//                    int count_comp_temp = count(clusters.at(comp_cluster).begin(), clusters.at(comp_cluster).end(),superpixel);
+//                    if(count_comp_temp > count_comp){
+//                        count_comp = count_comp_temp;
+//                    }
+
+//                }
+//                if(count_comp > 0 && valid == true){
+//                    temp_cluster.insert(temp_cluster.end(),clusters.at(comp_cluster).begin(),clusters.at(comp_cluster).end());
+//                    // add all labels in comp cluster to used clusters
+//                    used_clusters.push_back(comp_cluster);
+//                    for(int k = 0; k < clusters.at(comp_cluster).size();k++){
+//                        used_clusters.push_back(clusters.at(comp_cluster).at(k));
+//                    }
+//                }
+//            }
+//        }
+//        if(temp_cluster.size() == 0){
+//            cout << "Empty cluster accepted: " << final_clusters.size() << endl;
+//        }
+//        // Remove duplicates from vector
+//        sort(temp_cluster.begin(), temp_cluster.end());
+//        auto it = unique(temp_cluster.begin(), temp_cluster.end());
+//        temp_cluster.erase(it, temp_cluster.end());
+//        // Add cluster to final
+//        final_clusters.push_back(temp_cluster);
+//    }
+//}
+
+
+//cout << "No common elements. Lets check." << endl;
+//for(int element = 0; element < clusters.at(cluster).size(); element++){
+//    cout << clusters.at(cluster).at(element) << " ";
+//}
+//cout << endl;
+//for(int element = 0; element < clusters.at(comp_cluster).size(); element++){
+//    cout << clusters.at(comp_cluster).at(element) << " ";
+//}
+//cout << endl;
+//return data;
+
+//            // Add matches if found in other matches
+//            vector<int>::iterator iterator = closest_match.begin();
+//            vector<int> match_indexes;
+//            while((iterator = find_if(iterator, closest_match.end(),[&superpixel](int x){return x == superpixel;} )) != closest_match.end())
+//            {
+//                match_indexes.push_back(distance(closest_match.begin(), iterator));
+//                iterator++;
+//            }
+//            // Add all match indexes to cluster if not already present.
+//            for(int match = 0; match < match_indexes.size(); match++){
+//                // Ensure not already added
+//                int cluster_count = count(temp_cluster.begin(), temp_cluster.end(), match_indexes.at(match));
+//                if(cluster_count == 0){
+//                    temp_cluster.push_back(match_indexes.at(match));
+//                }
+//            }
+
+//        cout << "Clusters after combining: " << final_clusters.size() << endl;
+//        cout << "Number of clusters: " << final_clusters.size() << endl;
+//        for(int i = 0; i < final_clusters.size(); i++){
+//            cout << "Cluster " << i << " size: " << final_clusters.at(i).size() << endl;
+//            for(int j = 0; j < final_clusters.at(i).size();j++){
+//                cout << final_clusters.at(i).at(j) << ", ";
+//            }
+//            cout << endl;
+//        }
+        // Update superpixels
+//        cout << "The dreaded 20: ";
+//        for(int i = 0; i < final_clusters.at(20).size(); i++){
+//            cout << final_clusters.at(20).at(i) << " ";
+//        }
+//        cout << endl;
