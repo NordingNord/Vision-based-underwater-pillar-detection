@@ -55,6 +55,13 @@ public:
     // -- Triangulate points based on stereo camera system --
     cv::Point3f direct_linear_transform(cv::Mat projection_matrix_top, cv::Mat projection_matrix_bottom, cv::Point2f top_placement, cv::Point2f bottom_placement);
 
+    // -- Method that computes disparity between two images --
+    cv::Mat calculate_disparity(cv::Mat frame_bottom, cv::Mat frame_top);
+
+    // -- Method that triangulates using opencv --
+    cv::Point3f triangulate_point(cv::Mat projection_matrix_top, cv::Mat projection_matrix_bottom, cv::Point2f top_placement, cv::Point2f bottom_placement);
+
+
 private:
     // -- Minimum number of features required for optical flow to continue --
     int min_points = 5;
@@ -109,6 +116,16 @@ private:
 
     // -- currently hardcoded scale factor, due to resizing happening in python script --
     double frame_scale_factor = 0.35520833333;
+
+    // Disparity block size
+    int block_size = 11; // Max recomended value is 11
+
+    // Disparity min
+    int min_disparity = 50; // Default 0
+
+    // Disparity num
+    int num_disparity = 160; // Default is 16. Must be divisible with 16. Higher is better but slower
+
 };
 
 #endif // OBSTACLE_DETECTION_H

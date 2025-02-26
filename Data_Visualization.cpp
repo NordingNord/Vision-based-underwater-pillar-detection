@@ -210,6 +210,7 @@ void data_visualization::visualize_3d_points(vector<Point3f> points, vector<keyp
         // Make visualization environment look better
         frame_3d.setBackgroundColor(0,0,0);
         frame_3d.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "The point cloud");
+        frame_3d.initCameraParameters();
         // Visualize point cloud
         frame_3d.spin();
     }

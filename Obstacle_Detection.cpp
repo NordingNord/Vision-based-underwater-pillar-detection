@@ -93,6 +93,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 Mat combined;
                 hconcat(frame_top,frame_bottom,combined);
                 imshow("Preprocessed images",combined);
+                imwrite("1Preprocessed_frame.jpg",combined);
                 waitKey(0);
 
                 //  -- FIND FEATURES --
@@ -116,6 +117,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 Mat frame_keypoints_bottom = visualizer.mark_keypoints(bottom_data,frame_bottom);
                 hconcat(frame_keypoints_top,frame_keypoints_bottom,combined);
                 imshow("Features found",combined);
+                imwrite("2Feature_frame.jpg",combined);
                 waitKey(0);
 
                 // -- MATCH FEATURES --
@@ -127,6 +129,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 vector<DMatch> matches_vec = analyzer.get_surviving_matches(matches);
                 drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
                 imshow("All matches found",frame_matches);
+                imwrite("3Matches_frame.jpg",frame_matches);
                 waitKey(0);
 
                 // -- MATCH FILTERING --
@@ -137,6 +140,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 matches_vec = analyzer.get_surviving_matches(matches);
                 drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
                 imshow("Filtered matches",frame_matches);
+                imwrite("4Matches_filtered.jpg",frame_matches);
                 waitKey(0);
 
                 // -- KEEP ONLY MATCHED FEATURES --
@@ -158,6 +162,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 frame_keypoints_bottom = visualizer.mark_keypoints(current_bottom_data,frame_bottom);
                 hconcat(frame_keypoints_top,frame_keypoints_bottom,combined);
                 imshow("Filtered features",combined);
+                imwrite("5Filtered_feature_frame.jpg",combined);
                 waitKey(0);
 
                 // -- PERFORM SLIC --
@@ -169,26 +174,27 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 Mat super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,bottom_slic_results);
                 hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
                 imshow("Superpixel borders", combined);
+                imwrite("6Superpixel_border.jpg",combined);
                 waitKey(0);
 
                 Mat super_pixel_median_top = visualizer.mark_super_pixels(frame_top,top_slic_results);
                 Mat super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,bottom_slic_results);
                 hconcat(super_pixel_median_top,super_pixel_median_bottom,combined);
-                imshow("Superpixel medians", combined);
+                imshow("Superpixel means", combined);
+                imwrite("7Superpixel_means.jpg",combined);
                 waitKey(0);
 
 
                 // -- PERFORM SUPERPIXEL SEGMENTATION --
+                // K-means
                 //super_pixel_frame segmented_slic_top = superpixel_segmentation(top_slic_results,frame_top);
-
+                // Euclidean neighbors
                 super_pixel_frame segmented_slic_top = superpixel_segmentation_euclidean(top_slic_results,frame_top,100.0);
-                cout << "top done" << endl;
                 //segmented_slic_top = superpixel_segmentation_euclidean(segmented_slic_top,frame_top,100.0);
-
+                // K-means
                 //super_pixel_frame segmented_slic_bottom = superpixel_segmentation(bottom_slic_results,frame_bottom);
-
+                // Euclidean neighbors
                 super_pixel_frame segmented_slic_bottom = superpixel_segmentation_euclidean(bottom_slic_results,frame_bottom,100.0);
-                cout << "bottom done" << endl;
                 //segmented_slic_bottom = superpixel_segmentation_euclidean(segmented_slic_bottom,frame_bottom,100.0);
 
                 // -- VISUALIZE SEGMENTED SUPERPIXELS --
@@ -196,11 +202,20 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,segmented_slic_bottom);
                 hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
                 imshow("Segmented superpixel borders", combined);
+                imwrite("8Combined_superpixel_borders.jpg",combined);
                 waitKey(0);
                 super_pixel_median_top = visualizer.mark_super_pixels(frame_top,segmented_slic_top);
                 super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,segmented_slic_bottom);
                 hconcat(super_pixel_median_top,super_pixel_median_bottom,combined);
-                imshow("Segmented superpixel medians", combined);
+                imshow("Segmented superpixel means", combined);
+                imwrite("9Combined_superpixel_means.jpg",combined);
+                waitKey(0);
+
+                // -- CALCULATE DISPARITY MAP --
+                Mat frame_bottom_gray = finder.apply_grayscale(frame_bottom);
+                Mat frame_top_gray = finder.apply_grayscale(frame_top);
+                Mat disparity_map = calculate_disparity(frame_bottom_gray,frame_top_gray);
+                imshow("Disparity map", disparity_map);
                 waitKey(0);
 
 
@@ -235,6 +250,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                     Mat frame_matches;
                     drawMatches(frame_top, top_features, frame_bottom, bottom_features, final_matches, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
                     imshow("Flow filtered matches",frame_matches);
+                    imwrite("11Flow_filtered_frame.jpg",frame_matches);
                     waitKey(0);
 
                     // -- CLEAN CURRENT DATA BASED ON FILTER ---
@@ -256,8 +272,19 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                         point_estimates.push_back(point_3d);
                     }
 
+                    // -- COMPARE WITH OPENCV IMPLEMENTATION --
+                    vector<Point3f> point_estimates_comp;
+                    for(int i = 0; i < current_top_data.size(); i++){
+                        Point3f point_3d = triangulate_point(top_projection_matrix,bottom_projection_matrix,current_top_data.at(i).point, current_bottom_data.at(i).point);
+                        point_estimates_comp.push_back(point_3d);
+                    }
+                    for(int i = 0; i < point_estimates.size(); i++){
+                        cout << "DLT: " << point_estimates.at(i).x << ", " <<  point_estimates.at(i).y << ", " <<  point_estimates.at(i).z << endl;
+                        cout << "Opencv: " << point_estimates_comp.at(i).x << ", " <<  point_estimates_comp.at(i).y << ", " <<  point_estimates_comp.at(i).z << endl;
+                    }
+
                     // -- VISUALIZE POINT CLOUD --
-                    visualizer.visualize_3d_points(point_estimates,current_top_data,frame_top);
+                    visualizer.visualize_3d_points(point_estimates_comp,current_top_data,frame_top);
                 }
             }
         }
@@ -350,6 +377,7 @@ match_result obstacle_detection::optical_flow_filter(vector<Mat> frames_top, vec
                 Mat combined;
                 hconcat(top_viz,bottom_viz,combined);
                 imshow("Filtered velocities", combined);
+                imwrite("10Velocity_frame.jpg",combined);
                 waitKey(0);
             }
             // -- UPDATE SURVIVING FEATURES --
@@ -808,6 +836,65 @@ Point3f obstacle_detection::direct_linear_transform(Mat projection_matrix_top, M
     }
     return position_3d;
 }
+
+// -- Method that computes disparity between two images --
+Mat obstacle_detection::calculate_disparity(Mat frame_bottom, Mat frame_top){
+    // Timing
+    auto start = chrono::high_resolution_clock::now();
+
+    Mat disparity;
+    try{
+        // Calculate recomended disparity penalty
+        int small_diff_penalty = 8*frame_bottom.channels()*block_size*block_size;
+        int big_diff_penalty = 32*frame_bottom.channels()*block_size*block_size;
+
+        // Create stereo object
+        // min disparity: Starting offset
+        // num disparities: max disparity. Must be divisible by 16. Higher is better but slower
+        // Block size: odd number between 3 and 11. Matched block size
+        // P1 = parameter for disparity smoothness.Penalty for disparity change by +-1.
+        // P2 = parameter for disparity smoothness. Larger means more spooth. Penality for bigger disparity change. P2 must be bigger than P1
+        Ptr<StereoSGBM> stereo_cam = StereoSGBM::create(min_disparity,num_disparity,block_size,small_diff_penalty,big_diff_penalty);
+
+        // Compute desparity
+        stereo_cam->compute(frame_bottom,frame_top,disparity);
+    }
+    catch(const exception& error){
+        cout << error.what() << endl;
+    }
+    // Timing and post execution rundown
+    auto stop = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+    cout << "Disparity map created in " << duration.count() << " ms using SGBM." << endl;
+
+    return disparity;
+}
+
+// -- Method that triangulates using opencv --
+Point3f obstacle_detection::triangulate_point(Mat projection_matrix_top, Mat projection_matrix_bottom, Point2f top_placement, Point2f bottom_placement){
+    Point3f position_3d;
+    try{
+        // Create temp output
+        Mat temp_position;
+        // Convert points
+        Mat point_bottom(2,1,CV_64F,{bottom_placement.x,bottom_placement.y});
+        Mat point_top(2,1,CV_64F,{top_placement.x,top_placement.y});
+        // Perform triangulation
+        triangulatePoints(projection_matrix_bottom,projection_matrix_top,point_bottom,point_top,temp_position);
+        // This point is homogeneous so we un homogenize it -> homogenous to cartesian space.
+        Point3f temp_3d;
+        temp_3d.x = temp_position.at<float>(0)/temp_position.at<float>(3);
+        temp_3d.y = temp_position.at<float>(1)/temp_position.at<float>(3);
+        temp_3d.z = temp_position.at<float>(2)/temp_position.at<float>(3);
+        // Prepare output
+        position_3d = temp_3d;
+    }
+    catch(const exception& error){
+        cout << "ERROR: " << error.what() << endl;
+    }
+    return position_3d;
+}
+
 
 // ----------------------- OUTDATED -------------------------------------------------------
 
