@@ -17,6 +17,7 @@
 #include "Feature_Finder.h"
 #include "Feature_Analyzer.h"
 #include "Preprocessing.h"
+#include "Trackbars.h"
 
 
 // -- Define cluster settings --

@@ -1229,6 +1229,12 @@ preprocessor = preprocessing()
 # save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_bottom_video.mkv'
 # preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7,True,50,20)
 
+path_top = '../../Data/Video_Data/New_Pillar_Top.mkv'
+path_bottom = '../../Data/Video_Data/New_Pillar_Bottom.mkv'
+save_top = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog_third/combined_top_video.mkv'
+save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog_third/combined_bottom_video.mkv'
+preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,360,0.6,7,True,50,20)
+
 
 # Write all small images to directory
 # cap = cv.VideoCapture('../../Data/Video_Data/New_Pillar_Videos/Resized_bottom/Resized_video.mkv')

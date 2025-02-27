@@ -240,6 +240,12 @@ void camera_handler::resize_intrensic(double scale_factor,int center_placement){
     try{
         // Initialize new intrinsic parameters
         intrinsic new_bottom_intrinsic, new_top_intrinsic;
+        // Store old matrix
+        bottom_cam_intrinsic = create_intrinsic_matrix(bottom_cam_intrinsic);
+        top_cam_intrinsic = create_intrinsic_matrix(top_cam_intrinsic);
+        Mat old_top = top_cam_intrinsic.matrix;
+        Mat old_bottom = bottom_cam_intrinsic.matrix;
+
         // Update based on location of origin
         if(center_placement == CENTER_TOP_LEFT){
             // Update focal lengths
@@ -280,9 +286,189 @@ void camera_handler::resize_intrensic(double scale_factor,int center_placement){
         // Recreate matrix form
         bottom_cam_intrinsic = create_intrinsic_matrix(bottom_cam_intrinsic);
         top_cam_intrinsic = create_intrinsic_matrix(top_cam_intrinsic);
+        // Assing old matrices
+        bottom_cam_intrinsic.old_matrix = old_bottom;
+        top_cam_intrinsic.old_matrix = old_top;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+// -- Method that undistorts image --
+Mat camera_handler::undistort_frame(Mat frame, int frame_type){
+    Mat undistorted_frame;
+    try{
+        if(frame_type == TOP_CAM){
+            undistort(frame,undistorted_frame,top_cam_intrinsic.matrix,distortion_top);
+            cout << top_cam_intrinsic.matrix.at<double>(0,0) << endl; // WRONG VALUE .... how!
+
+        }
+        else if(frame_type == BOTTOM_CAM){
+            undistort(frame,undistorted_frame,bottom_cam_intrinsic.matrix,distortion_bottom);
+        }
+        else{
+            throw runtime_error("Unknown camera type. Please use top or bottom camera setting.");
+        }
 
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
+    return undistorted_frame;
+}
+
+// -- Visualize camera data --
+void camera_handler::vizualize_cam_info(int frame_type){
+    cout << top_cam_intrinsic.matrix.at<double>(0,0) << endl;;
+    try{
+        cout << fixed;
+        cout << setprecision(6);
+        if(frame_type == TOP_CAM){
+            cout << "Intrensic parameters for the top/right camera: " << endl;
+            cout << "-----------------------------------------------" << endl;
+            for(int row = 0; row < top_cam_intrinsic.matrix.rows; row++){
+                for(int col = 0; col < top_cam_intrinsic.matrix.cols; col++){
+                    if(col == top_cam_intrinsic.matrix.cols-1){
+                        cout << setfill(' ') << setw(11) <<top_cam_intrinsic.matrix.at<double>(row,col);
+                    }
+                    else{
+                        cout << setfill(' ') << setw(11) <<top_cam_intrinsic.matrix.at<double>(row,col) << ", ";
+                    }
+                }
+                cout << endl;
+            }
+            cout << "-----------------------------------------------" << endl;
+            cout << endl;
+//            cout << "Intrensic parameters for the top/right camera according to opencv: " << endl;
+//            cout << "-----------------------------------------------" << endl;
+//            Mat opencv_intrensic = getOptimalNewCameraMatrix(top_cam_intrinsic.old_matrix,distortion_top,original_size,1,new_size);
+//            for(int row = 0; row < opencv_intrensic.rows; row++){
+//                for(int col = 0; col < opencv_intrensic.cols; col++){
+//                    if(col == opencv_intrensic.cols-1){
+//                        cout << setfill(' ') << setw(11) <<opencv_intrensic.at<double>(row,col);
+//                    }
+//                    else{
+//                        cout << setfill(' ') << setw(11) <<opencv_intrensic.at<double>(row,col) << ", ";
+//                    }
+//                }
+//                cout << endl;
+//            }
+//            cout << "-----------------------------------------------" << endl;
+//            cout << endl;
+
+
+            cout << "Extrensic parameters for the top/right camera: " << endl;
+            cout << "-----------------------------------------------" << endl;
+            for(int row = 0; row < rotation_top.rows; row++){
+                for(int col = 0; col < rotation_top.cols+1; col++){
+                    if(col == rotation_top.cols){
+                        cout << setfill(' ') << setw(11) << translation_top.at<double>(row,0);
+                    }
+                    else{
+                        cout << setfill(' ') << setw(11) << rotation_top.at<double>(row,col) << ", ";
+                    }
+                }
+                cout << endl;
+            }
+            cout << "-----------------------------------------------" << endl;
+            cout << endl;
+            cout << "Distortion paramters for the top/right camera: " << endl;
+            cout << "-----------------------------------------------" << endl;
+            for(int row = 0; row < distortion_top.rows; row++){
+                cout << setfill(' ') << setw(11) << distortion_top.at<double>(row,0) << endl;;
+            }
+            cout << "-----------------------------------------------" << endl;
+            cout << endl;
+
+        }
+        else if(frame_type == BOTTOM_CAM){
+            cout << "Intrensic parameters for the bottom/left camera: " << endl;
+            cout << "-----------------------------------------------" << endl;
+            for(int row = 0; row < bottom_cam_intrinsic.matrix.rows; row++){
+                for(int col = 0; col < bottom_cam_intrinsic.matrix.cols; col++){
+                    if(col == bottom_cam_intrinsic.matrix.cols-1){
+                        cout << setfill(' ') << setw(7) <<bottom_cam_intrinsic.matrix.at<double>(row,col);
+                    }
+                    else{
+                        cout << setfill(' ') << setw(7) <<bottom_cam_intrinsic.matrix.at<double>(row,col) << ", ";
+                    }
+                }
+                cout << endl;
+            }
+            cout << "-----------------------------------------------" << endl;
+            cout << endl;
+//            cout << "Intrensic parameters for the bottom/left camera according to opencv: " << endl;
+//            cout << "-----------------------------------------------" << endl;
+//            Mat opencv_intrensic = getOptimalNewCameraMatrix(bottom_cam_intrinsic.old_matrix,distortion_bottom,original_size,1,new_size);
+//            for(int row = 0; row < opencv_intrensic.rows; row++){
+//                for(int col = 0; col < opencv_intrensic.cols; col++){
+//                    if(col == opencv_intrensic.cols-1){
+//                        cout << setfill(' ') << setw(11) <<opencv_intrensic.at<double>(row,col);
+//                    }
+//                    else{
+//                        cout << setfill(' ') << setw(11) <<opencv_intrensic.at<double>(row,col) << ", ";
+//                    }
+//                }
+//                cout << endl;
+//            }
+//            cout << "-----------------------------------------------" << endl;
+//            cout << endl;
+
+            cout << "Extrensic parameters for the bottom/left camera: " << endl;
+            cout << "-----------------------------------------------" << endl;
+            for(int row = 0; row < rotation_bottom.rows; row++){
+                for(int col = 0; col < rotation_bottom.cols+1; col++){
+                    if(col == rotation_bottom.cols){
+                        cout << setfill(' ') << setw(7) << translation_bottom.at<double>(row,0);
+                    }
+                    else{
+                        cout << setfill(' ') << setw(7) << rotation_bottom.at<double>(row,col) << ", ";
+                    }
+                }
+                cout << endl;
+            }
+            cout << "-----------------------------------------------" << endl;
+            cout << "Distortion paramters for the bottom/left camera: " << endl;
+            cout << "-----------------------------------------------" << endl;
+            for(int row = 0; row < distortion_bottom.rows; row++){
+                cout << setfill(' ') << setw(11) << distortion_bottom.at<double>(row,0) << endl;;
+            }
+            cout << "-----------------------------------------------" << endl;
+            cout << endl;
+
+        }
+        else{
+            throw runtime_error("Unknwon camera type. Please use top or bottom camera.");
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    cout << top_cam_intrinsic.matrix.at<double>(0,0) << endl;;
+}
+
+// -- Fixes camera matrix based on opencv --
+void camera_handler::resize_intrensic_opencv(){
+    try{
+        if(top_cam_intrinsic.matrix.empty() || top_cam_intrinsic.old_matrix.empty()){
+            top_cam_intrinsic = create_intrinsic_matrix(top_cam_intrinsic);
+            top_cam_intrinsic.old_matrix = top_cam_intrinsic.matrix;
+        }
+        Mat opencv_intrensic_top = getOptimalNewCameraMatrix(top_cam_intrinsic.old_matrix,distortion_top,original_size,1,new_size);
+        top_cam_intrinsic.matrix = opencv_intrensic_top;
+
+        if(bottom_cam_intrinsic.matrix.empty() || bottom_cam_intrinsic.old_matrix.empty()){
+            bottom_cam_intrinsic = create_intrinsic_matrix(bottom_cam_intrinsic);
+            bottom_cam_intrinsic.old_matrix = bottom_cam_intrinsic.matrix;
+        }
+        Mat opencv_intrensic_bottom = getOptimalNewCameraMatrix(bottom_cam_intrinsic.old_matrix,distortion_bottom,original_size,1,new_size);
+        bottom_cam_intrinsic.matrix = opencv_intrensic_bottom;
+        cout << top_cam_intrinsic.matrix.at<double>(0,0) << endl;;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+
 }

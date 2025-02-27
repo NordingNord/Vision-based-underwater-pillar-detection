@@ -1271,7 +1271,7 @@ match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descri
         Ptr<DescriptorMatcher> flann_matcher = DescriptorMatcher::create(DescriptorMatcher::FLANNBASED);
         // Find matches
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
-        flann_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches);
+        flann_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches); // Used to be top bottom. Now bottom top due to callbiration
         // Filter matches based on lowes ratio test
         vector<bool> valid_matches;
         vector<DMatch> best_matches;
@@ -1325,7 +1325,7 @@ match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descri
         }
         // Find matches
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
-        brute_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches);
+        brute_matcher->knnMatch(descriptors_top,descriptors_bottom,all_matches,number_of_best_matches); // used to be top bottom. Now bottom top due to callibration
         // Prepare shortest distance
         vector<DMatch> best_matches;
         vector<bool> accepted_matches;
@@ -1500,7 +1500,7 @@ match_result feature_analyzer::ransac_match_filter(match_result match_results,in
 
         // Find ransac mask
         Mat mask;
-        Mat H = findHomography(points_top,points_bottom,RANSAC,ransac_threshold,mask);
+        Mat H = findHomography(points_bottom,points_top,RANSAC,ransac_threshold,mask);
         // Keep only inliers
         vector<DMatch> good_matches;
         for(size_t i = 0; i < match_indexes.size();i++){

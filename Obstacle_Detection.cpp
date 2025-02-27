@@ -14,8 +14,8 @@ obstacle_detection::obstacle_detection(){
 void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int matching_type, int filter_type){
     try{
         // Initialize cameras
-        camera_handler cam_top(video_path_top); // Prepares the top camera video
-        camera_handler cam_bottom(video_path_bottom); // Prepares the bottom camera video
+        camera_handler cam_top(video_path_top); // Prepares the top camera video (right)
+        camera_handler cam_bottom(video_path_bottom); // Prepares the bottom camera video (left)
 
         // Initialize filter classes
         feature_finder finder(feature_type); // Finds the features based on desired type
@@ -53,6 +53,29 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         // Storage for triangulation
         Mat top_projection_matrix, bottom_projection_matrix;
 
+        // WHY DO THINGS CHANGE WHEN THIS IS COMMENTED OUT. THE INTRINSIC PARAMETERS ARE THE SAME IN ANY CASE
+//        // -- FIX CAMERA MATRIX BASED ON RESIZING --
+//        cam_top.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
+//        cam_bottom.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
+
+//        // -- VISUALIZE CAM DATA --
+//        cam_top.vizualize_cam_info(TOP_CAM);
+//        cam_bottom.vizualize_cam_info(BOTTOM_CAM);
+
+        // -- OR FIX CAMERA MATRIX USING OPENCV --
+        cam_top.resize_intrensic_opencv();
+        cam_bottom.resize_intrensic_opencv();
+
+        // -- VISUALIZE CAM DATA --
+        cam_top.vizualize_cam_info(TOP_CAM);
+        cam_bottom.vizualize_cam_info(BOTTOM_CAM);
+
+        // VALUE STILL CORRECT HERE
+
+        // -- CALCULATE PROJECTION MATRIX --
+        top_projection_matrix = cam_top.get_projection_matrix(TOP_CAM);
+        bottom_projection_matrix = cam_bottom.get_projection_matrix(BOTTOM_CAM);
+
         // Go through all frames
         while(true){
 
@@ -77,6 +100,11 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
             // -- TRANSPOSE FRAMES TO MATCH WITH CALLIBRATION --
             transpose(frame_top, frame_top);
             transpose(frame_bottom, frame_bottom);
+
+            // -- UNDISTORT FRAMES --
+            frame_top = cam_top.undistort_frame(frame_top,TOP_CAM);
+            frame_bottom = cam_bottom.undistort_frame(frame_bottom,BOTTOM_CAM);
+
             // Add frames to vectors
             top_frames.push_back(frame_top);
             bottom_frames.push_back(frame_bottom);
@@ -89,11 +117,12 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
             // -- FIND FEATURES --
             // Find features based on chosen method (if not exceeding maximum allowed features)
             if(find_features == true && current_top_features.size() < max_features && current_bottom_features.size() < max_features){
+
                 // -- VISUALIZE FRAMES --
                 Mat combined;
-                hconcat(frame_top,frame_bottom,combined);
-                imshow("Preprocessed images",combined);
-                imwrite("1Preprocessed_frame.jpg",combined);
+                hconcat(frame_bottom,frame_top,combined);
+                imshow("Preprocessed undistorted images",combined);
+                imwrite("1Preprocessed_undistort_frame.jpg",combined);
                 waitKey(0);
 
                 //  -- FIND FEATURES --
@@ -115,7 +144,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 // -- VISUALIZE FEATURES --
                 Mat frame_keypoints_top = visualizer.mark_keypoints(top_data,frame_top);
                 Mat frame_keypoints_bottom = visualizer.mark_keypoints(bottom_data,frame_bottom);
-                hconcat(frame_keypoints_top,frame_keypoints_bottom,combined);
+                hconcat(frame_keypoints_bottom,frame_keypoints_top,combined);
                 imshow("Features found",combined);
                 imwrite("2Feature_frame.jpg",combined);
                 waitKey(0);
@@ -160,7 +189,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 // -- VISUALIZE REMAINING FEATURES --
                 frame_keypoints_top = visualizer.mark_keypoints(current_top_data,frame_top);
                 frame_keypoints_bottom = visualizer.mark_keypoints(current_bottom_data,frame_bottom);
-                hconcat(frame_keypoints_top,frame_keypoints_bottom,combined);
+                hconcat(frame_keypoints_bottom,frame_keypoints_top,combined);
                 imshow("Filtered features",combined);
                 imwrite("5Filtered_feature_frame.jpg",combined);
                 waitKey(0);
@@ -172,14 +201,14 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 // -- VISUALIZE SUPERPIXELS --
                 Mat super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,top_slic_results);
                 Mat super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,bottom_slic_results);
-                hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
+                hconcat(super_pixel_border_bottom,super_pixel_border_top,combined);
                 imshow("Superpixel borders", combined);
                 imwrite("6Superpixel_border.jpg",combined);
                 waitKey(0);
 
                 Mat super_pixel_median_top = visualizer.mark_super_pixels(frame_top,top_slic_results);
                 Mat super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,bottom_slic_results);
-                hconcat(super_pixel_median_top,super_pixel_median_bottom,combined);
+                hconcat(super_pixel_median_bottom,super_pixel_median_top,combined);
                 imshow("Superpixel means", combined);
                 imwrite("7Superpixel_means.jpg",combined);
                 waitKey(0);
@@ -200,16 +229,20 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 // -- VISUALIZE SEGMENTED SUPERPIXELS --
                 super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,segmented_slic_top);
                 super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,segmented_slic_bottom);
-                hconcat(super_pixel_border_top,super_pixel_border_bottom,combined);
+                hconcat(super_pixel_border_bottom,super_pixel_border_top,combined);
                 imshow("Segmented superpixel borders", combined);
                 imwrite("8Combined_superpixel_borders.jpg",combined);
                 waitKey(0);
                 super_pixel_median_top = visualizer.mark_super_pixels(frame_top,segmented_slic_top);
                 super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,segmented_slic_bottom);
-                hconcat(super_pixel_median_top,super_pixel_median_bottom,combined);
+                hconcat(super_pixel_median_bottom,super_pixel_median_top,combined);
                 imshow("Segmented superpixel means", combined);
                 imwrite("9Combined_superpixel_means.jpg",combined);
                 waitKey(0);
+
+                // -- VISUALIZE DISPARITY SETTINGS --
+                trackbars tracker;
+                tracker.display_disparity(frame_bottom,frame_top);
 
                 // -- CALCULATE DISPARITY MAP --
                 Mat frame_bottom_gray = finder.apply_grayscale(frame_bottom);
@@ -218,19 +251,9 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 imshow("Disparity map", disparity_map);
                 waitKey(0);
 
-
-
                 // -- UPDATE FRAMES AT TIME OF MATCHING --
                 match_frame_top = frame_top;
                 match_frame_bottom = frame_bottom;
-
-                // -- FIX CAMERA MATRIX BASED ON RESIZING --
-                cam_top.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
-                cam_bottom.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
-
-                // -- CALCULATE PROJECTION MATRIX --
-                top_projection_matrix = cam_top.get_projection_matrix(TOP_CAM);
-                bottom_projection_matrix = cam_bottom.get_projection_matrix(BOTTOM_CAM);
 
                 // With this we have our initial surviving keypoints.
                 find_features = false;
@@ -375,7 +398,7 @@ match_result obstacle_detection::optical_flow_filter(vector<Mat> frames_top, vec
                 top_viz = visualizer.mark_velocity(current_top_data,top_viz);
                 bottom_viz = visualizer.mark_velocity(current_bottom_data,bottom_viz);
                 Mat combined;
-                hconcat(top_viz,bottom_viz,combined);
+                hconcat(bottom_viz,top_viz,combined);
                 imshow("Filtered velocities", combined);
                 imwrite("10Velocity_frame.jpg",combined);
                 waitKey(0);

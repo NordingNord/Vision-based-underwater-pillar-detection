@@ -104,6 +104,7 @@ struct intrinsic{
     double projection_center_u;
     double projection_center_v;
     cv::Mat matrix;
+    cv::Mat old_matrix;
 };
 
 #endif
