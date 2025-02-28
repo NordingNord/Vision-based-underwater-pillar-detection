@@ -122,18 +122,72 @@ void trackbars::display_disparity(Mat frame_bottom, Mat frame_top){
             cvtColor(frame_top,top_gray,COLOR_BGR2GRAY);
 
             // Compute desparity
-            stereo->compute(bottom_gray,top_gray,disparity);
+            stereo->compute(bottom_gray,top_gray,disparity); // Disparity type -> CV_16SC1 -> access elements with short
 
-            // Convert disparity values to CV_32F from CV_16S
-            //disparity.convertTo(disparity,CV_32F,1.0);
+            // -- EASY WAY --:
             disparity.convertTo(disparity,CV_8U,255/(num_disparities*16.0));
+            // -- Make color map
+            applyColorMap(disparity,disparity,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
 
-            // Scale down disparity
-            //disparity = disparity/16.0f;
-            //disparity = (disparity/16.0f-(float)minDisparity)/((float)numDisparities);
+
+//            // -- MANUAL WAY --
+//            // Devide with 16 due to scaling
+//            disparity = disparity/16;
+
+//            // Convert to CV_32F
+//            disparity.convertTo(disparity,CV_32F); // Disparity type -> CV_32FC1 -> access elements with float
+
+//            // Remove disparities below 0 and find min and max values
+//            float min_val;
+//            float max_val;
+//            vector<int> rows_of_doom;
+//            vector<int> cols_of_doom;
+//            float kill_small = 0.0;
+//            for(int row = 0; row < disparity.rows; row++){
+//                for(int col = 0; col < disparity.cols; col++){
+//                    if(disparity.at<float>(row,col) < 0.0){
+//                        disparity.at<float>(row,col) = kill_small;
+//                        rows_of_doom.push_back(row);
+//                        cols_of_doom.push_back(col);
+//                    }
+//                    if(row == 0){
+//                        min_val = disparity.at<float>(row,col);
+//                        max_val = disparity.at<float>(row,col);
+//                    }
+//                    if(disparity.at<float>(row,col) > max_val){
+//                        max_val = disparity.at<float>(row,col);
+//                    }
+//                    if(disparity.at<float>(row,col) < min_val){
+//                        min_val = disparity.at<float>(row,col);
+//                    }
+//                }
+//            }
+//            // Normalize
+//            disparity = (disparity-min_val)/(max_val-min_val);
+//            disparity = disparity * 255.0;
+
+//            // Convert to uint8
+//            disparity.convertTo(disparity,CV_8U); // CV_8uC1 -> access using uchar
+
+//            // -- Make color map
+//            applyColorMap(disparity,disparity,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+
+//            // Kill empty spots
+//            Vec3b kill = {0,0,0};
+//            for(int row = 0; row < rows_of_doom.size(); row++){
+//                disparity.at<Vec3b>(rows_of_doom.at(row),cols_of_doom.at(row)) = kill;
+//            }
+
+            // Combine image with left original to get some comparison going
+            Mat combined;
+            Mat showoff;
+            cvtColor(bottom_gray, showoff, COLOR_GRAY2BGR);
+            hconcat(disparity,showoff,combined);
 
             // Display disparity map
-            imshow("Disparity map",disparity);
+            imshow("Disparity map",combined);
+            string filename = "../disparityImg.png";
+            imwrite(filename, disparity);
             if(waitKey(1) == 27){ // Escape
                 break;
             }

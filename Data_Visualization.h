@@ -41,6 +41,9 @@ public:
     // -- Visualize 3D points --
     void visualize_3d_points(std::vector<cv::Point3f> points, std::vector<keypoint_data> keypoints, cv::Mat frame);
 
+    // -- Visualize matrix in text --
+    void visualize_mat_text(cv::Mat matrix, std::string matrix_name);
+
 private:
     int circle_diameter = 4;
 };

@@ -953,3 +953,80 @@
 //            cout << final_clusters.at(20).at(i) << " ";
 //        }
 //        cout << endl;
+
+
+// -- FIX CAMERA MATRIX BASED ON RESIZING --
+//        cam_top.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
+//        cam_bottom.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
+
+//        // -- IF NO RESIZING --
+//        cam_top.create_intrinsic_matrix();
+//        cam_bottom.create_intrinsic_matrix();
+
+// -- VISUALIZE CAM DATA --
+//        cam_top.vizualize_cam_info(TOP_CAM);
+//        cam_bottom.vizualize_cam_info(BOTTOM_CAM);
+
+// -- OR FIX CAMERA MATRIX USING OPENCV --
+//        cam_top.resize_intrensic_opencv();
+//        cam_bottom.resize_intrensic_opencv();
+
+
+
+// Convert to float and make smaller
+//disparity.convertTo(disparity,CV_8U,255/(num_disparities*16.0));
+//disparity.convertTo(disparity,CV_32F);
+//cout << "After float convert: " << disparity.at<float>(0,8) << endl;
+
+// Bingus disparity visualization
+// -- Remove disparities below 0 and find min and max
+//            double min_val;
+//            double max_val;
+//            for(int row = 0; row < disparity.rows; row++){
+//                for(int col = 0; col < disparity.cols; col++){
+//                    if(disparity.at<double>(row,col) < 0.0){
+//                        disparity.at<double>(row,col) = 0.0;
+//                    }
+//                    else if(col == 8 && row == 0){
+//                        cout << "A normal one at " << row << ", " << col << ": " << disparity.at<double>(row,col) << endl;
+//                    }
+//                    if(row == 0){
+//                        min_val = disparity.at<double>(row,col);
+//                        max_val = disparity.at<double>(row,col);
+//                    }
+//                    if(disparity.at<double>(row,col) > max_val){
+//                        max_val = disparity.at<double>(row,col);
+//                    }
+//                    if(disparity.at<double>(row,col) < min_val){
+//                        min_val = disparity.at<double>(row,col);
+//                    }
+//                }
+//            }
+// -- Normalize
+//            double min_val;
+//            double max_val;
+//            Point min_location;
+//            Point max_location;
+//            minMaxLoc(disparity,&min_val,&max_val,&min_location,&max_location);
+//            cout << "min: " << min_val << endl;
+//            cout << "max: " << max_val << endl;
+//            disparity = (disparity-min_val)/(max_val-min_val);
+//            cout << "New val: " << disparity.at<double>(0,8) << endl;
+//            disparity.convertTo(disparity,CV_8U,1.0/255.0,0);
+//            cout << "New val after convert: " << disparity.at<int>(0,8) << endl;
+//cout << disparity.at<double>(0,0) << endl;
+//disparity = 255.0f*disparity;
+//cout << disparity.at<double>(0,0) << endl;
+//disparity.convertTo(disparity,CV_8U);
+
+// -- Make color map
+//            Mat im_color;
+//            applyColorMap(disparity,im_color,COLORMAP_JET);
+
+// Convert disparity values to CV_32F from CV_16S
+//disparity.convertTo(disparity,CV_32F,1.0);
+//disparity.convertTo(disparity,CV_8U,255/(num_disparities*16.0));
+
+// Scale down disparity
+//disparity = disparity/16.0f;
+//disparity = (disparity/16.0f-(float)minDisparity)/((float)numDisparities);

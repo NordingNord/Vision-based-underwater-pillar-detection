@@ -1192,6 +1192,7 @@ Point2f feature_analyzer::correct_kalman(float x, float y){
         // Run correct
         Mat estimate = kalman_filter.correct(data_point);
         // Convert to point
+        cout << "Am in correct kalman. Remember to check Mat type and adressing if using this method." << endl;
         point.x = estimate.at<float>(0);
         point.y = estimate.at<float>(1);
     }
@@ -1209,6 +1210,7 @@ cv::Point2f feature_analyzer::predict_kalman(){
         Mat prediction = kalman_filter.predict();
 
         // Convert to point
+        cout << "Am in predict kalman. Remember to check Mat type and adressing if using this method." << endl;
         point.x = prediction.at<float>(0);
         point.y = prediction.at<float>(1);
     }
@@ -1504,7 +1506,7 @@ match_result feature_analyzer::ransac_match_filter(match_result match_results,in
         // Keep only inliers
         vector<DMatch> good_matches;
         for(size_t i = 0; i < match_indexes.size();i++){
-            if(mask.at<uchar>(i) > 0){
+            if(mask.at<uchar>(i) > 0){ // CV_8UC1 -> access with uchar
                 good_matches.push_back(match_results.matches[i]);
             }
             else{

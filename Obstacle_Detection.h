@@ -33,7 +33,7 @@ public:
     obstacle_detection();
 
     // -- Multicam feature pipeline --
-    void multicam_pipeline(std::string video_path_top, std::string video_path_bottom,int feature_type, int matching_type, int filter_type);
+    void multicam_pipeline(std::string video_path_top, std::string video_path_bottom,int feature_type, int matching_type, int filter_type, int resize_mode);
 
     // -- Performs optical flow on video --
     void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false, int cluster_setting = ON_FRAME, std::string recording_name = "Unnamed_optical_flow_recording", int frame_gap = 0);

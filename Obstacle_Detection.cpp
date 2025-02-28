@@ -11,7 +11,7 @@ obstacle_detection::obstacle_detection(){
 }
 
 // -- Multicam feature pipeline --
-void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int matching_type, int filter_type){
+void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int matching_type, int filter_type, int resize_mode){
     try{
         // Initialize cameras
         camera_handler cam_top(video_path_top); // Prepares the top camera video (right)
@@ -53,28 +53,20 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         // Storage for triangulation
         Mat top_projection_matrix, bottom_projection_matrix;
 
-        // WHY DO THINGS CHANGE WHEN THIS IS COMMENTED OUT. THE INTRINSIC PARAMETERS ARE THE SAME IN ANY CASE
-//        // -- FIX CAMERA MATRIX BASED ON RESIZING --
-//        cam_top.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
-//        cam_bottom.resize_intrensic(frame_scale_factor,CENTER_TOP_LEFT);
-
-//        // -- VISUALIZE CAM DATA --
-//        cam_top.vizualize_cam_info(TOP_CAM);
-//        cam_bottom.vizualize_cam_info(BOTTOM_CAM);
-
-        // -- OR FIX CAMERA MATRIX USING OPENCV --
-        cam_top.resize_intrensic_opencv();
-        cam_bottom.resize_intrensic_opencv();
+        // -- FIX CAMERA MATRIX BASED ON RESIZING --
+        cam_top.resize_intrensic_mode(resize_mode);
+        cam_bottom.resize_intrensic_mode(resize_mode);
 
         // -- VISUALIZE CAM DATA --
         cam_top.vizualize_cam_info(TOP_CAM);
         cam_bottom.vizualize_cam_info(BOTTOM_CAM);
 
-        // VALUE STILL CORRECT HERE
-
         // -- CALCULATE PROJECTION MATRIX --
         top_projection_matrix = cam_top.get_projection_matrix(TOP_CAM);
         bottom_projection_matrix = cam_bottom.get_projection_matrix(BOTTOM_CAM);
+
+        visualizer.visualize_mat_text(top_projection_matrix,"Top/right projection matrix: ");
+        visualizer.visualize_mat_text(bottom_projection_matrix, "Bottom/left projection matrix: ");
 
         // Go through all frames
         while(true){
@@ -98,17 +90,27 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 break;
             }
             // -- TRANSPOSE FRAMES TO MATCH WITH CALLIBRATION --
+            cout << frame_top.size() << endl;
             transpose(frame_top, frame_top);
             transpose(frame_bottom, frame_bottom);
+            cout << frame_top.size() << endl;
+
+            // -- RECTIFY FRAMES --
+            frame_top = cam_top.rectify(frame_top,TOP_CAM);
+            frame_bottom = cam_bottom.rectify(frame_bottom, BOTTOM_CAM);
+            cout << frame_top.size() << endl;
 
             // -- UNDISTORT FRAMES --
-            frame_top = cam_top.undistort_frame(frame_top,TOP_CAM);
-            frame_bottom = cam_bottom.undistort_frame(frame_bottom,BOTTOM_CAM);
+//            frame_top = cam_top.undistort_frame(frame_top,TOP_CAM);
+//            frame_bottom = cam_bottom.undistort_frame(frame_bottom,BOTTOM_CAM);
 
             // Add frames to vectors
             top_frames.push_back(frame_top);
             bottom_frames.push_back(frame_bottom);
 
+            // TEST REMOVE AFTER DISPARITY HAVE BEEN CHECKED
+            frame_bottom = imread("/home/benjamin/Master_Thesis_Workspace/Data/stereo_images/left_road.png");
+            frame_top = imread("/home/benjamin/Master_Thesis_Workspace/Data/stereo_images/right_road.png");
             // || Perform pipeline ||
 
             // -- PREPROCESSING --
@@ -307,7 +309,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                     }
 
                     // -- VISUALIZE POINT CLOUD --
-                    visualizer.visualize_3d_points(point_estimates_comp,current_top_data,frame_top);
+                    visualizer.visualize_3d_points(point_estimates,current_top_data,frame_top);
                 }
             }
         }
@@ -802,7 +804,7 @@ Point3f obstacle_detection::direct_linear_transform(Mat projection_matrix_top, M
         // Fill rows with all column values in that row
         for(int i = 0; i < projection_matrix_top.cols; i++){
             for(int j = 0; j < projection_matrix_top.rows; j++){
-                projection_rows_bottom.at(j).push_back(projection_matrix_bottom.at<double>(j,i));
+                projection_rows_bottom.at(j).push_back(projection_matrix_bottom.at<double>(j,i)); // CV_64F -> access with double
                 projection_rows_top.at(j).push_back(projection_matrix_top.at<double>(j,i));
             }
         }
@@ -831,7 +833,7 @@ Point3f obstacle_detection::direct_linear_transform(Mat projection_matrix_top, M
         Mat A_T;
         transpose(A,A_T);
         // get product
-        Mat B = A_T*A;
+        Mat B = A_T*A;// CV_64F -> access with double
 
         // Convert to matrix from eigen library
         Eigen::Matrix4d B_eigen;
@@ -898,7 +900,7 @@ Point3f obstacle_detection::triangulate_point(Mat projection_matrix_top, Mat pro
     Point3f position_3d;
     try{
         // Create temp output
-        Mat temp_position;
+        Mat temp_position; //CV_64F -> access with double
         // Convert points
         Mat point_bottom(2,1,CV_64F,{bottom_placement.x,bottom_placement.y});
         Mat point_top(2,1,CV_64F,{top_placement.x,top_placement.y});
@@ -906,9 +908,9 @@ Point3f obstacle_detection::triangulate_point(Mat projection_matrix_top, Mat pro
         triangulatePoints(projection_matrix_bottom,projection_matrix_top,point_bottom,point_top,temp_position);
         // This point is homogeneous so we un homogenize it -> homogenous to cartesian space.
         Point3f temp_3d;
-        temp_3d.x = temp_position.at<float>(0)/temp_position.at<float>(3);
-        temp_3d.y = temp_position.at<float>(1)/temp_position.at<float>(3);
-        temp_3d.z = temp_position.at<float>(2)/temp_position.at<float>(3);
+        temp_3d.x = temp_position.at<double>(0)/temp_position.at<double>(3);
+        temp_3d.y = temp_position.at<double>(1)/temp_position.at<double>(3);
+        temp_3d.z = temp_position.at<double>(2)/temp_position.at<double>(3);
         // Prepare output
         position_3d = temp_3d;
     }

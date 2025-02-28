@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <opencv2/opencv.hpp>
 #include "Data_Structures.h"
+#include "Data_Visualization.h"
 
 // Some defined names
 static const int TOP_CAM = 0;
@@ -15,6 +16,10 @@ static const int BOTTOM_CAM = 1;
 
 static const int CENTER_TOP_LEFT = 0;
 static const int LEFT_TOP_LEFT = 1;
+
+static const int MODE_MANUAL = 0;
+static const int MODE_OPENCV = 1;
+static const int MODE_NO_RESIZE = 2;
 
 // -- Class --
 class camera_handler{
@@ -62,6 +67,9 @@ public:
     // -- gets projection matrix --
     cv::Mat get_projection_matrix(int cam);
 
+    // -- Fixes intrensic paramters based on mode --
+    void resize_intrensic_mode(int mode);
+
     // -- Fixes intrensic parameters based on resizing --
     void resize_intrensic(double scale_factor,int center_placement = CENTER_TOP_LEFT);
 
@@ -73,6 +81,12 @@ public:
 
     // -- Fixes camera matrix based on opencv --
     void resize_intrensic_opencv();
+
+    // -- Method to get private intrensic paramters --
+    intrinsic get_intrensic(int frame_type);
+
+    // -- Method that rectify frames --
+    cv::Mat rectify(cv::Mat frame, int frame_type);
 
 private:
     // Frame data
@@ -90,7 +104,7 @@ private:
     // Hardcoded old size
     cv::Size original_size = cv::Size(1080,1920);
     // Hardcoded new size
-    cv::Size new_size = cv::Size(384,682);
+    cv::Size new_size = cv::Size(384,682); // If preprocessed (378,676)
 
     // Currently hard coded camera parameters.
     intrinsic bottom_cam_intrinsic = {1.4573042096686729e+03,1.4571772302602453e+03,5.6118918886024528e+02,9.4238009607042807e+02};

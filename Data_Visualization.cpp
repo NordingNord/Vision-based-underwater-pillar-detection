@@ -98,8 +98,8 @@ Mat data_visualization::mark_super_pixel_borders(Mat frame, super_pixel_frame da
         for(int row = 0; row < frame.rows; row++){
             for(int col = 0; col < frame.cols; col++){
                 // If border -> mark on current visualization frame
-                if(data.border_mask.at<uchar>(row,col) == border){
-                    visualized_frame.at<Vec3b>(row,col) = color;
+                if(data.border_mask.at<uchar>(row,col) == border){ // CV_8UC1 -> access with uchar
+                    visualized_frame.at<Vec3b>(row,col) = color; // CV_8UC3 -> access with Vec3b
                 }
             }
         }
@@ -121,8 +121,8 @@ Mat data_visualization::mark_super_pixels(Mat frame, super_pixel_frame data){
         for(int row = 0; row < frame.rows; row++){
             for(int col = 0; col < frame.cols; col++){
                 // Update color sums
-                sums.at(data.pixel_labels.at<int>(row,col)).at(0) += frame.at<Vec3b>(row,col)[0];
-                sums.at(data.pixel_labels.at<int>(row,col)).at(1) += frame.at<Vec3b>(row,col)[1];
+                sums.at(data.pixel_labels.at<int>(row,col)).at(0) += frame.at<Vec3b>(row,col)[0]; // label is CV_32SC1 -> access with int
+                sums.at(data.pixel_labels.at<int>(row,col)).at(1) += frame.at<Vec3b>(row,col)[1]; // frame is CV_8UC3 -> access with Vec3b
                 sums.at(data.pixel_labels.at<int>(row,col)).at(2) += frame.at<Vec3b>(row,col)[2];
                 // update count
                 member_count[data.pixel_labels.at<int>(row,col)] += 1;
@@ -210,7 +210,7 @@ void data_visualization::visualize_3d_points(vector<Point3f> points, vector<keyp
         // Make visualization environment look better
         frame_3d.setBackgroundColor(0,0,0);
         frame_3d.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "The point cloud");
-        frame_3d.initCameraParameters();
+        //frame_3d.initCameraParameters();
         // Visualize point cloud
         frame_3d.spin();
     }
@@ -219,3 +219,29 @@ void data_visualization::visualize_3d_points(vector<Point3f> points, vector<keyp
     }
 }
 
+// -- Visualize matrix in text --
+void data_visualization::visualize_mat_text(Mat matrix, string matrix_name){
+    try{
+        cout << fixed;
+        cout << setprecision(6);
+        cout << matrix_name << endl;
+        cout << "-----------------------------------------------" << endl;
+        for(int row = 0; row < matrix.rows; row++){
+            for(int col = 0; col < matrix.cols; col++){
+                if(col == matrix.cols-1){
+                    cout << setfill(' ') << setw(11) << matrix.at<double>(row,col); // Matrix is currently exprected to be CV_64FC1 -> access using  double
+                }
+                else{
+                    cout << setfill(' ') << setw(11) << matrix.at<double>(row,col) << ", ";
+                }
+            }
+            cout << endl;
+        }
+        cout << "-----------------------------------------------" << endl;
+        cout << endl;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+
+}
