@@ -326,7 +326,7 @@ Mat camera_handler::undistort_frame(Mat frame, int frame_type){
 }
 
 // -- Method that rectify frames --
-Mat camera_handler::rectify(Mat frame, int frame_type){
+Mat camera_handler::rectify(Mat frame,Mat frame_2, int frame_type){
     Mat rectified_frame;
     try{
         // Prepare needed input data
@@ -338,36 +338,137 @@ Mat camera_handler::rectify(Mat frame, int frame_type){
 
         Mat rotation = rotation_top;
         Mat translation = translation_top;
+//        translation = translation*1000;
+
+        // TEST SHOW VALUES USED IN RECTIFY
+        data_visualization visualizer;
+        visualizer.visualize_mat_text(camera_matrix_left,"Intrensic parameters for the left camera: ");
+        visualizer.visualize_mat_text(camera_matrix_right,"Intrensic parameters for the right camera: ");
+        visualizer.visualize_mat_text(distortion_left,"Distortion for the left camera: ");
+        visualizer.visualize_mat_text(distortion_right,"Distortion for the right camera: ");
+        visualizer.visualize_mat_text(rotation,"Rotation: ");
+        visualizer.visualize_mat_text(translation,"Translation:");
+        cout << "Callibration height: " << new_size.height << endl;
+        cout << "Left height: " << frame.rows << endl;
+        cout << "Right height: " << frame_2.rows << endl;
+        cout << "Callibration width: " << new_size.width << endl;
+
+
+        // All this data looks correct.
+
+
+
+        // TEST CHANGE TYPE OF MATRIX
+//        camera_matrix_left.convertTo(camera_matrix_left,CV_32F);
+//        camera_matrix_right.convertTo(camera_matrix_right,CV_32F);
 
         // Prepare outputs
         Mat rectify_left, rectify_right, projection_left, projection_right, disparity_to_depth_map;
 
         // Call stereo rectify
         double alpha = 0;
-        stereoRectify(camera_matrix_left, distortion_left, camera_matrix_right, distortion_right, new_size, rotation,translation,rectify_left, rectify_right, projection_left, projection_right,disparity_to_depth_map); // ,CALIB_ZERO_DISPARITY,alpha,new_size,0,0
+        Rect validRoi[2];
+        stereoRectify(camera_matrix_left, distortion_left, camera_matrix_right, distortion_right, new_size, rotation,translation,rectify_left, rectify_right, projection_left, projection_right,disparity_to_depth_map,CALIB_ZERO_DISPARITY,1,new_size, &validRoi[0], &validRoi[1]); // ,CALIB_ZERO_DISPARITY,alpha,new_size,0,0
+
+        // TEST print results after stereo rectify
+        visualizer.visualize_mat_text(rectify_left, "Rectify left: ");
+        visualizer.visualize_mat_text(rectify_right, "Rectify right: ");
+        visualizer.visualize_mat_text(projection_left, "Projection left: ");
+        visualizer.visualize_mat_text(projection_right, "Projection right: ");
+
+//        projection_right.at<double>(1,3) = projection_right.at<double>(0,3);
+//        projection_right.at<double>(0,3) = 0.0;
+//        visualizer.visualize_mat_text(projection_right, "Projection new right: ");
 
         // Prepare undistortion
-        Mat map_x_left;
-        Mat map_y_left;
-        initUndistortRectifyMap(camera_matrix_left,distortion_left,rectify_left,projection_left,new_size,CV_32FC1,map_x_left, map_y_left); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+        Mat rmap[2][2];
+        initUndistortRectifyMap(camera_matrix_left,distortion_left,rectify_left,projection_left,new_size,CV_16SC2,rmap[0][0],rmap[0][1]); //CV_16SC2
+        initUndistortRectifyMap(camera_matrix_right,distortion_right,rectify_right,projection_right,new_size,CV_16SC2,rmap[1][0],rmap[1][1]);
+        //initUndistortRectifyMap(camera_matrix_left,distortion_left,rectify_left,projection_left,new_size,CV_16SC2,rmap[0][0],rmap[0][1]);
+        //initUndistortRectifyMap(camera_matrix_right,distortion_right,rectify_right,projection_right,new_size,CV_16SC2,rmap[1][0],rmap[1][1]);
 
-        Mat map_x_right;
-        Mat map_y_right;
-        initUndistortRectifyMap(camera_matrix_right,distortion_right,rectify_right,projection_right,new_size,CV_32FC1,map_x_right, map_y_right); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+//        Mat map_x_left;
+//        Mat map_y_left;
+//        cout << camera_matrix_left.at<double>(0,0) << endl;
+//        cout << camera_matrix_right.at<double>(0,0) << endl;
+//        initUndistortRectifyMap(camera_matrix_left,distortion_left,rectify_left,projection_left,new_size,CV_32FC1,map_x_left, map_y_left); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
 
-        // Perform remaping
-        Mat work_frame;
-        cvtColor(frame,work_frame,COLOR_BGR2RGB);
-        Mat viz;
+//        Mat map_x_right;
+//        Mat map_y_right;
+//        initUndistortRectifyMap(camera_matrix_right,distortion_right,rectify_right,projection_right,new_size,CV_32FC1,map_x_right, map_y_right); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+        // Create test vizualization
+        Mat canvas;
+        double sf;
+        int w, h;
+        sf = 600.0/MAX(new_size.width,new_size.height);
+        w = cvRound(new_size.width*sf);
+        h = cvRound(new_size.height*sf);
+        canvas.create(h,w*2,CV_8UC3);
+
+        float cheat = 16/sf;
+        float warp_values[] = {1.0,0.0,0.0,0.0,1.0,-cheat};
+        Mat translation_cheat = Mat(2,3,CV_32F,warp_values);
+
+        vector<Mat> frames = {frame,frame_2};
+        vector<Mat> new_frames;
+        for(int i = 0; i < 2; i++){
+            Mat frame_gray;
+            cvtColor(frames.at(i),frame_gray,COLOR_BGR2GRAY);
+            Mat new_frame;
+            remap(frame_gray,new_frame,rmap[i][0],rmap[i][1],INTER_LINEAR);
+            if(i == 1){
+                warpAffine(new_frame,new_frame,translation_cheat,new_frame.size());
+            }
+            string name = "thing " + to_string(i);
+            imshow(name, new_frame);
+            waitKey(0);
+
+
+            Mat new_frame_color;
+            cvtColor(new_frame,new_frame_color,COLOR_GRAY2BGR);
+
+
+            new_frames.push_back(new_frame_color);
+
+
+            Mat canvasPart = canvas(Rect(w*i, 0, w, h));
+            resize(new_frame_color,canvasPart,canvasPart.size(),0,0,INTER_AREA);
+
+            Rect vroi(cvRound(validRoi[i].x*sf), cvRound(validRoi[i].y*sf),cvRound(validRoi[i].width*sf), cvRound(validRoi[i].height*sf));
+            rectangle(canvasPart, vroi, Scalar(0,0,255), 3, 8);
+        }
+        for(int j = 0; j < canvas.rows; j += 16 ){
+            line(canvas, Point(0, j), Point(canvas.cols, j), Scalar(0, 255, 0), 1, 8);
+        }
+
+        imshow("rectified", canvas);
+        waitKey(0);
+
         if(frame_type == TOP_CAM){
-            remap(work_frame,rectified_frame,map_x_right,map_y_right,INTER_LINEAR,BORDER_CONSTANT,Scalar());
+            rectified_frame = new_frames[1];
         }
         else if(frame_type == BOTTOM_CAM){
-            remap(work_frame,rectified_frame,map_x_left,map_y_left,INTER_LINEAR,BORDER_CONSTANT,Scalar());
+            rectified_frame = new_frames[0];
         }
         else{
             throw runtime_error("Unknown camera.");
         }
+
+
+        // Perform remaping
+//        Mat work_frame;
+//        cvtColor(frame,work_frame,COLOR_BGR2RGB);
+//        Mat viz;
+//        if(frame_type == TOP_CAM){
+//            remap(work_frame,rectified_frame,map_x_right,map_y_right,INTER_LINEAR,BORDER_CONSTANT,Scalar());
+//        }
+//        else if(frame_type == BOTTOM_CAM){
+//            remap(work_frame,rectified_frame,map_x_left,map_y_left,INTER_LINEAR,BORDER_CONSTANT,Scalar());
+//        }
+//        else{
+//            throw runtime_error("Unknown camera.");
+//        }
+//        cvtColor(rectified_frame,rectified_frame,COLOR_RGB2BGR);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -394,7 +495,7 @@ void camera_handler::vizualize_cam_info(int frame_type){
 
         }
         else if(frame_type == BOTTOM_CAM){
-            visualizer.visualize_mat_text(top_cam_intrinsic.matrix,"Intrensic parameters for the bottom/left camera: ");
+            visualizer.visualize_mat_text(bottom_cam_intrinsic.matrix,"Intrensic parameters for the bottom/left camera: ");
 
             Mat extrensic;
             hconcat(rotation_bottom,translation_bottom,extrensic);
@@ -476,4 +577,9 @@ void camera_handler::resize_intrensic_mode(int mode){
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
+}
+
+// -- Method that sets new size --
+void camera_handler::set_frame_size(Size size){
+    new_size = size;
 }

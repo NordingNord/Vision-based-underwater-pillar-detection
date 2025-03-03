@@ -86,7 +86,10 @@ public:
     intrinsic get_intrensic(int frame_type);
 
     // -- Method that rectify frames --
-    cv::Mat rectify(cv::Mat frame, int frame_type);
+    cv::Mat rectify(cv::Mat frame, cv::Mat frame_2, int frame_type);
+
+    // -- Method that sets new size --
+    void set_frame_size(cv::Size size);
 
 private:
     // Frame data
@@ -114,7 +117,7 @@ private:
     cv::Mat translation_bottom = (cv::Mat_<double>(3,1) << 0.0, 0.0, 0.0);
     cv::Mat rotation_bottom = (cv::Mat_<double>(3,3) << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0); // Eye matrix since rotation and translation is from this cam to the next, so this is the basis.
 
-    cv::Mat translation_top = (cv::Mat_<double>(3,1) << -6.0232602731165007e-02, 5.0696392732741975e-04, -2.1759794874252371e-04);
+    cv::Mat translation_top = (cv::Mat_<double>(3,1) << -6.0232602731165007e-02, 5.0696392732741975e-04, -2.1759794874252371e-04); // Orig:  << -6.0232602731165007e-02, 5.0696392732741975e-04, -2.1759794874252371e-04)
     cv::Mat rotation_top = (cv::Mat_<double>(3,3) << 9.9999025308859502e-01, 1.3210364715320931e-03, -4.2129076003026055e-03, -1.3230173719132052e-03, 9.9999901555929249e-01, -4.6744569710903378e-04, 4.2122859401305226e-03, 4.7301489089870296e-04, 9.9999101641168364e-01);
 
     // Distortion parameters

@@ -11,7 +11,7 @@ obstacle_detection::obstacle_detection(){
 }
 
 // -- Multicam feature pipeline --
-void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int matching_type, int filter_type, int resize_mode){
+void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int matching_type, int filter_type, int resize_mode, int size_mode){
     try{
         // Initialize cameras
         camera_handler cam_top(video_path_top); // Prepares the top camera video (right)
@@ -54,8 +54,30 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         Mat top_projection_matrix, bottom_projection_matrix;
 
         // -- FIX CAMERA MATRIX BASED ON RESIZING --
-        cam_top.resize_intrensic_mode(resize_mode);
-        cam_bottom.resize_intrensic_mode(resize_mode);
+        if(size_mode == RESIZED){
+            cam_top.set_frame_size(resized_size);
+            cam_bottom.set_frame_size(resized_size);
+
+            cam_top.resize_intrensic_mode(resize_mode);
+            cam_bottom.resize_intrensic_mode(resize_mode);
+//            cam_top.create_intrinsic_matrix();
+//            cam_bottom.create_intrinsic_matrix();
+        }
+        else if(size_mode == PREPROCESSED){
+            cam_top.set_frame_size(resized_preprocessed_size);
+            cam_bottom.set_frame_size(resized_preprocessed_size);
+
+            cam_top.resize_intrensic_mode(resize_mode);
+            cam_bottom.resize_intrensic_mode(resize_mode);
+
+        }
+        else if(size_mode == ORIGINAL){
+            cam_top.set_frame_size(original_size);
+            cam_bottom.set_frame_size(original_size);
+
+            cam_top.create_intrinsic_matrix();
+            cam_bottom.create_intrinsic_matrix();
+        }
 
         // -- VISUALIZE CAM DATA --
         cam_top.vizualize_cam_info(TOP_CAM);
@@ -68,6 +90,11 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
         visualizer.visualize_mat_text(top_projection_matrix,"Top/right projection matrix: ");
         visualizer.visualize_mat_text(bottom_projection_matrix, "Bottom/left projection matrix: ");
 
+        // Test video writer
+        VideoWriter video("rectified_top.mkv",CV_FOURCC('M','J','P','G'),30,original_size);
+        VideoWriter video_bottom("rectified_bottom.mkv",CV_FOURCC('M','J','P','G'),30,original_size);
+        int frame_count = 0;
+
         // Go through all frames
         while(true){
 
@@ -76,6 +103,7 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
             // Read frames
             frame_top = cam_top.get_frame();
             frame_bottom = cam_bottom.get_frame();
+            frame_count++;
 
             // Break if no more frames any of the videos
             if(frame_top.empty() || frame_bottom.empty()){
@@ -90,27 +118,36 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
                 break;
             }
             // -- TRANSPOSE FRAMES TO MATCH WITH CALLIBRATION --
-            cout << frame_top.size() << endl;
+            Mat test_top = frame_top;
+            Mat test_bottom = frame_bottom;
+
             transpose(frame_top, frame_top);
             transpose(frame_bottom, frame_bottom);
-            cout << frame_top.size() << endl;
+
+            // -- ROTATE FRAMES TO MATCH WI>TH> CALLIBRATION
+//            rotate(frame_top,frame_top,ROTATE_90_COUNTERCLOCKWISE);
+//            rotate(frame_bottom, frame_bottom, ROTATE_90_COUNTERCLOCKWISE);
 
             // -- RECTIFY FRAMES --
-            frame_top = cam_top.rectify(frame_top,TOP_CAM);
-            frame_bottom = cam_bottom.rectify(frame_bottom, BOTTOM_CAM);
-            cout << frame_top.size() << endl;
+//            frame_top = cam_top.rectify(frame_bottom,frame_top,TOP_CAM);
+//            frame_bottom = cam_bottom.rectify(frame_bottom,frame_top, BOTTOM_CAM);
+//            test_top = cam_top.rectify(frame_bottom,frame_top,TOP_CAM);
+//            test_bottom = cam_bottom.rectify(frame_bottom,frame_top, BOTTOM_CAM);
+//            video.write(frame_top);
+//            video_bottom.write(frame_bottom);
+//            cout << frame_top.size() << endl;
 
             // -- UNDISTORT FRAMES --
 //            frame_top = cam_top.undistort_frame(frame_top,TOP_CAM);
 //            frame_bottom = cam_bottom.undistort_frame(frame_bottom,BOTTOM_CAM);
 
-            // Add frames to vectors
-            top_frames.push_back(frame_top);
-            bottom_frames.push_back(frame_bottom);
+//            // Add frames to vectors
+//            top_frames.push_back(frame_top);
+//            bottom_frames.push_back(frame_bottom);
 
             // TEST REMOVE AFTER DISPARITY HAVE BEEN CHECKED
-            frame_bottom = imread("/home/benjamin/Master_Thesis_Workspace/Data/stereo_images/left_road.png");
-            frame_top = imread("/home/benjamin/Master_Thesis_Workspace/Data/stereo_images/right_road.png");
+//            frame_bottom = imread("/home/benjamin/Master_Thesis_Workspace/Data/stereo_images/left_road.png");
+//            frame_top = imread("/home/benjamin/Master_Thesis_Workspace/Data/stereo_images/right_road.png");
             // || Perform pipeline ||
 
             // -- PREPROCESSING --
@@ -120,197 +157,235 @@ void obstacle_detection::multicam_pipeline(string video_path_top, string video_p
             // Find features based on chosen method (if not exceeding maximum allowed features)
             if(find_features == true && current_top_features.size() < max_features && current_bottom_features.size() < max_features){
 
-                // -- VISUALIZE FRAMES --
-                Mat combined;
-                hconcat(frame_bottom,frame_top,combined);
-                imshow("Preprocessed undistorted images",combined);
-                imwrite("1Preprocessed_undistort_frame.jpg",combined);
-                waitKey(0);
+//                // -- VISUALIZE FRAMES --
+//                Mat combined;
+//                hconcat(frame_bottom,frame_top,combined);
+//                resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+//                imshow("Preprocessed undistorted images",combined);
+//                imwrite("1Preprocessed_undistort_frame.jpg",combined);
+//                waitKey(0);
 
-                //  -- FIND FEATURES --
-                top_features = finder.find_features(frame_top); // Find features using initialized detector
-                bottom_features = finder.find_features(frame_bottom); // Find features using initialized detector
+//                Mat test;
+//                hconcat(test_bottom,test_top,test);
+//                resize(test,test,Size(),0.5,0.5,INTER_LINEAR);
+//                imshow("Original images",test);
+//                waitKey(0);
 
-                // -- FIND DESCRIPTORS --
-                Mat top_descriptors = finder.get_descriptors(frame_top,top_features); // Gets descriptors based on newly found top view features
-                Mat bottom_descriptors = finder.get_descriptors(frame_bottom,bottom_features); // Gets descriptors based on newly found bottom view features
-
-                // -- CONVERT FEATURES TO DATA --
-                top_data = analyzer.convert_to_data(top_features);
-                bottom_data = analyzer.convert_to_data(bottom_features);
-                vector<Scalar> colours_top = visualizer.generate_random_colours(top_features.size());
-                vector<Scalar> colours_bottom = visualizer.generate_random_colours(bottom_features.size());
-                top_data = analyzer.insert_data(top_data, colours_top);
-                bottom_data = analyzer.insert_data(bottom_data, colours_bottom);
-
-                // -- VISUALIZE FEATURES --
-                Mat frame_keypoints_top = visualizer.mark_keypoints(top_data,frame_top);
-                Mat frame_keypoints_bottom = visualizer.mark_keypoints(bottom_data,frame_bottom);
-                hconcat(frame_keypoints_bottom,frame_keypoints_top,combined);
-                imshow("Features found",combined);
-                imwrite("2Feature_frame.jpg",combined);
-                waitKey(0);
-
-                // -- MATCH FEATURES --
-                // Match features between cameras
-                matches = analyzer.get_matches(top_descriptors,bottom_descriptors,matching_type,number_of_matches,feature_type);
-
-                // -- VISUALIZE MATCHES --
-                Mat frame_matches;
-                vector<DMatch> matches_vec = analyzer.get_surviving_matches(matches);
-                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-                imshow("All matches found",frame_matches);
-                imwrite("3Matches_frame.jpg",frame_matches);
-                waitKey(0);
-
-                // -- MATCH FILTERING --
-                // Filter matches with RANSAC (Alternative is my homemade filter based on known camera displacement, but that is currently not tweaked and is most likely worse.)
-                matches = analyzer.filter_matches(matches,top_features, bottom_features, filter_type);
-
-                // -- VISUALIZE FILTERED MATCHES --
-                matches_vec = analyzer.get_surviving_matches(matches);
-                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-                imshow("Filtered matches",frame_matches);
-                imwrite("4Matches_filtered.jpg",frame_matches);
-                waitKey(0);
-
-                // -- KEEP ONLY MATCHED FEATURES --
-                vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features,keep_unique); // Index 0 means features that a contained in match 0
-                current_top_features = remaining_features.at(0);
-                current_bottom_features = remaining_features.at(1);
-
-                // -- CONVERT FEATURES TO FEATURE DATA --
-                current_top_data = analyzer.convert_to_data(current_top_features);
-                current_bottom_data = analyzer.convert_to_data(current_bottom_features);
-
-                // -- ADD COLOR IDENTITIES FOR VISUALIZATION --
-                vector<Scalar> colours = visualizer.generate_random_colours(current_top_features.size());
-                current_top_data = analyzer.insert_data(current_top_data, colours);
-                current_bottom_data = analyzer.insert_data(current_bottom_data, colours);
-
-                // -- VISUALIZE REMAINING FEATURES --
-                frame_keypoints_top = visualizer.mark_keypoints(current_top_data,frame_top);
-                frame_keypoints_bottom = visualizer.mark_keypoints(current_bottom_data,frame_bottom);
-                hconcat(frame_keypoints_bottom,frame_keypoints_top,combined);
-                imshow("Filtered features",combined);
-                imwrite("5Filtered_feature_frame.jpg",combined);
-                waitKey(0);
-
-                // -- PERFORM SLIC --
-                super_pixel_frame top_slic_results = analyzer.perform_slic(frame_top,slic_method,region_size,ruler,slic_iterations);
-                super_pixel_frame bottom_slic_results = analyzer.perform_slic(frame_bottom,slic_method,region_size,ruler,slic_iterations);
-
-                // -- VISUALIZE SUPERPIXELS --
-                Mat super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,top_slic_results);
-                Mat super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,bottom_slic_results);
-                hconcat(super_pixel_border_bottom,super_pixel_border_top,combined);
-                imshow("Superpixel borders", combined);
-                imwrite("6Superpixel_border.jpg",combined);
-                waitKey(0);
-
-                Mat super_pixel_median_top = visualizer.mark_super_pixels(frame_top,top_slic_results);
-                Mat super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,bottom_slic_results);
-                hconcat(super_pixel_median_bottom,super_pixel_median_top,combined);
-                imshow("Superpixel means", combined);
-                imwrite("7Superpixel_means.jpg",combined);
-                waitKey(0);
-
-
-                // -- PERFORM SUPERPIXEL SEGMENTATION --
-                // K-means
-                //super_pixel_frame segmented_slic_top = superpixel_segmentation(top_slic_results,frame_top);
-                // Euclidean neighbors
-                super_pixel_frame segmented_slic_top = superpixel_segmentation_euclidean(top_slic_results,frame_top,100.0);
-                //segmented_slic_top = superpixel_segmentation_euclidean(segmented_slic_top,frame_top,100.0);
-                // K-means
-                //super_pixel_frame segmented_slic_bottom = superpixel_segmentation(bottom_slic_results,frame_bottom);
-                // Euclidean neighbors
-                super_pixel_frame segmented_slic_bottom = superpixel_segmentation_euclidean(bottom_slic_results,frame_bottom,100.0);
-                //segmented_slic_bottom = superpixel_segmentation_euclidean(segmented_slic_bottom,frame_bottom,100.0);
-
-                // -- VISUALIZE SEGMENTED SUPERPIXELS --
-                super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,segmented_slic_top);
-                super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,segmented_slic_bottom);
-                hconcat(super_pixel_border_bottom,super_pixel_border_top,combined);
-                imshow("Segmented superpixel borders", combined);
-                imwrite("8Combined_superpixel_borders.jpg",combined);
-                waitKey(0);
-                super_pixel_median_top = visualizer.mark_super_pixels(frame_top,segmented_slic_top);
-                super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,segmented_slic_bottom);
-                hconcat(super_pixel_median_bottom,super_pixel_median_top,combined);
-                imshow("Segmented superpixel means", combined);
-                imwrite("9Combined_superpixel_means.jpg",combined);
-                waitKey(0);
-
-                // -- VISUALIZE DISPARITY SETTINGS --
-                trackbars tracker;
-                tracker.display_disparity(frame_bottom,frame_top);
-
-                // -- CALCULATE DISPARITY MAP --
-                Mat frame_bottom_gray = finder.apply_grayscale(frame_bottom);
-                Mat frame_top_gray = finder.apply_grayscale(frame_top);
-                Mat disparity_map = calculate_disparity(frame_bottom_gray,frame_top_gray);
-                imshow("Disparity map", disparity_map);
-                waitKey(0);
-
-                // -- UPDATE FRAMES AT TIME OF MATCHING --
-                match_frame_top = frame_top;
-                match_frame_bottom = frame_bottom;
-
-                // With this we have our initial surviving keypoints.
-                find_features = false;
-            }
-            // -- WHAT SHOULD BE DONE IF NO NEW FEATURES SHOULD BE FOUND --
-            else{
-                // -- IF ENOUGH DATA PERFORM OPTICAL FLOW FILTERING --
-                if(top_frames.size() == filter_frames){
-                    // -- PERFORM FILTERING --
-                    matches = optical_flow_filter(top_frames, bottom_frames, matches, current_top_data, current_bottom_data);
-                    // -- CLEAN VECTORS --
-                    top_frames = {};
-                    bottom_frames = {};
-
-                    // -- VISUALIZE REAMAINING MATCHES --
-                    vector<DMatch> final_matches = analyzer.get_surviving_matches(matches);
-                    Mat frame_matches;
-                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, final_matches, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-                    imshow("Flow filtered matches",frame_matches);
-                    imwrite("11Flow_filtered_frame.jpg",frame_matches);
+                if(frame_count == 1){ // 870
+                    Mat combined;
+                    hconcat(test_bottom,test_top,combined);
+                    resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+                    imshow("Preprocessed undistorted images",combined);
+                    imwrite("1Preprocessed_undistort_frame.jpg",combined);
                     waitKey(0);
 
-                    // -- CLEAN CURRENT DATA BASED ON FILTER ---
-                    vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features,keep_unique); // Index 0 means features that a contained in match 0
-                    current_top_features = remaining_features.at(0);
-                    current_bottom_features = remaining_features.at(1);
+                    hconcat(frame_bottom,frame_top,combined);
+                    resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+                    imshow("flipped images",combined);
+                    waitKey(0);
 
-                    current_top_data = analyzer.convert_to_data(current_top_features);
-                    current_bottom_data = analyzer.convert_to_data(current_bottom_features);
+//                    Mat clip_top = cam_top.undistort_frame(frame_top,TOP_CAM);
+//                    Mat flsic_bottom = cam_bottom.undistort_frame(frame_bottom,BOTTOM_CAM);
 
-                    vector<Scalar> colours = visualizer.generate_random_colours(current_top_features.size());
-                    current_top_data = analyzer.insert_data(current_top_data, colours);
-                    current_bottom_data = analyzer.insert_data(current_bottom_data, colours);
+                    Mat clip_top = cam_top.rectify(frame_bottom,frame_top,TOP_CAM);
+                    Mat flsic_bottom = cam_bottom.rectify(frame_bottom,frame_top, BOTTOM_CAM);
 
-                    // -- ESTIMATE 3D POINTS USING TRIANGULATION --
-                    vector<Point3f> point_estimates;
-                    for(int i = 0; i < current_top_data.size(); i++){
-                        Point3f point_3d = direct_linear_transform(top_projection_matrix,bottom_projection_matrix,current_top_data.at(i).point, current_bottom_data.at(i).point);
-                        point_estimates.push_back(point_3d);
-                    }
+                    hconcat(flsic_bottom,clip_top,combined);
+                    resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+                    imshow("flipped images",combined);
+                    waitKey(0);
 
-                    // -- COMPARE WITH OPENCV IMPLEMENTATION --
-                    vector<Point3f> point_estimates_comp;
-                    for(int i = 0; i < current_top_data.size(); i++){
-                        Point3f point_3d = triangulate_point(top_projection_matrix,bottom_projection_matrix,current_top_data.at(i).point, current_bottom_data.at(i).point);
-                        point_estimates_comp.push_back(point_3d);
-                    }
-                    for(int i = 0; i < point_estimates.size(); i++){
-                        cout << "DLT: " << point_estimates.at(i).x << ", " <<  point_estimates.at(i).y << ", " <<  point_estimates.at(i).z << endl;
-                        cout << "Opencv: " << point_estimates_comp.at(i).x << ", " <<  point_estimates_comp.at(i).y << ", " <<  point_estimates_comp.at(i).z << endl;
-                    }
-
-                    // -- VISUALIZE POINT CLOUD --
-                    visualizer.visualize_3d_points(point_estimates,current_top_data,frame_top);
+                    // -- VISUALIZE DISPARITY SETTINGS --
+                    trackbars tracker;
+                    transpose(flsic_bottom,flsic_bottom);
+                    transpose(clip_top,clip_top);
+                    tracker.display_disparity(flsic_bottom,clip_top);
                 }
+
+//                //  -- FIND FEATURES --
+//                top_features = finder.find_features(frame_top); // Find features using initialized detector
+//                bottom_features = finder.find_features(frame_bottom); // Find features using initialized detector
+
+//                // -- FIND DESCRIPTORS --
+//                Mat top_descriptors = finder.get_descriptors(frame_top,top_features); // Gets descriptors based on newly found top view features
+//                Mat bottom_descriptors = finder.get_descriptors(frame_bottom,bottom_features); // Gets descriptors based on newly found bottom view features
+
+//                // -- CONVERT FEATURES TO DATA --
+//                top_data = analyzer.convert_to_data(top_features);
+//                bottom_data = analyzer.convert_to_data(bottom_features);
+//                vector<Scalar> colours_top = visualizer.generate_random_colours(top_features.size());
+//                vector<Scalar> colours_bottom = visualizer.generate_random_colours(bottom_features.size());
+//                top_data = analyzer.insert_data(top_data, colours_top);
+//                bottom_data = analyzer.insert_data(bottom_data, colours_bottom);
+
+//                // -- VISUALIZE FEATURES --
+//                Mat frame_keypoints_top = visualizer.mark_keypoints(top_data,frame_top);
+//                Mat frame_keypoints_bottom = visualizer.mark_keypoints(bottom_data,frame_bottom);
+//                hconcat(frame_keypoints_bottom,frame_keypoints_top,combined);
+//                imshow("Features found",combined);
+//                imwrite("2Feature_frame.jpg",combined);
+//                waitKey(0);
+
+//                // -- MATCH FEATURES --
+//                // Match features between cameras
+//                matches = analyzer.get_matches(top_descriptors,bottom_descriptors,matching_type,number_of_matches,feature_type);
+
+//                // -- VISUALIZE MATCHES --
+//                Mat frame_matches;
+//                vector<DMatch> matches_vec = analyzer.get_surviving_matches(matches);
+//                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                imshow("All matches found",frame_matches);
+//                imwrite("3Matches_frame.jpg",frame_matches);
+//                waitKey(0);
+
+//                // -- MATCH FILTERING --
+//                // Filter matches with RANSAC (Alternative is my homemade filter based on known camera displacement, but that is currently not tweaked and is most likely worse.)
+//                matches = analyzer.filter_matches(matches,top_features, bottom_features, filter_type);
+
+//                // -- VISUALIZE FILTERED MATCHES --
+//                matches_vec = analyzer.get_surviving_matches(matches);
+//                drawMatches(frame_top, top_features, frame_bottom, bottom_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                imshow("Filtered matches",frame_matches);
+//                imwrite("4Matches_filtered.jpg",frame_matches);
+//                waitKey(0);
+
+//                // -- KEEP ONLY MATCHED FEATURES --
+//                vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features,keep_unique); // Index 0 means features that a contained in match 0
+//                current_top_features = remaining_features.at(0);
+//                current_bottom_features = remaining_features.at(1);
+
+//                // -- CONVERT FEATURES TO FEATURE DATA --
+//                current_top_data = analyzer.convert_to_data(current_top_features);
+//                current_bottom_data = analyzer.convert_to_data(current_bottom_features);
+
+//                // -- ADD COLOR IDENTITIES FOR VISUALIZATION --
+//                vector<Scalar> colours = visualizer.generate_random_colours(current_top_features.size());
+//                current_top_data = analyzer.insert_data(current_top_data, colours);
+//                current_bottom_data = analyzer.insert_data(current_bottom_data, colours);
+
+//                // -- VISUALIZE REMAINING FEATURES --
+//                frame_keypoints_top = visualizer.mark_keypoints(current_top_data,frame_top);
+//                frame_keypoints_bottom = visualizer.mark_keypoints(current_bottom_data,frame_bottom);
+//                hconcat(frame_keypoints_bottom,frame_keypoints_top,combined);
+//                imshow("Filtered features",combined);
+//                imwrite("5Filtered_feature_frame.jpg",combined);
+//                waitKey(0);
+
+//                // -- PERFORM SLIC --
+//                super_pixel_frame top_slic_results = analyzer.perform_slic(frame_top,slic_method,region_size,ruler,slic_iterations);
+//                super_pixel_frame bottom_slic_results = analyzer.perform_slic(frame_bottom,slic_method,region_size,ruler,slic_iterations);
+
+//                // -- VISUALIZE SUPERPIXELS --
+//                Mat super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,top_slic_results);
+//                Mat super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,bottom_slic_results);
+//                hconcat(super_pixel_border_bottom,super_pixel_border_top,combined);
+//                imshow("Superpixel borders", combined);
+//                imwrite("6Superpixel_border.jpg",combined);
+//                waitKey(0);
+
+//                Mat super_pixel_median_top = visualizer.mark_super_pixels(frame_top,top_slic_results);
+//                Mat super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,bottom_slic_results);
+//                hconcat(super_pixel_median_bottom,super_pixel_median_top,combined);
+//                imshow("Superpixel means", combined);
+//                imwrite("7Superpixel_means.jpg",combined);
+//                waitKey(0);
+
+
+////                // -- PERFORM SUPERPIXEL SEGMENTATION --
+////                // K-means
+////                //super_pixel_frame segmented_slic_top = superpixel_segmentation(top_slic_results,frame_top);
+////                // Euclidean neighbors
+////                super_pixel_frame segmented_slic_top = superpixel_segmentation_euclidean(top_slic_results,frame_top,100.0);
+////                //segmented_slic_top = superpixel_segmentation_euclidean(segmented_slic_top,frame_top,100.0);
+////                // K-means
+////                //super_pixel_frame segmented_slic_bottom = superpixel_segmentation(bottom_slic_results,frame_bottom);
+////                // Euclidean neighbors
+////                super_pixel_frame segmented_slic_bottom = superpixel_segmentation_euclidean(bottom_slic_results,frame_bottom,100.0);
+////                //segmented_slic_bottom = superpixel_segmentation_euclidean(segmented_slic_bottom,frame_bottom,100.0);
+
+////                // -- VISUALIZE SEGMENTED SUPERPIXELS --
+////                super_pixel_border_top = visualizer.mark_super_pixel_borders(frame_top,segmented_slic_top);
+////                super_pixel_border_bottom = visualizer.mark_super_pixel_borders(frame_bottom,segmented_slic_bottom);
+////                hconcat(super_pixel_border_bottom,super_pixel_border_top,combined);
+////                imshow("Segmented superpixel borders", combined);
+////                imwrite("8Combined_superpixel_borders.jpg",combined);
+////                waitKey(0);
+////                super_pixel_median_top = visualizer.mark_super_pixels(frame_top,segmented_slic_top);
+////                super_pixel_median_bottom = visualizer.mark_super_pixels(frame_bottom,segmented_slic_bottom);
+////                hconcat(super_pixel_median_bottom,super_pixel_median_top,combined);
+////                imshow("Segmented superpixel means", combined);
+////                imwrite("9Combined_superpixel_means.jpg",combined);
+////                waitKey(0);
+
+//                // -- VISUALIZE DISPARITY SETTINGS --
+//                trackbars tracker;
+//                tracker.display_disparity(frame_bottom,frame_top);
+
+//                // -- CALCULATE DISPARITY MAP --
+//                Mat frame_bottom_gray = finder.apply_grayscale(frame_bottom);
+//                Mat frame_top_gray = finder.apply_grayscale(frame_top);
+//                Mat disparity_map = calculate_disparity(frame_bottom_gray,frame_top_gray);
+//                imshow("Disparity map", disparity_map);
+//                waitKey(0);
+
+//                // -- UPDATE FRAMES AT TIME OF MATCHING --
+//                match_frame_top = frame_top;
+//                match_frame_bottom = frame_bottom;
+
+//                // With this we have our initial surviving keypoints.
+//                find_features = false;
+//            }
+//            // -- WHAT SHOULD BE DONE IF NO NEW FEATURES SHOULD BE FOUND --
+//            else{
+//                // -- IF ENOUGH DATA PERFORM OPTICAL FLOW FILTERING --
+//                if(top_frames.size() == filter_frames){
+//                    // -- PERFORM FILTERING --
+//                    matches = optical_flow_filter(top_frames, bottom_frames, matches, current_top_data, current_bottom_data);
+//                    // -- CLEAN VECTORS --
+//                    top_frames = {};
+//                    bottom_frames = {};
+
+//                    // -- VISUALIZE REAMAINING MATCHES --
+//                    vector<DMatch> final_matches = analyzer.get_surviving_matches(matches);
+//                    Mat frame_matches;
+//                    drawMatches(frame_top, top_features, frame_bottom, bottom_features, final_matches, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//                    imshow("Flow filtered matches",frame_matches);
+//                    imwrite("11Flow_filtered_frame.jpg",frame_matches);
+//                    waitKey(0);
+
+//                    // -- CLEAN CURRENT DATA BASED ON FILTER ---
+//                    vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,top_features,bottom_features,keep_unique); // Index 0 means features that a contained in match 0
+//                    current_top_features = remaining_features.at(0);
+//                    current_bottom_features = remaining_features.at(1);
+
+//                    current_top_data = analyzer.convert_to_data(current_top_features);
+//                    current_bottom_data = analyzer.convert_to_data(current_bottom_features);
+
+//                    vector<Scalar> colours = visualizer.generate_random_colours(current_top_features.size());
+//                    current_top_data = analyzer.insert_data(current_top_data, colours);
+//                    current_bottom_data = analyzer.insert_data(current_bottom_data, colours);
+
+//                    // -- ESTIMATE 3D POINTS USING TRIANGULATION --
+//                    vector<Point3f> point_estimates;
+//                    for(int i = 0; i < current_top_data.size(); i++){
+//                        Point3f point_3d = direct_linear_transform(top_projection_matrix,bottom_projection_matrix,current_top_data.at(i).point, current_bottom_data.at(i).point);
+//                        point_estimates.push_back(point_3d);
+//                    }
+
+//                    // -- COMPARE WITH OPENCV IMPLEMENTATION --
+//                    vector<Point3f> point_estimates_comp;
+//                    for(int i = 0; i < current_top_data.size(); i++){
+//                        Point3f point_3d = triangulate_point(top_projection_matrix,bottom_projection_matrix,current_top_data.at(i).point, current_bottom_data.at(i).point);
+//                        point_estimates_comp.push_back(point_3d);
+//                    }
+//                    for(int i = 0; i < point_estimates.size(); i++){
+//                        cout << "DLT: " << point_estimates.at(i).x << ", " <<  point_estimates.at(i).y << ", " <<  point_estimates.at(i).z << endl;
+//                        cout << "Opencv: " << point_estimates_comp.at(i).x << ", " <<  point_estimates_comp.at(i).y << ", " <<  point_estimates_comp.at(i).z << endl;
+//                    }
+
+//                    // -- VISUALIZE POINT CLOUD --
+//                    visualizer.visualize_3d_points(point_estimates,current_top_data,frame_top);
+//                }
             }
         }
     }

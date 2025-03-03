@@ -25,6 +25,11 @@ static const int ON_FRAME = 0;
 static const int ON_FIRST_VEL = 1;
 static const int ON_VEL_LIMIT = 2;
 
+// -- Define size settings --
+static const int ORIGINAL = 0;
+static const int RESIZED = 1;
+static const int PREPROCESSED = 2;
+
 // -- Class --
 class obstacle_detection
 {
@@ -33,7 +38,7 @@ public:
     obstacle_detection();
 
     // -- Multicam feature pipeline --
-    void multicam_pipeline(std::string video_path_top, std::string video_path_bottom,int feature_type, int matching_type, int filter_type, int resize_mode);
+    void multicam_pipeline(std::string video_path_top, std::string video_path_bottom,int feature_type, int matching_type, int filter_type, int resize_mode, int size_mode);
 
     // -- Performs optical flow on video --
     void perform_optical_flow(std::string video_path, int feature_type = 0, bool record = false, int cluster_setting = ON_FRAME, std::string recording_name = "Unnamed_optical_flow_recording", int frame_gap = 0);
@@ -126,6 +131,11 @@ private:
 
     // Disparity num
     int num_disparity = 160; // Default is 16. Must be divisible with 16. Higher is better but slower
+
+    // Hardcoded sizes
+    cv::Size original_size = cv::Size(1080,1920);
+    cv::Size resized_size = cv::Size(384,682);
+    cv::Size resized_preprocessed_size = cv::Size(378,676);
 
 };
 
