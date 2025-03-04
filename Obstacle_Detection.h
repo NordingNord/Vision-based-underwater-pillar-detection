@@ -37,6 +37,9 @@ public:
     // -- Constructor --
     obstacle_detection();
 
+    // -- Pipeline from image gathering to 3D estimation, without all the other fuzz --
+    void estimation_3d(std::string left_path, std::string right_path);
+
     // -- Multicam feature pipeline --
     void multicam_pipeline(std::string video_path_top, std::string video_path_bottom,int feature_type, int matching_type, int filter_type, int resize_mode, int size_mode);
 

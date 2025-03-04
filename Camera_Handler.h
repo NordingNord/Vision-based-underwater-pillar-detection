@@ -21,6 +21,9 @@ static const int MODE_MANUAL = 0;
 static const int MODE_OPENCV = 1;
 static const int MODE_NO_RESIZE = 2;
 
+static const int MODE_FUNDAMENTAL = 0;
+static const int MODE_NO_FUNDAMENTAL = 1;
+
 // -- Class --
 class camera_handler{
 public:
@@ -91,6 +94,21 @@ public:
     // -- Method that sets new size --
     void set_frame_size(cv::Size size);
 
+    // -- Method that prepares rectification data --
+    void prepare_rectify();
+
+    // -- Method that rectifies frames --
+    std::vector<cv::Mat> rectify_frames(cv::Mat left_frame, cv::Mat right_frame);
+
+    // Calcualtes essential matrix from rotation and translation
+    cv::Mat calculate_essential();
+
+    // Calculates fundamental matrix using essential matrix as well as intrinsic parameters
+    cv::Mat calculate_fundamental();
+
+    // -- Prepares rectify under using fundamental matrix and matches --
+    void prepare_rectify_fundamental();
+
 private:
     // Frame data
     cv::Mat current_frame;
@@ -124,6 +142,12 @@ private:
     cv::Mat distortion_top = (cv::Mat_<double>(5,1) << -3.0683891770449273e-01,1.5888523843296737e-01,-3.2325175788525481e-04,-8.2882788956294796e-05,-5.8964154410778548e-02);
     cv::Mat distortion_bottom = (cv::Mat_<double>(5,1) << -3.1256797114883389e-01, 1.7817603486185030e-01, -3.4249792102626191e-04, -5.5946418105614888e-04, -7.7932689272905184e-02);
 
+    // Rectification maps
+    cv::Mat rectification_x_left, rectification_y_left, rectification_x_right, rectification_y_right;
+
+    // Essential and fundamental matrix storage
+    Mat essential_matrix;
+    Mat fundamental_matrix;
 };
 
 #endif // CAMERA_HANDLER_H

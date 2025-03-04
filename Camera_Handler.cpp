@@ -583,3 +583,118 @@ void camera_handler::resize_intrensic_mode(int mode){
 void camera_handler::set_frame_size(Size size){
     new_size = size;
 }
+
+// -- Method that prepares rectification data --
+void camera_handler::prepare_rectify(){
+    try{
+        // -- Step 0: Prepare data
+        Mat camera_matrix_left = bottom_cam_intrinsic.matrix;
+        Mat distortion_left = distortion_bottom;
+
+        Mat camera_matrix_right = top_cam_intrinsic.matrix;
+        Mat distortion_right = distortion_top;
+
+        Mat rotation = rotation_top;
+        Mat translation = translation_top;
+
+        // -- Step 1: Get rectification and projection matrixes
+        Mat rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map;
+        Rect validRoi[2]; // Region in each image where the algorithm beleives only correct matches are atained.
+        double alpha = 0;
+        stereoRectify(camera_matrix_left, distortion_left, camera_matrix_right, distortion_right, original_size, rotation, translation, rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,new_size, &validRoi[0], &validRoi[1]);
+
+        // -- Step 2: Initialize undistortion
+        Mat map_x_left, map_y_left, map_x_right, map_y_right;
+        initUndistortRectifyMap(camera_matrix_left,distortion_left,rectification_transform_left,rectification_projection_left,original_size,CV_16SC2,map_x_left, map_y_left); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+        initUndistortRectifyMap(camera_matrix_right,distortion_right,rectification_transform_right,rectification_projection_right,original_size,CV_16SC2,map_x_right, map_y_right); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+
+        // -- Step 3: Save in private variables
+        rectification_x_left = map_x_left;
+        rectification_y_left = map_y_left;
+        rectification_x_right = map_x_right;
+        rectification_y_right = map_y_right;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+// -- Method that rectifies frames --
+vector<Mat> camera_handler::rectify_frames(Mat left_frame, Mat right_frame){
+    vector<Mat> output;
+    try{
+        // Remap left
+        Mat rectified_left;
+        remap(left_frame,rectified_left,rectification_x_left,rectification_y_left,INTER_LINEAR);
+        output.push_back(rectified_left);
+        // Remap right
+        Mat rectified_right;
+        remap(right_frame,rectified_right,rectification_x_right,rectification_y_right,INTER_LINEAR);
+        output.push_back(rectified_right);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return output;
+}
+
+// Calcualtes essential matrix from rotation and translation
+Mat camera_handler::calculate_essential(){
+    Mat essential;
+    try{
+        // Setup skew matrix
+        double translation_x = translation_top.at<double>(0);
+        double translation_y = translation_top.at<double>(1);
+        double translation_z = translation_top.at<double>(2);
+
+        Mat skew = (cv::Mat_<double>(3,3) << 0.0, -translation_x, translation_y, translation_z,0.0,-translation_x,-translation_y,translation_x,0.0);
+
+        // Calculate essential matrix
+        essential = rotation_top*skew;
+
+        // Update privare variable
+        essential_matrix = essential;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return essential;
+}
+
+// Calculates fundamental matrix using essential matrix as well as intrinsic parameters
+Mat camera_handler::calculate_fundamental(){
+    Mat fundamental;
+    try{
+        // Retrieve essential matrix
+        Mat essential;
+        if(essential_matrix.empty()){
+            essential = calculate_essential;
+        }
+        else{
+            essential = essential_matrix;
+        }
+        // Prepare intrinsic parameters
+        Mat intrinsic_right;
+        transpose(top_cam_intrinsic.matrix,intrinsic_right);
+        intrinsic_right = intrinsic_right.inv();
+        Mat intrinsic_left = bottom_cam_intrinsic.matrix.inv();
+        // Calculate fundamental
+        fundamental = intrinsic_right*essential*intrinsic_left;
+        // Update private variable
+        fundamental_matrix = fundamental;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return fundamental;
+}
+
+// -- Prepares rectify under using fundamental matrix and matches --
+void camera_handler::prepare_rectify_fundamental(Mat left_frame, Mat right_frame){
+    try{
+
+    }
+    catch(const extention& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}

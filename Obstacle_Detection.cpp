@@ -10,6 +10,96 @@ obstacle_detection::obstacle_detection(){
 
 }
 
+// -- Pipeline from image gathering to 3D estimation, without all the other fuzz --
+void obstacle_detection::estimation_3d(string left_path, string right_path){
+    try{
+        // Initialize camera classes
+        camera_handler left_cam(left_path);
+        camera_handler right_cam(right_path);
+        camera_handler cam_storage(left_path); // Used for storing camera parameters in one place
+
+        // Initialize frame counter
+        int frame_count  = 0;
+
+        // Initialize frames
+        Mat left_frame,right_frame, old_left_frame, old_right_frame;
+
+        // Prepare intrensic and extrensic parameters (currently only orginal size
+        cam_storage.set_frame_size(original_size);
+        cam_storage.create_intrinsic_matrix();
+
+        // Prepare rectification data
+        cam_storage.prepare_rectify();
+
+        // Visualize camera data
+        cout << "----- Right camera -----" << endl;
+        cam_storage.vizualize_cam_info(TOP_CAM);
+        cout << "----- Left camera -----" << endl;
+        cam_storage.vizualize_cam_info(BOTTOM_CAM);
+
+        // Calcualte fundamental and essential matrix
+        Mat essential_matrix = cam_storage.calculate_essential();
+        Mat fundamental_matrix = cam_storage.calculate_fundamental();
+
+
+        while(true){
+            // Update old frames
+            if(frame_count > 0){
+                old_left_frame = left_frame;
+                old_right_frame = right_frame;
+            }
+            // Read frames
+            left_frame = left_cam.get_frame();
+            right_frame = right_cam.get_frame();
+            // Increment counter
+            frame_count++;
+            // Break if no more frames any of the videos
+            if(left_frame.empty() || right_frame.empty()){
+                cout << "Reached end of a video stream" << endl;
+                // Error notification if one video ends prematurely
+                if(left_frame.empty() == false){
+                    throw runtime_error("Top video was limited by right video length.");
+                }
+                else if(right_frame.empty() == false){
+                    throw runtime_error("Bottom video was limited by left video length.");
+                }
+                break;
+            }
+            // Transpose frames, due to the cameras being callibrated in transpose
+            transpose(left_frame,left_frame);
+            transpose(right_frame,right_frame);
+
+            // Stereo rectify frames
+            vector<Mat> frames = cam_storage.rectify_frames(left_frame,right_frame);
+            left_frame = frames.at(0);
+            right_frame = frames.at(1);
+
+            // Visualize progress so far
+            cout << "Size left: " << left_frame.size() << endl;
+            cout << "Size right: " << right_frame.size() << endl;
+            Mat combined;
+            hconcat(left_frame,right_frame,combined);
+            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("Rectified frames",combined);
+            waitKey(0);
+
+            // Test
+            frames = cam_storage.rectify_frames(right_frame,left_frame);
+            Mat test_left = frames.at(0);
+            Mat test_right = frames.at(1);
+            combined;
+            hconcat(test_left,test_right,combined);
+            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("Rectified frames reverse order",combined);
+            waitKey(0);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+
+}
+
 // -- Multicam feature pipeline --
 void obstacle_detection::multicam_pipeline(string video_path_top, string video_path_bottom, int feature_type, int matching_type, int filter_type, int resize_mode, int size_mode){
     try{

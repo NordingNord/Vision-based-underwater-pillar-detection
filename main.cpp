@@ -118,7 +118,9 @@ int main(){
     //string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_4_full/Homomorphic_video.mkv";
     //string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Homomorphic_video.mkv";
 
-    detection.multicam_pipeline(top_video,bottom_video,METHOD_AKAZE,MATCH_BRUTE_CROSS,FILTER_RANSAC,MODE_MANUAL, ORIGINAL);
+    detection.estimation_3d(bottom_video,top_video);
+//    detection.multicam_pipeline(top_video,bottom_video,METHOD_AKAZE,MATCH_BRUTE_CROSS,FILTER_RANSAC,MODE_MANUAL, ORIGINAL);
+
 //    detection.get_detection_data("/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_5_full/Homomorphic_video.mkv", 0, 0, false);
 
 //    // Testing optical flow //
