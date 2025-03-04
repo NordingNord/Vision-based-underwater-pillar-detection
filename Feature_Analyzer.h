@@ -205,7 +205,7 @@ private:
     int min_matches = 10;
 
     // -- Ransac threshold --
-    double ransac_threshold = 3.5;
+    double ransac_threshold = 1.5;
 
     // Variables for homebrew directional filter
     int angle_limit = 45;

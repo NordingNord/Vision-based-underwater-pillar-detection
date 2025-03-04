@@ -647,7 +647,7 @@ Mat camera_handler::calculate_essential(){
         double translation_y = translation_top.at<double>(1);
         double translation_z = translation_top.at<double>(2);
 
-        Mat skew = (cv::Mat_<double>(3,3) << 0.0, -translation_x, translation_y, translation_z,0.0,-translation_x,-translation_y,translation_x,0.0);
+        Mat skew = (cv::Mat_<double>(3,3) << 0.0, -translation_z, translation_y, translation_z,0.0,-translation_x,-translation_y,translation_x,0.0);
 
         // Calculate essential matrix
         essential = rotation_top*skew;
@@ -734,7 +734,7 @@ void camera_handler::prepare_rectify_fundamental(Mat left_frame, Mat right_frame
 
         // Step 3: Match features
         // -- initialize with crosscheck and AKAZE
-        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING,true);
+        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING2,true);
         // -- prepare results
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
         // -- Match left descriptors to right descriptors
@@ -797,7 +797,7 @@ void camera_handler::prepare_rectify_fundamental(Mat left_frame, Mat right_frame
         // Step 5: Perform rectification
         Mat H1,H2;
         cout << "Time to rectify" << endl;
-        stereoRectifyUncalibrated(left_points,right_points,F,original_size,H1,H2,3); // 3 is a threshold
+        stereoRectifyUncalibrated(left_points,right_points,fundamental_matrix,original_size,H1,H2,3); // 3 is a threshold
         cout << "hello" << endl;
         Mat rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right;
         rectification_transform_left = camera_matrix_left.inv()*H1*camera_matrix_left;
