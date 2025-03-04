@@ -107,7 +107,7 @@ public:
     cv::Mat calculate_fundamental();
 
     // -- Prepares rectify under using fundamental matrix and matches --
-    void prepare_rectify_fundamental();
+    void prepare_rectify_fundamental(cv::Mat left_frame, cv::Mat right_frame);
 
 private:
     // Frame data
@@ -146,8 +146,8 @@ private:
     cv::Mat rectification_x_left, rectification_y_left, rectification_x_right, rectification_y_right;
 
     // Essential and fundamental matrix storage
-    Mat essential_matrix;
-    Mat fundamental_matrix;
+    cv::Mat essential_matrix;
+    cv::Mat fundamental_matrix;
 };
 
 #endif // CAMERA_HANDLER_H

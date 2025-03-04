@@ -1233,7 +1233,9 @@ match_result feature_analyzer::get_matches(Mat descriptors_top, Mat descriptors_
             method = "FLANN";
         }
         else if(type == MATCH_BRUTE_CROSS){
-            matches = get_brute_matches(descriptors_top,descriptors_bottom,1,true,feature_type); // Crosscheck only works if one match is found per feature
+            // Test opposite
+            matches = get_brute_matches(descriptors_top,descriptors_bottom,1,true,feature_type);
+            //matches = get_brute_matches(descriptors_top,descriptors_bottom,1,true,feature_type); // Crosscheck only works if one match is found per feature
             method = "Brute Force with crosscheck";
         }
         else if(type == MATCH_BRUTE){
@@ -1655,15 +1657,17 @@ vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(match_result matc
 }
 
 vector<vector<KeyPoint>> feature_analyzer::get_valid_keypoints(vector<DMatch> matches, vector<KeyPoint> features_top, vector<KeyPoint> features_bottom, bool unique_indexes){
-    vector<vector<KeyPoint>> surviving_features; // index 0 = top frame, index 1 = bottom frame
+    vector<vector<KeyPoint>> surviving_features; // index 0 = bottom frame, index 1 = top frame
     try{
         // Go through matches and find valid indexes
         vector<int> top_indexes;
         vector<int> bottom_indexes;
         for(int match = 0; match < matches.size(); match++){
             // Get indexes
-            top_indexes.push_back(matches[match].queryIdx);
+            top_indexes.push_back(matches[match].queryIdx); // querry is left and thus bottom
             bottom_indexes.push_back(matches[match].trainIdx);
+//            top_indexes.push_back(matches[match].trainIdx);
+//            bottom_indexes.push_back(matches[match].queryIdx);
         }
         if(unique_indexes == true){
             // Remove duplicates if present (two features on one frame matching to the same feature on the other frame)

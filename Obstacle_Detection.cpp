@@ -29,7 +29,7 @@ void obstacle_detection::estimation_3d(string left_path, string right_path){
         cam_storage.create_intrinsic_matrix();
 
         // Prepare rectification data
-        cam_storage.prepare_rectify();
+        //cam_storage.prepare_rectify();
 
         // Visualize camera data
         cout << "----- Right camera -----" << endl;
@@ -65,9 +65,28 @@ void obstacle_detection::estimation_3d(string left_path, string right_path){
                 }
                 break;
             }
+            // Show frames
+            Mat combined;
+            hconcat(left_frame,right_frame,combined);
+            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("Original frames",combined);
+            waitKey(0);
+
             // Transpose frames, due to the cameras being callibrated in transpose
             transpose(left_frame,left_frame);
             transpose(right_frame,right_frame);
+
+            // show transposed frames
+            combined;
+            hconcat(left_frame,right_frame,combined);
+            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("Transposed frames",combined);
+            waitKey(0);
+
+            // Initialise fundamental rectification if first frame
+            if(frame_count == 1){
+                cam_storage.prepare_rectify_fundamental(left_frame,right_frame);
+            }
 
             // Stereo rectify frames
             vector<Mat> frames = cam_storage.rectify_frames(left_frame,right_frame);
@@ -77,20 +96,10 @@ void obstacle_detection::estimation_3d(string left_path, string right_path){
             // Visualize progress so far
             cout << "Size left: " << left_frame.size() << endl;
             cout << "Size right: " << right_frame.size() << endl;
-            Mat combined;
+            combined;
             hconcat(left_frame,right_frame,combined);
             resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
             imshow("Rectified frames",combined);
-            waitKey(0);
-
-            // Test
-            frames = cam_storage.rectify_frames(right_frame,left_frame);
-            Mat test_left = frames.at(0);
-            Mat test_right = frames.at(1);
-            combined;
-            hconcat(test_left,test_right,combined);
-            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
-            imshow("Rectified frames reverse order",combined);
             waitKey(0);
         }
     }

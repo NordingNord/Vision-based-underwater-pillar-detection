@@ -668,7 +668,7 @@ Mat camera_handler::calculate_fundamental(){
         // Retrieve essential matrix
         Mat essential;
         if(essential_matrix.empty()){
-            essential = calculate_essential;
+            essential = calculate_essential();
         }
         else{
             essential = essential_matrix;
@@ -676,7 +676,9 @@ Mat camera_handler::calculate_fundamental(){
         // Prepare intrinsic parameters
         Mat intrinsic_right;
         transpose(top_cam_intrinsic.matrix,intrinsic_right);
+
         intrinsic_right = intrinsic_right.inv();
+
         Mat intrinsic_left = bottom_cam_intrinsic.matrix.inv();
         // Calculate fundamental
         fundamental = intrinsic_right*essential*intrinsic_left;
@@ -692,9 +694,129 @@ Mat camera_handler::calculate_fundamental(){
 // -- Prepares rectify under using fundamental matrix and matches --
 void camera_handler::prepare_rectify_fundamental(Mat left_frame, Mat right_frame){
     try{
+        // -- Step 0: Prepare data
+        Mat camera_matrix_left = bottom_cam_intrinsic.matrix;
+        Mat distortion_left = distortion_bottom;
 
+        Mat camera_matrix_right = top_cam_intrinsic.matrix;
+        Mat distortion_right = distortion_top;
+
+        Mat rotation = rotation_top;
+        Mat translation = translation_top;
+
+        // Step 1: Find features in each frame
+        feature_finder finder(METHOD_AKAZE);
+        vector<KeyPoint> left_features = finder.find_features(left_frame);
+        vector<KeyPoint> right_features = finder.find_features(right_frame);
+        cout << "Features found in left frame: " << left_features.size() << endl;
+        cout << "Features found in right frame: " << right_features.size() << endl;
+
+        // Show features:
+        feature_analyzer analyzer;
+        data_visualization visualizer;
+        vector<keypoint_data> left_data = analyzer.convert_to_data(left_features);
+        vector<keypoint_data> right_data = analyzer.convert_to_data(right_features);
+        vector<Scalar> colours_left = visualizer.generate_random_colours(left_features.size());
+        vector<Scalar> colours_right = visualizer.generate_random_colours(right_features.size());
+        left_data = analyzer.insert_data(left_data, colours_left);
+        right_data = analyzer.insert_data(right_data, colours_right);
+        Mat frame_keypoints_left = visualizer.mark_keypoints(left_data,left_frame);
+        Mat frame_keypoints_right = visualizer.mark_keypoints(right_data,right_frame);
+        Mat combined;
+        hconcat(frame_keypoints_left,frame_keypoints_right,combined);
+        resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+        imshow("Features found",combined);
+        waitKey(0);
+
+        // Step 2: Find descriptors
+        Mat left_descriptors = finder.get_descriptors(left_frame,left_features);
+        Mat right_descriptors = finder.get_descriptors(right_frame,right_features);
+
+        // Step 3: Match features
+        // -- initialize with crosscheck and AKAZE
+        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING,true);
+        // -- prepare results
+        vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
+        // -- Match left descriptors to right descriptors
+        brute_matcher->knnMatch(left_descriptors,right_descriptors,all_matches,1); // Left is query, right is train
+        // -- Prepare shortest distance
+        vector<DMatch> best_matches;
+        vector<bool> accepted_matches;
+        for(size_t i = 0; i < all_matches.size();i++){
+            // check if empty
+            if(all_matches[i].empty() == false){
+                best_matches.push_back(all_matches[i][0]);
+                accepted_matches.push_back(true);
+            }
+        }
+        // -- Make matches result
+        match_result matches;
+        matches.matches = best_matches;
+        matches.all_matches = all_matches;
+        matches.good_matches = accepted_matches;
+
+        // visualize matches
+        Mat frame_matches;
+        vector<DMatch> matches_vec = analyzer.get_surviving_matches(matches);
+        drawMatches(left_frame, left_features, right_frame, right_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+        resize(frame_matches,frame_matches,Size(),0.5,0.5,INTER_LINEAR);
+        imshow("Matches",frame_matches);
+        waitKey(0);
+
+        // ALL matches the same here
+
+        //match_result matches = analyzer.get_matches(left_descriptors,right_descriptors,MATCH_BRUTE_CROSS,1,METHOD_AKAZE);
+
+        // Step 4: Filter matches
+        matches = analyzer.filter_matches(matches,left_features, right_features, FILTER_RANSAC);
+
+        // Visualize matches
+        matches_vec = analyzer.get_surviving_matches(matches);
+        drawMatches(left_frame, left_features, right_frame, right_features, matches_vec, frame_matches, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+        resize(frame_matches,frame_matches,Size(),0.5,0.5,INTER_LINEAR);
+        imshow("Filtered matches",frame_matches);
+        waitKey(0);
+
+        // prepare points
+        vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,left_features,right_features,false); // Index 0 means features that a contained in match 0
+        left_features = remaining_features.at(0);
+        right_features = remaining_features.at(1);
+        vector<Point2f> left_points = analyzer.keypoints_to_points(left_features);
+        vector<Point2f> right_points = analyzer.keypoints_to_points(right_features);
+
+        // test find fundamental
+        cout << left_points.size() << endl;
+        Mat F = findFundamentalMat(left_points, right_points, FM_LMEDS, 0, 0);
+        cout << "fundamental found" << endl;
+        cout << F.type()<< endl;
+        cout << fundamental_matrix.type() << endl;
+
+        visualizer.visualize_mat_text(F,"Opencv fundamental matrix: ");
+        visualizer.visualize_mat_text(fundamental_matrix, "Fundamental matrix based on known parameters: ");
+
+        // Step 5: Perform rectification
+        Mat H1,H2;
+        cout << "Time to rectify" << endl;
+        stereoRectifyUncalibrated(left_points,right_points,F,original_size,H1,H2,3); // 3 is a threshold
+        cout << "hello" << endl;
+        Mat rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right;
+        rectification_transform_left = camera_matrix_left.inv()*H1*camera_matrix_left;
+        rectification_transform_right = camera_matrix_right.inv()*H2*camera_matrix_right;
+        rectification_projection_left = camera_matrix_left;
+        rectification_projection_right = camera_matrix_right;
+
+        // -- Step 6: Initialize undistortion
+        Mat map_x_left, map_y_left, map_x_right, map_y_right;
+        initUndistortRectifyMap(camera_matrix_left,distortion_left,rectification_transform_left,rectification_projection_left,original_size,CV_16SC2,map_x_left, map_y_left); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+        initUndistortRectifyMap(camera_matrix_right,distortion_right,rectification_transform_right,rectification_projection_right,original_size,CV_16SC2,map_x_right, map_y_right); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+
+        // -- Step 3: Save in private variables
+        rectification_x_left = map_x_left;
+        rectification_y_left = map_y_left;
+        rectification_x_right = map_x_right;
+        rectification_y_right = map_y_right;
     }
-    catch(const extention& error){
+    catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
 }
