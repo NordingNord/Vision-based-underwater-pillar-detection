@@ -600,7 +600,7 @@ void camera_handler::prepare_rectify(){
         // -- Step 1: Get rectification and projection matrixes
         Mat rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map;
         Rect validRoi[2]; // Region in each image where the algorithm beleives only correct matches are atained.
-        double alpha = 0;
+        double alpha = 1;
         stereoRectify(camera_matrix_left, distortion_left, camera_matrix_right, distortion_right, original_size, rotation, translation, rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,new_size, &validRoi[0], &validRoi[1]);
 
         // -- Step 2: Initialize undistortion
@@ -613,6 +613,7 @@ void camera_handler::prepare_rectify(){
         rectification_y_left = map_y_left;
         rectification_x_right = map_x_right;
         rectification_y_right = map_y_right;
+
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -683,7 +684,9 @@ Mat camera_handler::calculate_fundamental(){
         // Calculate fundamental
         fundamental = intrinsic_right*essential*intrinsic_left;
         // Update private variable
-        fundamental_matrix = fundamental;
+        //fundamental_matrix = fundamental;
+        // TEST HARCODED MATLAB ONE
+        fundamental_matrix = (cv::Mat_<double>(3,3) << 8.708064994072800e-13,1.026801148930788e-10,2.507825371799823e-07,1.702684658873040e-11,1.329576482282425e-11,4.135475135934675e-05,-3.098719854100531e-07,-4.140622163200745e-05,-2.678845653528161e-04);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -734,7 +737,7 @@ void camera_handler::prepare_rectify_fundamental(Mat left_frame, Mat right_frame
 
         // Step 3: Match features
         // -- initialize with crosscheck and AKAZE
-        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING2,true);
+        Ptr<DescriptorMatcher> brute_matcher = BFMatcher::create(NORM_HAMMING,true);
         // -- prepare results
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
         // -- Match left descriptors to right descriptors
@@ -797,7 +800,7 @@ void camera_handler::prepare_rectify_fundamental(Mat left_frame, Mat right_frame
         // Step 5: Perform rectification
         Mat H1,H2;
         cout << "Time to rectify" << endl;
-        stereoRectifyUncalibrated(left_points,right_points,fundamental_matrix,original_size,H1,H2,3); // 3 is a threshold
+        stereoRectifyUncalibrated(left_points,right_points,F,original_size,H1,H2,5); // 3 is a threshold
         cout << "hello" << endl;
         Mat rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right;
         rectification_transform_left = camera_matrix_left.inv()*H1*camera_matrix_left;

@@ -72,12 +72,12 @@ int main(){
     // Test simplified optical flow
     obstacle_detection detection;
 
-//    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Tank_With_Pipe_2.mkv";
-//    string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Tank_With_Pipe.mkv";
+    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Varied_Top.mkv";
+    string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Varied_Bottom.mkv";
 
     // -- No Preprocessing --
-    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Top.mkv";
-    string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Bottom.mkv";
+//    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Top.mkv";
+//    string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Bottom.mkv";
 
     // -- Only resizing --
 //    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_5_full/Resized_video.mkv";

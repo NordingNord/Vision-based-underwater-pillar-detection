@@ -129,6 +129,7 @@ private:
 
     // Currently hard coded camera parameters.
     intrinsic bottom_cam_intrinsic = {1.4573042096686729e+03,1.4571772302602453e+03,5.6118918886024528e+02,9.4238009607042807e+02};
+
     intrinsic top_cam_intrinsic = {1.4559082053767202e+03,1.4557162795186625e+03,5.6422591354649398e+02,9.4971024389872707e+02};
 
     // Currently hard coded translation and rotation from left to right (bottom to top)
@@ -139,11 +140,13 @@ private:
     cv::Mat rotation_top = (cv::Mat_<double>(3,3) << 9.9999025308859502e-01, 1.3210364715320931e-03, -4.2129076003026055e-03, -1.3230173719132052e-03, 9.9999901555929249e-01, -4.6744569710903378e-04, 4.2122859401305226e-03, 4.7301489089870296e-04, 9.9999101641168364e-01);
 
     // Distortion parameters
-    cv::Mat distortion_top = (cv::Mat_<double>(5,1) << -3.0683891770449273e-01,1.5888523843296737e-01,-3.2325175788525481e-04,-8.2882788956294796e-05,-5.8964154410778548e-02);
     cv::Mat distortion_bottom = (cv::Mat_<double>(5,1) << -3.1256797114883389e-01, 1.7817603486185030e-01, -3.4249792102626191e-04, -5.5946418105614888e-04, -7.7932689272905184e-02);
+
+    cv::Mat distortion_top = (cv::Mat_<double>(5,1) << -3.0683891770449273e-01,1.5888523843296737e-01,-3.2325175788525481e-04,-8.2882788956294796e-05,-5.8964154410778548e-02);
 
     // Rectification maps
     cv::Mat rectification_x_left, rectification_y_left, rectification_x_right, rectification_y_right;
+
 
     // Essential and fundamental matrix storage
     cv::Mat essential_matrix;

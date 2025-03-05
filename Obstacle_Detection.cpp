@@ -29,7 +29,7 @@ void obstacle_detection::estimation_3d(string left_path, string right_path){
         cam_storage.create_intrinsic_matrix();
 
         // Prepare rectification data
-        //cam_storage.prepare_rectify();
+        cam_storage.prepare_rectify();
 
         // Visualize camera data
         cout << "----- Right camera -----" << endl;
@@ -75,36 +75,40 @@ void obstacle_detection::estimation_3d(string left_path, string right_path){
             // Transpose frames, due to the cameras being callibrated in transpose
             transpose(left_frame,left_frame);
             transpose(right_frame,right_frame);
+//            rotate(left_frame, left_frame, ROTATE_90_CLOCKWISE);
+//            rotate(right_frame, right_frame, ROTATE_90_CLOCKWISE);
 
             // show transposed frames
-//            combined;
-//            hconcat(left_frame,right_frame,combined);
-//            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+            Mat combined;
+            hconcat(left_frame,right_frame,combined);
+            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+            imwrite("Original.png",combined);
 //            imshow("Transposed frames",combined);
 //            waitKey(0);
 
             // Initialise fundamental rectification if first frame
-            if(frame_count == 1){
-                cam_storage.prepare_rectify_fundamental(left_frame,right_frame);
-            }
+//            if(frame_count == 1){
+//                cam_storage.prepare_rectify_fundamental(left_frame,right_frame);
+//            }
 
             // Stereo rectify frames
             vector<Mat> frames = cam_storage.rectify_frames(left_frame,right_frame);
-            left_frame = frames.at(0);
-            right_frame = frames.at(1);
 
             // Visualize progress so far
             cout << frame_count << endl;
-            if(frame_count == 870){
+            if(frame_count == 1800){
+                left_frame = frames.at(0);
+                right_frame = frames.at(1);
                 cout << "Size left: " << left_frame.size() << endl;
                 cout << "Size right: " << right_frame.size() << endl;
-                Mat combined;
+                combined;
                 hconcat(left_frame,right_frame,combined);
                 for(int j = 0; j < combined.rows; j+=16){
                     line(combined,Point(0,j),Point(combined.cols,j),Scalar(0,255,0),1,8);
                 }
                 resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
                 imshow("Rectified frames",combined);
+                imwrite("Rectified.png", combined);
                 waitKey(0);
                 cout << "done" << endl;
             }
