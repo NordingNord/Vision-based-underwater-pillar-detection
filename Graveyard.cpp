@@ -1030,3 +1030,51 @@
 // Scale down disparity
 //disparity = disparity/16.0f;
 //disparity = (disparity/16.0f-(float)minDisparity)/((float)numDisparities);
+
+//// Calcualte fundamental and essential matrix
+//Mat essential_matrix = cam_storage.calculate_essential();
+//Mat fundamental_matrix = cam_storage.calculate_fundamental();
+
+//            rotate(left_frame, left_frame, ROTATE_90_CLOCKWISE);
+//            rotate(right_frame, right_frame, ROTATE_90_CLOCKWISE);
+
+// Initialise fundamental rectification if first frame
+//            if(frame_count == 1){
+//                cam_storage.prepare_rectify_fundamental(left_frame,right_frame);
+//            }
+
+
+//if(frame_count == 100){
+//    imwrite("left.png",left_frame);
+//    imwrite("right.png",right_frame);
+//    left_frame = frames.at(0);
+//    right_frame = frames.at(1);
+//    cout << "Size left: " << left_frame.size() << endl;
+//    cout << "Size right: " << right_frame.size() << endl;
+//    combined;
+//    hconcat(left_frame,right_frame,combined);
+//    for(int j = 0; j < combined.rows; j+=16){
+//        if(j/16 == 37){
+//            line(combined,Point(0,j),Point(combined.cols,j),Scalar(0,255,0),2,8);
+//        }
+//    }
+//    resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+//    imshow("Rectified frames",combined);
+//    imwrite("Rectified.png", combined);
+//    waitKey(0);
+//    cout << "done" << endl;
+//}
+
+//// Show frames
+//Mat combined;
+//hconcat(left_frame,right_frame,combined);
+//resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+//imshow("Original frames",combined);
+//waitKey(0);
+
+//// show transposed frames
+//combined;
+//hconcat(left_frame,right_frame,combined);
+//resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+//imshow("Transposed frames",combined);
+//waitKey(0);

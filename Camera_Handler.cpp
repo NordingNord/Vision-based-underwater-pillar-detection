@@ -600,7 +600,7 @@ void camera_handler::prepare_rectify(){
         // -- Step 1: Get rectification and projection matrixes
         Mat rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map;
         Rect validRoi[2]; // Region in each image where the algorithm beleives only correct matches are atained.
-        double alpha = 1;
+        double alpha = 0;
         stereoRectify(camera_matrix_left, distortion_left, camera_matrix_right, distortion_right, original_size, rotation, translation, rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,new_size, &validRoi[0], &validRoi[1]);
 
         // -- Step 2: Initialize undistortion

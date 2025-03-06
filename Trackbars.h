@@ -10,6 +10,9 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include "opencv2/imgcodecs.hpp"
+#include "opencv2/core/utility.hpp"
+#include "opencv2/ximgproc.hpp"
 #include <stdio.h>
 #include "opencv2/imgcodecs.hpp"
 #include "Data_Structures.h"
@@ -32,7 +35,7 @@ public:
 //    void on_trackbar_min_disp(int, void*);
 
     // -- Method that visualizes changes in disparity settings --
-    void display_disparity(cv::Mat frame_bototm, cv::Mat frame_top);
+    std::vector<cv::Mat> display_disparity(cv::Mat frame_bototm, cv::Mat frame_top);
 
 private:
 //    cv::Ptr<cv::StereoBM> stereo = cv::StereoBM::create();

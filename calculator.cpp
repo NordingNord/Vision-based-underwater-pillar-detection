@@ -1,0 +1,95 @@
+// -- Includes --
+#include "calculator.h"
+
+// -- Namespace --
+using namespace std;
+using namespace cv;
+
+// -- Constructor --
+calculator::calculator(){}
+
+// -- Methods for calculating distance --
+float calculator::calculate_euclidean_distance(vector<float> first_data, vector<float> second_data, vector<float> weights){
+    float distance = -1.0;
+    try{
+        // Check conditions
+        if(first_data.size() != second_data.size()){
+            throw runtime_error("Unable to calculate euclidean distance due to difference in data sizes.");
+        }
+        // Prepare weights
+        for(int index = weights.size(); index < first_data.size(); index++){
+            weights.push_back(1.0);
+        }
+        // Prepare power sum
+        float power_sum = 0.0;
+        // Go through all data points
+        for(int index = 0; index < first_data.size(); index++){
+            // Calculate difference
+            float diff = second_data.at(index)-first_data.at(index);
+            // Calculate power
+            float power = pow(diff,2)*weights.at(index);
+            // Add to power sum
+            power_sum += power;
+        }
+        // Calculate euclidean distance
+        distance = sqrt(power_sum);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return distance;
+}
+
+float calculator::calculate_euclidean_distance(float first_x, float first_y, float second_x, float second_y, vector<float> weights){
+    float distance = -1.0;
+    try{
+        // Calculate distance
+        distance = calculate_euclidean_distance({first_x,first_y},{second_x,second_y},weights);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return distance;
+}
+
+float calculator::calculate_euclidean_distance(cv::Point2f first_point, cv::Point2f second_point, vector<float> weights){
+    float distance = -1.0;
+    try{
+        // Calculate distance
+        distance = calculate_euclidean_distance({first_point.x,first_point.y},{second_point.x,second_point.y},weights);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return distance;
+}
+
+
+// -- Methods for calculating velocity --
+float calculator::calculate_velocity(std::vector<cv::Point2f> positions, float fps){
+    float velocity = -1.0;
+    try{
+        // Check conditions
+        if(positions.size() < 2){
+            throw runtime_error("Unable to calculate velocity due to lack of positions.");
+        }
+        // Determine steps
+        int steps = positions.size();
+        // Calculate time
+        float time = steps/fps;
+        // Calculate total traveled distance
+        float total_distance = 0.0;
+        for(int index = 1; index < steps; index++){
+            float distance = calculate_euclidean_distance(positions.at(index-1),positions.at(index));
+            total_distance += distance;
+        }
+        // Calculate velocity in pixel distance per second
+        velocity = total_distance/time;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return velocity;
+}
+
+

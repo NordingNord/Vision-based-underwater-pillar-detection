@@ -883,8 +883,23 @@ class preprocessing:
 
         frame_size = (int(capturer_top.get(3)*diff_percentage-(kernel_size-1)),int(capturer_top.get(4)*diff_percentage-(kernel_size-1)))
 
-        writer_top = cv.VideoWriter(save_path_top, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
-        writer_bottom = cv.VideoWriter(save_path_bottom, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        top_resized_path = save_path_top+str("resized_top.mkv")
+        bottom_resized_path = save_path_bottom+str("resized_bottom.mkv")
+
+        top_snow_path = save_path_top+str("snow_top.mkv")
+        bottom_snow_path = save_path_bottom+str("snow_bottom.mkv")
+
+        top_light_path = save_path_top+str("light_top.mkv")
+        bottom_light_path = save_path_bottom+str("light_bottom.mkv")
+
+        writer_top_resize = cv.VideoWriter(top_resized_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        writer_bottom_resize = cv.VideoWriter(bottom_resized_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+
+        writer_top_snow = cv.VideoWriter(top_snow_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        writer_bottom_snow = cv.VideoWriter(bottom_snow_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+
+        writer_top_ligth = cv.VideoWriter(top_light_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        writer_bottom_light = cv.VideoWriter(bottom_light_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
 
         frames = 0
 
@@ -903,9 +918,15 @@ class preprocessing:
             frame_top = cv.resize(frame_top,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
             frame_bottom = cv.resize(frame_bottom,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
 
+            writer_top_resize.write(frame_top)
+            writer_bottom_resize.write(frame_bottom)
+
             # Step 1: Remove snow
             cleaned_frame_top =  preprocessor.snow_blur(frame_top,prob_limit,kernel_size,False)
             cleaned_frame_bottom =  preprocessor.snow_blur(frame_bottom,prob_limit,kernel_size,False)
+
+            writer_top_snow.write(cleaned_frame_top)
+            writer_bottom_snow.write(cleaned_frame_bottom)
 
             # Step 2: combine
             combined_frame = preprocessor.combine_frames(cleaned_frame_top,cleaned_frame_bottom)
@@ -941,6 +962,9 @@ class preprocessing:
             # Step 5: split frame
             frame_top,frame_bottom = preprocessor.split_frames(homomorphic_frame,cleaned_frame_top)
 
+            writer_top_ligth.write(frame_top)
+            writer_bottom_light.write(frame_bottom)
+
             # Step 6: Align lum if desired
             if(align_lum == True):
                 frame_bottom = preprocessor.align_lum(frame_top,frame_bottom,vertical_offset, horizontal_offset)
@@ -960,8 +984,8 @@ class preprocessing:
 
 
             # Record frame
-            writer_top.write(frame_top)
-            writer_bottom.write(frame_bottom)
+            #writer_top.write(frame_top)
+            #writer_bottom.write(frame_bottom)
             # Time taking
             end = time.time()
             time_taken = (end-start) * 10**3
@@ -1201,25 +1225,25 @@ preprocessor = preprocessing()
 
 # ---- ORDER 5 full test (no light tweaking) ----
 
-# Step 0: Resize
-#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Resized_video.mkv',30,-1,384)
+# #Step 0: Resize
+# preprocessor.record_smaller('../../Data/Video_Data/Varied_rectified_right.mkv','../../Data/Video_Data/Varied_Videos/Order_5_full_test/Resized_video.mkv',30,-1,384)
 
-# Step 0: Remove snow
-#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Snow_Removal_video.mkv',30,-1,0.6,7)
+# #Step 0: Remove snow
+# preprocessor.snow_removal_create('../../Data/Video_Data/Varied_Videos/Order_5_full_test/Resized_video.mkv','../../Data/Video_Data/Varied_Videos/Order_5_full_test/Snow_Removal_video.mkv',30,-1,0.6,7)
 
-# Step 2: Homomorphic filter
-#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+# #Step 2: Homomorphic filter
+# preprocessor.homomorphic_create('../../Data/Video_Data/Varied_Videos/Order_5_full_test/Snow_Removal_video.mkv','../../Data/Video_Data/Varied_Videos/Order_5_full_test/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
 
-# ---- ORDER 5 full test bottom (no light tweaking) ----
+# # ---- ORDER 5 full test bottom (no light tweaking) ----
 
-# Step 0: Resize
-#preprocessor.record_smaller('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Resized_video.mkv',30,-1,384)
+# #Step 0: Resize
+# preprocessor.record_smaller('../../Data/Video_Data/Varied_rectified_left.mkv','../../Data/Video_Data/Varied_Videos/Order_5_full_test_bottom/Resized_video.mkv',30,-1,384)
 
-# Step 0: Remove snow
-#preprocessor.snow_removal_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Resized_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Snow_Removal_video.mkv',30,-1,0.6,7)
+# #Step 0: Remove snow
+# preprocessor.snow_removal_create('../../Data/Video_Data/Varied_Videos/Order_5_full_test_bottom/Resized_video.mkv','../../Data/Video_Data/Varied_Videos/Order_5_full_test_bottom/Snow_Removal_video.mkv',30,-1,0.6,7)
 
-# Step 2: Homomorphic filter
-#preprocessor.homomorphic_create('../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Snow_Removal_video.mkv','../../Data/Video_Data/New_Pillar_Videos/Order_5_full_test_bottom/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
+# #Step 2: Homomorphic filter
+# preprocessor.homomorphic_create('../../Data/Video_Data/Varied_Videos/Order_5_full_test_bottom/Snow_Removal_video.mkv','../../Data/Video_Data/Varied_Videos/Order_5_full_test_bottom/Homomorphic_video.mkv',30,-1,0.5,2.5,1.0)
 
 
 # ----- ORDER 5 combined test
@@ -1229,11 +1253,11 @@ preprocessor = preprocessing()
 # save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_bottom_video.mkv'
 # preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7,True,50,20)
 
-path_top = '../../Data/Video_Data/New_Pillar_Top.mkv'
-path_bottom = '../../Data/Video_Data/New_Pillar_Bottom.mkv'
-save_top = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog_third/combined_top_video.mkv'
-save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog_third/combined_bottom_video.mkv'
-preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,360,0.6,7,True,50,20)
+path_top = '../../Data/Video_Data/Varied_rectified_right.mkv'
+path_bottom = '../../Data/Video_Data/Varied_rectified_left.mkv'
+save_top = '../../Data/Video_Data/Varied_Videos/Order_5_full/'
+save_bottom = '../../Data/Video_Data/Varied_Videos/Order_5_full/'
+preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,360,0.6,7,False,50,20)
 
 
 # Write all small images to directory

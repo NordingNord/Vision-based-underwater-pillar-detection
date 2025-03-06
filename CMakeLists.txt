@@ -9,5 +9,5 @@ include_directories( ${PCL_INCLUDE_DIRS})
 include_directories( ${PCL_LIBRARY_DIRS})
 include_directories( ${PCL_DEFINITIONS})
 
-add_executable(Vision-based-underwater-pillar-detection main.cpp Data_Structures.h Camera_Handler.cpp Camera_Handler.h Feature_Finder.cpp Feature_Finder.h Data_Visualization.cpp Data_Visualization.h Data_Collector.cpp Data_Collector.h Obstacle_Detection.cpp Obstacle_Detection.h Test_Methods.cpp Test_Methods.h Graveyard.cpp Feature_Analyzer.cpp Feature_Analyzer.h Preprocessing.cpp Preprocessing.h Trackbars.cpp Trackbars.h)
+add_executable(Vision-based-underwater-pillar-detection main.cpp calculator.cpp calculator.h Data_Structures.h Camera_Handler.cpp Camera_Handler.h Feature_Finder.cpp Feature_Finder.h Data_Visualization.cpp Data_Visualization.h Data_Collector.cpp Data_Collector.h Obstacle_Detection.cpp Obstacle_Detection.h Test_Methods.cpp Test_Methods.h Graveyard.cpp Feature_Analyzer.cpp Feature_Analyzer.h Preprocessing.cpp Preprocessing.h Trackbars.cpp Trackbars.h)
 target_link_libraries(Vision-based-underwater-pillar-detection ${PCL_LIBRARIES} ${OpenCV_LIBS})

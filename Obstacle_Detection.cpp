@@ -18,13 +18,18 @@ void obstacle_detection::estimation_3d(string left_path, string right_path){
         camera_handler right_cam(right_path);
         camera_handler cam_storage(left_path); // Used for storing camera parameters in one place
 
+        // Initialize other used classes
+        feature_finder finder(METHOD_AKAZE); // Currently just using akaze features
+        feature_analyzer analyzer;
+        data_visualization visualizer;
+
         // Initialize frame counter
         int frame_count  = 0;
 
         // Initialize frames
         Mat left_frame,right_frame, old_left_frame, old_right_frame;
 
-        // Prepare intrensic and extrensic parameters (currently only orginal size
+        // Prepare intrensic and extrensic parameters
         cam_storage.set_frame_size(original_size);
         cam_storage.create_intrinsic_matrix();
 
@@ -37,22 +42,20 @@ void obstacle_detection::estimation_3d(string left_path, string right_path){
         cout << "----- Left camera -----" << endl;
         cam_storage.vizualize_cam_info(BOTTOM_CAM);
 
-        // Calcualte fundamental and essential matrix
-        Mat essential_matrix = cam_storage.calculate_essential();
-        Mat fundamental_matrix = cam_storage.calculate_fundamental();
-
-
         while(true){
             // Update old frames
             if(frame_count > 0){
                 old_left_frame = left_frame;
                 old_right_frame = right_frame;
             }
+
             // Read frames
             left_frame = left_cam.get_frame();
             right_frame = right_cam.get_frame();
+
             // Increment counter
             frame_count++;
+
             // Break if no more frames any of the videos
             if(left_frame.empty() || right_frame.empty()){
                 cout << "Reached end of a video stream" << endl;
@@ -65,53 +68,198 @@ void obstacle_detection::estimation_3d(string left_path, string right_path){
                 }
                 break;
             }
-            // Show frames
-//            Mat combined;
-//            hconcat(left_frame,right_frame,combined);
-//            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
-//            imshow("Original frames",combined);
-//            waitKey(0);
 
             // Transpose frames, due to the cameras being callibrated in transpose
             transpose(left_frame,left_frame);
             transpose(right_frame,right_frame);
-//            rotate(left_frame, left_frame, ROTATE_90_CLOCKWISE);
-//            rotate(right_frame, right_frame, ROTATE_90_CLOCKWISE);
-
-            // show transposed frames
-            Mat combined;
-            hconcat(left_frame,right_frame,combined);
-            resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
-            imwrite("Original.png",combined);
-//            imshow("Transposed frames",combined);
-//            waitKey(0);
-
-            // Initialise fundamental rectification if first frame
-//            if(frame_count == 1){
-//                cam_storage.prepare_rectify_fundamental(left_frame,right_frame);
-//            }
 
             // Stereo rectify frames
             vector<Mat> frames = cam_storage.rectify_frames(left_frame,right_frame);
+            left_frame = frames.at(0);
+            right_frame = frames.at(1);
 
-            // Visualize progress so far
-            cout << frame_count << endl;
-            if(frame_count == 1800){
-                left_frame = frames.at(0);
-                right_frame = frames.at(1);
-                cout << "Size left: " << left_frame.size() << endl;
-                cout << "Size right: " << right_frame.size() << endl;
-                combined;
-                hconcat(left_frame,right_frame,combined);
-                for(int j = 0; j < combined.rows; j+=16){
-                    line(combined,Point(0,j),Point(combined.cols,j),Scalar(0,255,0),1,8);
+            // Perform feature matching
+            if(old_left_frame.empty() == false && old_right_frame.empty() == false){
+                // Find features in left frames
+                vector<KeyPoint> old_left_features = finder.find_features(old_left_frame); // Find features using initialized detector
+                vector<KeyPoint> left_features = finder.find_features(left_frame);
+                // Find descriptors
+                Mat old_left_descriptors = finder.get_descriptors(old_left_frame,old_left_features);
+                Mat left_descriptors = finder.get_descriptors(left_frame,left_features);
+                // Match features
+                match_result matches = analyzer.get_matches(old_left_descriptors,left_descriptors,MATCH_BRUTE_CROSS,1,METHOD_AKAZE);
+                // Filter matches
+                matches = analyzer.filter_matches(matches,old_left_features, left_features, FILTER_RANSAC);
+                // Clean data
+                vector<vector<KeyPoint>> remaining_features = analyzer.get_valid_keypoints(matches,old_left_features,left_features,false); // Index 0 means features that a contained in match 0
+                old_left_features = remaining_features.at(0);
+                left_features = remaining_features.at(1);
+                // Retrieve features as points
+                vector<Point2f> old_left_points = analyzer.keypoints_to_points(old_left_features);
+                vector<Point2f> left_points = analyzer.keypoints_to_points(left_features);
+                // Compute desparity
+                cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create();
+                // define settings
+                int min_disparity = 0;
+                int num_disparities = 112;
+                int block_size = 3;
+                int p1 = 8*left_frame.channels()*block_size*block_size;
+                int p2 = 16*left_frame.channels()*block_size*block_size;
+                int disp_12_max_diff = 0;
+                int pre_filter_cap = 0;
+                int uniqueness_ratio = 0;
+                int speckle_window_size = 0;
+                int speckle_range = 0;
+                int mode = StereoSGBM::MODE_SGBM;
+                // set settings
+                stereo->setMinDisparity(min_disparity);
+                stereo->setNumDisparities(num_disparities);
+                stereo->setBlockSize(block_size);
+                stereo->setP1(p1);
+                stereo->setP2(p2);
+                stereo->setDisp12MaxDiff(disp_12_max_diff);
+                stereo->setPreFilterCap(pre_filter_cap);
+                stereo->setUniquenessRatio(uniqueness_ratio);
+                stereo->setSpeckleWindowSize(speckle_window_size);
+                stereo->setSpeckleRange(speckle_range);
+                stereo->setMode(mode);
+                // compute
+                Mat disparity, old_disparity;
+                stereo->compute(old_left_frame,old_right_frame,old_disparity);
+                old_disparity.convertTo(old_disparity,CV_8U,255/(num_disparities*16.0));
+                stereo->compute(left_frame,right_frame,disparity);
+                disparity.convertTo(disparity,CV_8U,255/(num_disparities*16.0));
+                // Get disparites at points
+                vector<Point2f> old_left_survivors, left_survivors;
+                vector<uchar> old_disparities, disparities;
+                for(int i = 0; i < old_left_points.size();i++){
+                    uchar old_disparity_val = old_disparity.at<uchar>(old_left_points.at(i).x,old_left_points.at(i).y);
+                    uchar disparity_val = old_disparity.at<uchar>(left_points.at(i).x,left_points.at(i).y);
+                    if((disparity_val > 0.0 && disparity_val < 100.0) || (old_disparity_val > 0.0 && old_disparity_val < 100.0)){
+                        old_left_survivors.push_back(old_left_points.at(i));
+                        old_disparities.push_back(old_disparity_val);
+                        left_survivors.push_back(left_points.at(i));
+                        disparities.push_back(disparity_val);
+                    }
                 }
-                resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
-                imshow("Rectified frames",combined);
-                imwrite("Rectified.png", combined);
-                waitKey(0);
-                cout << "done" << endl;
+                // Determine point in right frame
+                vector<Point2f> old_right_points, right_points;
+                for(int i = 0; i < old_left_survivors.size(); i++){
+                    Point2f old_right_point = old_left_survivors.at(i);
+                    old_right_point.x -= old_disparities.at(i);
+                    Point2f right_point = left_survivors.at(i);
+                    right_point.x -= disparities.at(i);
+                    old_right_points.push_back(old_right_point);
+                    right_points.push_back(right_point);
+                }
+                // Get projection matrix
+                Mat left_projection_matrix = cam_storage.get_projection_matrix(BOTTOM_CAM);
+                Mat right_projection_matrix = cam_storage.get_projection_matrix(TOP_CAM);
+
+                // Triangulate points
+                vector<Point3f> old_point_estimates;
+                vector<Point3f> point_estimates;
+                for(int i = 0; i < old_right_points.size(); i++){
+                    Point3f point_3d = triangulate_point(left_projection_matrix,right_projection_matrix,old_left_survivors.at(i), old_right_points.at(i));
+                    old_point_estimates.push_back(point_3d);
+                }
+                for(int i = 0; i < right_points.size(); i++){
+                    Point3f point_3d = triangulate_point(left_projection_matrix,right_projection_matrix,left_survivors.at(i), right_points.at(i));
+                    point_estimates.push_back(point_3d);
+                }
+                // Convert features to data
+                vector<keypoint_data> left_data = analyzer.convert_to_data(left_survivors);
+                vector<keypoint_data> old_left_data = analyzer.convert_to_data(old_left_survivors);
+
+                vector<Scalar> colours = visualizer.generate_random_colours(left_survivors.size());
+                vector<Scalar> old_colours = visualizer.generate_random_colours(old_left_survivors.size());
+                left_data = analyzer.insert_data(left_data, colours);
+                old_left_data = analyzer.insert_data(old_left_data, old_colours);
+                // Visualize
+                visualizer.visualize_3d_points(point_estimates,left_data,left_frame);
             }
+
+//            cout << frame_count << endl;
+//            if(frame_count == 3180){ // 3180 -> pillar in november dataset
+//                // Stereo rectify frames
+//                vector<Mat> frames = cam_storage.rectify_frames(left_frame,right_frame);
+//                left_frame = frames.at(0);
+//                right_frame = frames.at(1);
+
+//                // Prefilter
+////                cvtColor(left_frame,left_frame,COLOR_BGR2GRAY);
+////                cvtColor(right_frame,right_frame,COLOR_BGR2GRAY);
+////                equalizeHist(left_frame,left_frame);
+////                equalizeHist(right_frame,right_frame);
+////                cvtColor(left_frame,left_frame,COLOR_GRAY2BGR);
+////                cvtColor(right_frame,right_frame,COLOR_GRAY2BGR);
+
+//                // Visualize progress so far
+//                Mat combined;
+//                hconcat(left_frame,right_frame,combined);
+//                for(int j = 0; j < combined.rows; j+=32){
+//                    line(combined,Point(0,j),Point(combined.cols,j),Scalar(0,255,0),2,8);
+//                }
+//                resize(combined,combined,Size(),0.5,0.5,INTER_LINEAR);
+//                imshow("Rectified frames",combined);
+//                waitKey(0);
+
+//                // Analyze disparity
+//                cv::Ptr<cv::StereoSGBM> stereo = cv::StereoSGBM::create();
+//                int min_disparity = 0;
+//                int num_disparities = 112;
+//                int block_size = 3;
+//                int p1 = 8*left_frame.channels()*block_size*block_size;
+//                int p2 = 16*left_frame.channels()*block_size*block_size;
+//                int disp_12_max_diff = 0;
+//                int pre_filter_cap = 0;
+//                int uniqueness_ratio = 0;
+//                int speckle_window_size = 0;
+//                int speckle_range = 0;
+//                int mode = StereoSGBM::MODE_SGBM;
+
+//                stereo->setMinDisparity(min_disparity);
+//                stereo->setNumDisparities(num_disparities);
+//                stereo->setBlockSize(block_size);
+//                stereo->setP1(p1);
+//                stereo->setP2(p2);
+//                stereo->setDisp12MaxDiff(disp_12_max_diff);
+//                stereo->setPreFilterCap(pre_filter_cap);
+//                stereo->setUniquenessRatio(uniqueness_ratio);
+//                stereo->setSpeckleWindowSize(speckle_window_size);
+//                stereo->setSpeckleRange(speckle_range);
+//                stereo->setMode(mode);
+
+//                Ptr<StereoMatcher> right_matcher = ximgproc::createRightMatcher(stereo);
+//                Mat left_gray, right_gray;
+//                Mat disparity_left;
+//                Mat disparity_right;
+//                cvtColor(left_frame,left_gray,COLOR_BGR2GRAY);
+//                cvtColor(right_frame,right_gray,COLOR_BGR2GRAY);
+//                stereo->compute(left_gray,right_gray,disparity_left); // Disparity type -> CV_16SC1 -> access elements with short
+//                //disparity_left.convertTo(disparity_left,CV_8U,255/(num_disparities*16.0));
+
+//                right_matcher->compute(right_gray,left_gray,disparity_right);
+
+//                Ptr<ximgproc::DisparityWLSFilter> wls_filter = ximgproc::createDisparityWLSFilter(stereo);
+//                double lamda = 4000.0;
+//                double sigma = 1.5;
+//                wls_filter->setLambda(lamda);
+//                wls_filter->setSigmaColor(sigma);
+//                Mat filtered_disparity;
+//                wls_filter->filter(disparity_left,left_frame,filtered_disparity,disparity_right);
+
+//                Mat disp_viz;
+//                ximgproc::getDisparityVis(filtered_disparity,disp_viz,1.0);
+//                applyColorMap(disp_viz,disp_viz,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+
+//                resize(disp_viz,disp_viz,Size(),0.5,0.5,INTER_LINEAR);
+//                imshow("Final disparity", disp_viz);
+//                waitKey(0);
+
+//                //trackbars tracker;
+//                //vector<Mat> disparity_maps = tracker.display_disparity(left_frame,right_frame);
+//            }
         }
     }
     catch(const exception& error){

@@ -81,7 +81,8 @@ static void on_trackbar_mode(int step,void*){
 }
 
 // -- Method that visualizes changes in disparity settings --
-void trackbars::display_disparity(Mat frame_bottom, Mat frame_top){
+vector<Mat> trackbars::display_disparity(Mat frame_bottom, Mat frame_top){
+    vector<Mat> disparity_maps;
     try{
         frame = frame_bottom;
         // Create window
@@ -112,19 +113,22 @@ void trackbars::display_disparity(Mat frame_bottom, Mat frame_top){
         createTrackbar("Mode", "Disparity map",nullptr, 1, on_trackbar_mode);
 
         // Initialize Mats
+        Mat disparity_left;
+        Mat disparity_right;
         Mat disparity;
-
+        Ptr<StereoMatcher> right_matcher = ximgproc::createRightMatcher(stereo);
+        // Convert frames to grayscale (He grayscales before destortion i do it opposite)
+        Mat bottom_gray, top_gray;
+        cvtColor(frame_bottom,bottom_gray,COLOR_BGR2GRAY);
+        cvtColor(frame_top,top_gray,COLOR_BGR2GRAY);
         // Continue forever and ever
         while(true){
-            // Convert frames to grayscale (He grayscales before destortion i do it opposite)
-            Mat bottom_gray, top_gray;
-            cvtColor(frame_bottom,bottom_gray,COLOR_BGR2GRAY);
-            cvtColor(frame_top,top_gray,COLOR_BGR2GRAY);
 
             // Compute desparity
             stereo->compute(bottom_gray,top_gray,disparity); // Disparity type -> CV_16SC1 -> access elements with short
-
+            //right_matcher->compute(top_gray,bottom_gray,disparity_right);
             // -- EASY WAY --:
+            disparity_left = disparity;
             disparity.convertTo(disparity,CV_8U,255/(num_disparities*16.0));
             // -- Make color map
             applyColorMap(disparity,disparity,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
@@ -192,9 +196,37 @@ void trackbars::display_disparity(Mat frame_bottom, Mat frame_top){
                 break;
             }
         }
+        cout << "made it out" << endl;
 
+        // Perform filtering
+        Ptr<ximgproc::DisparityWLSFilter> wls_filter = ximgproc::createDisparityWLSFilter(stereo);
+        double lamda = 8000.0;
+        double sigma = 1.5;
+
+        wls_filter->setLambda(lamda);
+        wls_filter->setSigmaColor(sigma);
+        Mat filtered_disparity;
+        wls_filter->filter(disparity_left,frame_bottom,filtered_disparity,disparity_right);
+        double vis_mult = 1.0;
+        // -- EASY WAY --:
+        filtered_disparity.convertTo(filtered_disparity,CV_8U,255/(num_disparities*16.0));
+        // -- Make color map
+        applyColorMap(filtered_disparity,filtered_disparity,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+
+        // Visualize
+        Mat the_image;
+        Mat the_image_combined;
+        cvtColor(bottom_gray, the_image, COLOR_GRAY2BGR);
+        hconcat(filtered_disparity,the_image,the_image_combined);
+        // Display disparity map
+        imshow("Filtered",the_image_combined);
+        waitKey(0);
+
+        disparity_maps.push_back(disparity);
+        disparity_maps.push_back(disparity_right);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
+    return disparity_maps;
 }
