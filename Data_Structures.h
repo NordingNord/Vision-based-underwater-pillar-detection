@@ -107,4 +107,24 @@ struct intrinsic{
     cv::Mat old_matrix;
 };
 
+// Extrinsic parameters
+struct extrinsic{
+    cv::Mat rotation;
+    cv::Mat translation;
+    cv::Mat transformation;
+};
+
+// Rectification paramters
+struct rectification_parameters{
+    cv::Mat first_transform;
+    cv::Mat second_transform;
+    cv::Mat first_projection;
+    cv::Mat second_projection;
+    cv::Mat disparity_depth_map;
+    cv::Mat first_x_map;
+    cv::Mat first_y_map;
+    cv::Mat second_x_map;
+    cv::Mat second_y_map;
+};
+
 #endif

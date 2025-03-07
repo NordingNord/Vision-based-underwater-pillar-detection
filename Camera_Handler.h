@@ -67,6 +67,22 @@ public:
     void create_intrinsic_matrix();
     intrinsic create_intrinsic_matrix(intrinsic parameters);
 
+    // -- Method to get private intrensic paramters --
+    intrinsic get_intrensic(int frame_type);
+
+    // -- Visualize camera data --
+    void vizualize_cam_info(int frame_type);
+
+
+    // Above moved to camera.h
+    // Bellow belong in another class
+
+
+    // -- Method that prepares rectification data --
+    void prepare_rectify();
+
+
+
     // -- gets projection matrix --
     cv::Mat get_projection_matrix(int cam);
 
@@ -79,23 +95,14 @@ public:
     // -- Method that undistorts image --
     cv::Mat undistort_frame(cv::Mat frame, int frame_type);
 
-    // -- Visualize camera data --
-    void vizualize_cam_info(int frame_type);
-
     // -- Fixes camera matrix based on opencv --
     void resize_intrensic_opencv();
-
-    // -- Method to get private intrensic paramters --
-    intrinsic get_intrensic(int frame_type);
 
     // -- Method that rectify frames --
     cv::Mat rectify(cv::Mat frame, cv::Mat frame_2, int frame_type);
 
     // -- Method that sets new size --
     void set_frame_size(cv::Size size);
-
-    // -- Method that prepares rectification data --
-    void prepare_rectify();
 
     // -- Method that rectifies frames --
     std::vector<cv::Mat> rectify_frames(cv::Mat left_frame, cv::Mat right_frame);

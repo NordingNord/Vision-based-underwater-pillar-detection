@@ -19,6 +19,8 @@
 #include "Preprocessing.h"
 #include "Trackbars.h"
 
+#include "feature_handling.h"
+
 
 // -- Define cluster settings --
 static const int ON_FRAME = 0;

@@ -219,7 +219,7 @@ void data_visualization::visualize_3d_points(vector<Point3f> points, vector<keyp
     }
 }
 
-// -- Visualize matrix in text --
+// -- Visualize matrix in text (Converted) --
 void data_visualization::visualize_mat_text(Mat matrix, string matrix_name){
     try{
         cout << fixed;

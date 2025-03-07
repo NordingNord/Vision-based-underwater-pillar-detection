@@ -1,83 +1,37 @@
 // -- Includes --
 #include <iostream>
 #include <fstream>
+#include "pipeline.h"
+#include "feature_handling.h"
 #include "Data_Structures.h"
 #include "Test_Methods.h"
-#include "Obstacle_Detection.h"
+//#include "Obstacle_Detection.h"
 #include "Data_Collector.h"
-#include "Feature_Finder.h"
+//#include "Feature_Finder.h"
 #include "Preprocessing.h"
+#include "stereo.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
+#include "filters.h"
 
 // -- Namespace --
 using namespace std;
 using namespace cv;
 
-// -- Constants --
-const int cam_num = 2;
-
 // -- Main --
 int main(){
 
-//    // Test preprocess //
-//    camera_handler cam_handler_pre("../Data/Video_Data/Preprocessed_Solo_Pillar.mkv");
-//    camera_handler cam_handler("../Data/Video_Data/Solo_Pillar.mkv");
+    // -- VIDEO PATHS --
 
-//    feature_finder finder(0);
-//    data_visualization visualizer;
-//    feature_analyzer analyzer;
-//    vector<KeyPoint> current_features;
-//    vector<keypoint_data> current_data;
-//    vector<KeyPoint> current_features_pre;
-//    vector<keypoint_data> current_data_pre;
-//    int index = 0;
-
-//    while(true){
-//        Mat frame = cam_handler.get_frame();
-//        Mat frame_pre = cam_handler_pre.get_frame();
-
-//        // Break if no more frames
-//        if(frame_pre.empty()){
-//            cout << "Reached end of video stream" << endl;
-//            break;
-//        }
-//        current_features = finder.find_features(frame);
-//        current_data = analyzer.convert_to_data(current_features);
-//        vector<Scalar> colours = visualizer.generate_random_colours(current_features.size());
-//        current_data = analyzer.insert_data(current_data, colours);
-//        Mat circle_frame = visualizer.mark_keypoints(current_data,frame);
-//        Mat scaled;
-//        resize(circle_frame,scaled, Size(), 0.5, 0.5, INTER_LINEAR);
-
-
-//        current_features_pre = finder.find_features(frame_pre);
-//        current_data_pre = analyzer.convert_to_data(current_features_pre);
-//        colours = visualizer.generate_random_colours(current_features_pre.size());
-//        current_data_pre = analyzer.insert_data(current_data_pre, colours);
-//        Mat circle_frame_pre = visualizer.mark_keypoints(current_data_pre,frame_pre);
-//        Mat scaled_pre;
-//        resize(circle_frame_pre,scaled_pre, Size(), 0.5, 0.5, INTER_LINEAR);
-//        string path = "../Data/preprocess_images/" + to_string(index) +".jpg";
-//        imwrite(path, scaled);
-//        string path_pre = "../Data/preprocess_images/" + to_string(index) +"_pre.jpg";
-//        imwrite(path_pre, scaled_pre);
-//        imshow("frame", scaled);
-//        imshow("preprocessed frame", scaled_pre);
-//        waitKey(0);
-//    }
-
-    // Test simplified optical flow
-    obstacle_detection detection;
-
+    // -- varied top dataset --
     string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Varied_Top.mkv";
     string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Varied_Bottom.mkv";
 
-//string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Wall_Indents_Top.mkv";
-//string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Wall_Indents_Bottom.mkv";
-
+    // -- wall indents dataset --
+//    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Wall_Indents_Top.mkv";
+//    string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Wall_Indents_Bottom.mkv";
 
     // -- No Preprocessing --
 //    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Top.mkv";
@@ -115,59 +69,52 @@ int main(){
 //    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/UIEC2Net_resized.mkv";
 //    string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/UIEC2Net_resized_bottom.mkv";
 
-    //string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_5_full/Homomorphic_video.mkv";
-    //string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_5_full_bottom/Homomorphic_video.mkv";
-    //string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_5_full/Resized_video.mkv";
-    //string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_5_full_bottom/Resized_video.mkv";
-    //string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_4_full/Homomorphic_video.mkv";
-    //string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_4_full_bottom/Homomorphic_video.mkv";
+    // -- PARAMETER PATHS --
+    string top_parameter_path = "/home/benjamin/Master_Thesis_Workspace/Data/Parameters/November_Top.yml";
+    string bottom_paramter_path = "/home/benjamin/Master_Thesis_Workspace/Data/Parameters/November_Bottom.yml";
 
-    detection.estimation_3d(bottom_video,top_video);
-//    detection.multicam_pipeline(top_video,bottom_video,METHOD_AKAZE,MATCH_BRUTE_CROSS,FILTER_RANSAC,MODE_MANUAL, ORIGINAL);
+    // -- Feature settings --
 
-//    detection.get_detection_data("/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/New_Pillar_Videos/Order_5_full/Homomorphic_video.mkv", 0, 0, false);
+    // -- newest sift
+    //sift_settings settings = {1000,3,0.005,100,1.6,CV_8U,false};
+    // -- original sift
+    //sift_settings settings = {1000,3,0.03,43,1.6,CV_8U,false};
+    // -- soft lense sift
+    //sift_settings settings = {1000,3,0.005,100,1.2,CV_8U,false};
+    // -- newest orb
+    //orb_settings settings = {1000,1.6,6,6,0,4,6,4};
+    // -- original orb
+    //orb_settings settings = {1000,1.6,6,34,0,2,34,13};
+    // -- more features orb
+    //orb_settings settings = {1000,1.6,6,34,0,2,34,4};
+    // -- newest akaze
+    akaze_settings settings = {cv::AKAZE::DESCRIPTOR_MLDB,0,3,0.00001f,4,4,cv::KAZE::DIFF_PM_G2};
+    // -- default akaze
+    //akaze_settings settings = {cv::AKAZE::DESCRIPTOR_MLDB,0,3,0.001f,4,4,cv::KAZE::DIFF_PM_G2};
+    // -- uniform settings
+    //int uniform_gap = 100;
+    //int uniform_keypoint_size = 31;
 
-//    // Testing optical flow //
-//    obstacle_detection detection;
-//    detection.perform_optical_flow("../Data/Video_Data/Heavy_Blur_New_Pillar_Top.mkv",0, true, ON_FRAME, "preprocess test",0); // 0 -> ORB 2 -> SIFT last int is gap
-//    detection.perform_optical_flow("../Data/Video_Data/Solo_Pillar.mkv",0, true, ON_FRAME, "gap_test",0);
-//    feature_analyzer test;
-//    vector<keypoint_data> keypoints;
-//    vector<float> velocities = {4,5,9,10};
-//    for(int i = 0; i < velocities.size(); i++){
-//        keypoint_data keypoint;
-//        keypoint.velocity = velocities[i];
-//        keypoints.push_back(keypoint);
-//    }
-//    test.Jenks_Natural_Breaks_Clustering(keypoints, 2);
+    // -- Match settings --
+    //int match_type = MATCH_BRUTE;
+    int match_type = MATCH_BRUTE_CROSS;
+    //int match_type = MATCH_FLANN;
+    int n_best = 1;
+    float flann_ratio = 0.7;
 
-    // Test kalman filter
-//    vector<float> x = {1,2,3,4,6};
-//    vector<float> y = {1,1,5,-1,1};
-//    vector<Point2f> results;
-//    feature_analyzer test;
-//    test.init_kalman(4,2,0,0,0);
-//    for(int i = 0; i < x.size(); i++){
-//        Point2f result = test.predict_kalman();
-//        results.push_back(result);
-//        test.correct_kalman(x[i],y[i]);
-//        cout << result.x << ", " << result.y << endl;
-//    }
+    // -- Match filter settings --
+    int match_filter_type = MATCH_FILTER_RANSAC;
+    int ransac_min = 10;
+    double ransac_threshold = 2.5;
 
 
-//    // Test median filter
-//    camera_handler cam_handler("../Data/Video_Data/New_Pillar_Top.mkv");
-//    preprocessing preprocessor;
-//    while(true){
-//        Mat frame = cam_handler.get_frame();
-//        // Break if no more frames
-//        if(frame.empty()){
-//            cout << "Reached end of video stream" << endl;
-//            break;
-//        }
-//        Mat result = preprocessor.median_filter(frame,11);
-//        imshow("Blurred frame",result);
-//        imshow("original frame",frame);
-//        waitKey(0);
-//    }
+    // -- RUN PIPELINE --
+    pipeline detection_triangulation(bottom_video,top_video); // Setup mode and video feeds
+    detection_triangulation.set_parameter_paths(bottom_paramter_path, top_parameter_path); // Setup camera data
+    detection_triangulation.set_stereo_parameters(FULL,true); // Setup stereo parameters
+    detection_triangulation.set_feature_parameters(settings); // Setup feature settings
+    detection_triangulation.set_match_parameters(match_type,n_best,flann_ratio);
+    detection_triangulation.set_match_filter_parameters(match_filter_type,ransac_min,ransac_threshold);
+    detection_triangulation.run_triangulation_pipeline();
+
 }

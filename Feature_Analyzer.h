@@ -17,6 +17,8 @@
 #include "Feature_Finder.h"
 #include "Data_Visualization.h"
 
+#include "feature_handling.h"
+
 // -- Some name definitions --
 static const int VELOCITY = 0;
 static const int VELOCITY_AND_POS = 1;
@@ -24,9 +26,10 @@ static const int POSITION = 2;
 
 static const float ANGLE_ERROR = 400;
 
-static const int MATCH_FLANN = 0;
-static const int MATCH_BRUTE_CROSS = 1;
-static const int MATCH_BRUTE = 2;
+// Comented out due to same name as other header
+//static const int MATCH_FLANN = 0;
+//static const int MATCH_BRUTE_CROSS = 1;
+//static const int MATCH_BRUTE = 2;
 
 static const int FILTER_RANSAC = 0;
 static const int FILTER_DIRECTIONAL = 1;

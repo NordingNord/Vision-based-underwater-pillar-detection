@@ -9,8 +9,7 @@ using namespace cv;
 camera_handler::camera_handler(){
 }
 
-
-// -- Constructor with scaling --
+// -- Constructor with scaling (converted)--
 camera_handler::camera_handler(double width_scale, double height_scale){
     try{
         // Update scale
@@ -22,7 +21,7 @@ camera_handler::camera_handler(double width_scale, double height_scale){
 }
 
 
-// -- Constructor with scaling and video path--
+// -- Constructor with scaling and video path (converted)--
 camera_handler::camera_handler(std::string video_path, double width_scale, double height_scale){
     try{
         // Update scale
@@ -38,7 +37,7 @@ camera_handler::camera_handler(std::string video_path, double width_scale, doubl
 }
 
 
-// -- Method for starting a video --
+// -- Method for starting a video (Converted) --
 void camera_handler::run_video(string video_path){
     try{
         // create camera capturer
@@ -56,7 +55,7 @@ void camera_handler::run_video(string video_path){
 }
 
 
-// -- Method for getting next video frame --
+// -- Method for getting next video frame (Converted) --
 Mat camera_handler::get_frame(){
     Mat frame;
     try{
@@ -76,7 +75,7 @@ Mat camera_handler::get_frame(){
 }
 
 
-// -- Method for retrieving current frame --
+// -- Method for retrieving current frame (Converted) --
 Mat camera_handler::get_current_frame(){
     try{
         if(current_frame.empty()){
@@ -90,7 +89,7 @@ Mat camera_handler::get_current_frame(){
 }
 
 
-// -- Get number of read frames in video --
+// -- Get number of read frames in video (Converted) --
 double camera_handler::get_frame_count(){
     try{
         if(frame_count == 0){
@@ -104,7 +103,7 @@ double camera_handler::get_frame_count(){
 }
 
 
-// -- Close current video capturer --
+// -- Close current video capturer  (Converted)--
 void camera_handler::close_video_capturer(){
     try{
         capturer.release();
@@ -115,7 +114,7 @@ void camera_handler::close_video_capturer(){
 }
 
 
-// -- gets frame count in video --
+// -- gets frame count in video (Converted)--
 int camera_handler::get_total_frame_count(){
     int frame_count = 0;
     try{
@@ -128,7 +127,7 @@ int camera_handler::get_total_frame_count(){
 }
 
 
-// -- Updates scaling --
+// -- Updates scaling (converted) --
 void camera_handler::update_scaling(double width_scale, double height_scale){
     try{
         // Update scale
@@ -140,14 +139,13 @@ void camera_handler::update_scaling(double width_scale, double height_scale){
     }
 }
 
-
-// -- gets fps of video --
+// -- gets fps of video (converted) --
 int camera_handler::get_fps(){
     int fps = capturer.get(CAP_PROP_FPS);
     return fps;
 }
 
-// -- gets dimensions of video --
+// -- gets dimensions of video (Converted) --
 vector<int> camera_handler::get_dim(){
     int rows = capturer.get(CAP_PROP_FRAME_HEIGHT);
     int cols = capturer.get(CAP_PROP_FRAME_WIDTH);
@@ -156,7 +154,7 @@ vector<int> camera_handler::get_dim(){
 
 }
 
-// -- converts intrinsic parameters into matrix --
+// -- converts intrinsic parameters into matrix (Converted) --
 void camera_handler::create_intrinsic_matrix(){
     try{
         // Prepare matrices
@@ -193,6 +191,125 @@ intrinsic camera_handler::create_intrinsic_matrix(intrinsic parameters){
     }
     return updated_parameters;
 }
+
+// -- Method to get private intrensic paramters (Converted) --
+intrinsic camera_handler::get_intrensic(int frame_type){
+    intrinsic data;
+    try{
+        if(frame_type == BOTTOM_CAM){
+            data = bottom_cam_intrinsic;
+        }
+        else if(frame_type == TOP_CAM){
+            data = top_cam_intrinsic;
+        }
+        else{
+            throw runtime_error("Unknown camera type");
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return data;
+}
+
+// -- Visualize camera data (Converted)--
+void camera_handler::vizualize_cam_info(int frame_type){
+    try{
+        // Initialize visualizer
+        data_visualization visualizer;
+        cout << fixed;
+        cout << setprecision(6);
+        if(frame_type == TOP_CAM){
+            visualizer.visualize_mat_text(top_cam_intrinsic.matrix,"Intrensic parameters for the top/right camera: ");
+
+            Mat extrensic;
+            hconcat(rotation_top,translation_top,extrensic);
+
+            visualizer.visualize_mat_text(extrensic,"Extrensic parameters for the top/right camera: ");
+
+            visualizer.visualize_mat_text(distortion_top,"Distortion paramters for the top/right camera: ");
+
+        }
+        else if(frame_type == BOTTOM_CAM){
+            visualizer.visualize_mat_text(bottom_cam_intrinsic.matrix,"Intrensic parameters for the bottom/left camera: ");
+
+            Mat extrensic;
+            hconcat(rotation_bottom,translation_bottom,extrensic);
+
+            visualizer.visualize_mat_text(extrensic,"Extrensic parameters for the bottom/left camera: ");
+
+            visualizer.visualize_mat_text(distortion_bottom,"Distortion paramters for the bottom/left camera: ");
+        }
+        else{
+            throw runtime_error("Unknwon camera type. Please use top or bottom camera.");
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+
+// -- Method that prepares rectification data (Converted) --
+void camera_handler::prepare_rectify(){
+    try{
+        // -- Step 0: Prepare data
+        Mat camera_matrix_left = bottom_cam_intrinsic.matrix;
+        Mat distortion_left = distortion_bottom;
+
+        Mat camera_matrix_right = top_cam_intrinsic.matrix;
+        Mat distortion_right = distortion_top;
+
+        Mat rotation = rotation_top;
+        Mat translation = translation_top;
+
+        // -- Step 1: Get rectification and projection matrixes
+        Mat rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map;
+        Rect validRoi[2]; // Region in each image where the algorithm beleives only correct matches are atained.
+        double alpha = 0;
+        stereoRectify(camera_matrix_left, distortion_left, camera_matrix_right, distortion_right, original_size, rotation, translation, rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,new_size, &validRoi[0], &validRoi[1]);
+
+        // -- Step 2: Initialize undistortion
+        Mat map_x_left, map_y_left, map_x_right, map_y_right;
+        initUndistortRectifyMap(camera_matrix_left,distortion_left,rectification_transform_left,rectification_projection_left,original_size,CV_16SC2,map_x_left, map_y_left); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+        initUndistortRectifyMap(camera_matrix_right,distortion_right,rectification_transform_right,rectification_projection_right,original_size,CV_16SC2,map_x_right, map_y_right); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+
+        // -- Step 3: Save in private variables
+        rectification_x_left = map_x_left;
+        rectification_y_left = map_y_left;
+        rectification_x_right = map_x_right;
+        rectification_y_right = map_y_right;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+// -- Method that rectifies frames (Converted)--
+vector<Mat> camera_handler::rectify_frames(Mat left_frame, Mat right_frame){
+    vector<Mat> output;
+    try{
+        // Remap left
+        Mat rectified_left;
+        remap(left_frame,rectified_left,rectification_x_left,rectification_y_left,INTER_LINEAR);
+        output.push_back(rectified_left);
+        // Remap right
+        Mat rectified_right;
+        remap(right_frame,rectified_right,rectification_x_right,rectification_y_right,INTER_LINEAR);
+        output.push_back(rectified_right);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return output;
+}
+
+
+
+
+
 
 // -- gets projection matrix --
 Mat camera_handler::get_projection_matrix(int cam){
@@ -476,43 +593,6 @@ Mat camera_handler::rectify(Mat frame,Mat frame_2, int frame_type){
     return rectified_frame;
 }
 
-// -- Visualize camera data --
-void camera_handler::vizualize_cam_info(int frame_type){
-    try{
-        // Initialize visualizer
-        data_visualization visualizer;
-        cout << fixed;
-        cout << setprecision(6);
-        if(frame_type == TOP_CAM){
-            visualizer.visualize_mat_text(top_cam_intrinsic.matrix,"Intrensic parameters for the top/right camera: ");
-
-            Mat extrensic;
-            hconcat(rotation_top,translation_top,extrensic);
-
-            visualizer.visualize_mat_text(extrensic,"Extrensic parameters for the top/right camera: ");
-
-            visualizer.visualize_mat_text(distortion_top,"Distortion paramters for the top/right camera: ");
-
-        }
-        else if(frame_type == BOTTOM_CAM){
-            visualizer.visualize_mat_text(bottom_cam_intrinsic.matrix,"Intrensic parameters for the bottom/left camera: ");
-
-            Mat extrensic;
-            hconcat(rotation_bottom,translation_bottom,extrensic);
-
-            visualizer.visualize_mat_text(extrensic,"Extrensic parameters for the bottom/left camera: ");
-
-            visualizer.visualize_mat_text(distortion_bottom,"Distortion paramters for the bottom/left camera: ");
-        }
-        else{
-            throw runtime_error("Unknwon camera type. Please use top or bottom camera.");
-        }
-
-    }
-    catch(const exception& error){
-        cout << "Error: " << error.what() << endl;
-    }
-}
 
 // -- Fixes camera matrix based on opencv --
 void camera_handler::resize_intrensic_opencv(){
@@ -535,27 +615,6 @@ void camera_handler::resize_intrensic_opencv(){
         cout << "Error: " << error.what() << endl;
     }
 }
-
-// -- Method to get private intrensic paramters --
-intrinsic camera_handler::get_intrensic(int frame_type){
-    intrinsic data;
-    try{
-        if(frame_type == BOTTOM_CAM){
-            data = bottom_cam_intrinsic;
-        }
-        else if(frame_type == TOP_CAM){
-            data = top_cam_intrinsic;
-        }
-        else{
-            throw runtime_error("Unknown camera type");
-        }
-    }
-    catch(const exception& error){
-        cout << "Error: " << error.what() << endl;
-    }
-    return data;
-}
-
 
 // -- Fixes intrensic paramters based on mode --
 void camera_handler::resize_intrensic_mode(int mode){
@@ -582,61 +641,6 @@ void camera_handler::resize_intrensic_mode(int mode){
 // -- Method that sets new size --
 void camera_handler::set_frame_size(Size size){
     new_size = size;
-}
-
-// -- Method that prepares rectification data --
-void camera_handler::prepare_rectify(){
-    try{
-        // -- Step 0: Prepare data
-        Mat camera_matrix_left = bottom_cam_intrinsic.matrix;
-        Mat distortion_left = distortion_bottom;
-
-        Mat camera_matrix_right = top_cam_intrinsic.matrix;
-        Mat distortion_right = distortion_top;
-
-        Mat rotation = rotation_top;
-        Mat translation = translation_top;
-
-        // -- Step 1: Get rectification and projection matrixes
-        Mat rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map;
-        Rect validRoi[2]; // Region in each image where the algorithm beleives only correct matches are atained.
-        double alpha = 0;
-        stereoRectify(camera_matrix_left, distortion_left, camera_matrix_right, distortion_right, original_size, rotation, translation, rectification_transform_left, rectification_transform_right,rectification_projection_left, rectification_projection_right, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,new_size, &validRoi[0], &validRoi[1]);
-
-        // -- Step 2: Initialize undistortion
-        Mat map_x_left, map_y_left, map_x_right, map_y_right;
-        initUndistortRectifyMap(camera_matrix_left,distortion_left,rectification_transform_left,rectification_projection_left,original_size,CV_16SC2,map_x_left, map_y_left); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
-        initUndistortRectifyMap(camera_matrix_right,distortion_right,rectification_transform_right,rectification_projection_right,original_size,CV_16SC2,map_x_right, map_y_right); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
-
-        // -- Step 3: Save in private variables
-        rectification_x_left = map_x_left;
-        rectification_y_left = map_y_left;
-        rectification_x_right = map_x_right;
-        rectification_y_right = map_y_right;
-
-    }
-    catch(const exception& error){
-        cout << "Error: " << error.what() << endl;
-    }
-}
-
-// -- Method that rectifies frames --
-vector<Mat> camera_handler::rectify_frames(Mat left_frame, Mat right_frame){
-    vector<Mat> output;
-    try{
-        // Remap left
-        Mat rectified_left;
-        remap(left_frame,rectified_left,rectification_x_left,rectification_y_left,INTER_LINEAR);
-        output.push_back(rectified_left);
-        // Remap right
-        Mat rectified_right;
-        remap(right_frame,rectified_right,rectification_x_right,rectification_y_right,INTER_LINEAR);
-        output.push_back(rectified_right);
-    }
-    catch(const exception& error){
-        cout << "Error: " << error.what() << endl;
-    }
-    return output;
 }
 
 // Calcualtes essential matrix from rotation and translation

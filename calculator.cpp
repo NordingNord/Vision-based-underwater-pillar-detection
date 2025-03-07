@@ -44,7 +44,9 @@ float calculator::calculate_euclidean_distance(float first_x, float first_y, flo
     float distance = -1.0;
     try{
         // Calculate distance
-        distance = calculate_euclidean_distance({first_x,first_y},{second_x,second_y},weights);
+        vector<float> first_data = {first_x,first_y};
+        vector<float> second_data = {second_x,second_y};
+        distance = calculate_euclidean_distance(first_data,second_data,weights);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -56,7 +58,9 @@ float calculator::calculate_euclidean_distance(cv::Point2f first_point, cv::Poin
     float distance = -1.0;
     try{
         // Calculate distance
-        distance = calculate_euclidean_distance({first_point.x,first_point.y},{second_point.x,second_point.y},weights);
+        vector<float> first_data = {first_point.x,first_point.y};
+        vector<float> second_data = {second_point.x,second_point.y};
+        distance = calculate_euclidean_distance(first_data,second_data,weights);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

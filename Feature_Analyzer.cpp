@@ -1220,7 +1220,7 @@ cv::Point2f feature_analyzer::predict_kalman(){
     return point;
 }
 
-// -- Methods that gets matches, based on desired setting --
+// -- Methods that gets matches, based on desired setting (converted) --
 match_result feature_analyzer::get_matches(Mat descriptors_top, Mat descriptors_bottom, int type, int number_of_best_matches, int feature_type){
     // Timing
     auto start = chrono::high_resolution_clock::now();
@@ -1258,7 +1258,7 @@ match_result feature_analyzer::get_matches(Mat descriptors_top, Mat descriptors_
 }
 
 
-// -- Perform FLANN feature matching --
+// -- Perform FLANN feature matching (converted) --
 match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descriptors_bottom,int number_of_best_matches, float ratio_threshold){
     match_result matches;
     try{
@@ -1300,7 +1300,7 @@ match_result feature_analyzer::get_flann_matches(Mat descriptors_top, Mat descri
     return matches;
 }
 
-// -- Performs brute force matching --
+// -- Performs brute force matching (converted)--
 match_result feature_analyzer::get_brute_matches(Mat descriptors_top, Mat descriptors_bottom,int number_of_best_matches, bool do_crosscheck, int feature_type){
     match_result matches;
     try{
