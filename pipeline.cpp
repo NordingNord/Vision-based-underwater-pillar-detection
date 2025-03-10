@@ -37,7 +37,6 @@ pipeline::pipeline(string first_video_path, string second_video_path){
     }
 }
 
-
 // -- Methods for setting paramters --
 void pipeline::set_parameter_path(string parameter_path){
     try{
@@ -161,6 +160,32 @@ void pipeline::set_match_filter_parameters(int type,int min_matches, double thre
     }
 }
 
+void pipeline::set_disparity_parameters(int min_disp, int num_disp, int block_size, int p1, int p2, int disp_12_max_diff, int prefilter_cap, int uniqueness_ratio, int speckle_window_size, int speckle_range, int mode){
+    try{
+        stereo_system.set_disparity_settings(min_disp,num_disp,block_size,p1,p2,disp_12_max_diff,prefilter_cap,uniqueness_ratio,speckle_window_size,speckle_range,mode);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+void pipeline::set_wsl_parameters(double lamda, double sigma){
+    try{
+        stereo_system.set_wsl_filter_settings(lamda,sigma);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+void pipeline::set_bilateral_parameters(int diameter, double sigma_color, double sigma_space){
+    try{
+        filtering_sytem.set_bilateral_settings(diameter,sigma_color,sigma_space);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
 
 // -- The pipelines --
 void pipeline::run_triangulation_pipeline(){
@@ -175,6 +200,15 @@ void pipeline::run_triangulation_pipeline(){
         // Initialize some loop paramters
         int frame_index = 0;
         Mat first_frame, second_frame, old_first_frame, old_second_frame;
+
+        // temporary delete later
+        vector<int> sizes = first_camera.get_camera_dimensions();
+        int frame_height = sizes.at(1);
+        int frame_width = sizes.at(0);
+
+        VideoWriter video_bottom("/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Rectified_Objects_bottom.mkv",CV_FOURCC('M','J','P','G'),30, Size(frame_width,frame_height));
+        VideoWriter video_top("/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Rectified_Objects_top.mkv",CV_FOURCC('M','J','P','G'),30, Size(frame_width,frame_height));
+
 
         // Begin to go through video feed
         while(true){
@@ -211,8 +245,35 @@ void pipeline::run_triangulation_pipeline(){
                 transpose(second_frame,second_frame);
             }
 
+//            // Show original
+//            Mat original;
+//            hconcat(first_frame,second_frame,original);
+//            resize(original,original,Size(),0.5,0.5,INTER_LINEAR);
+//            imshow("Original frames", original);
+//            waitKey(0);
+
             // Rectify frames
             vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
+            first_frame = rectified_frames.at(0);
+            second_frame = rectified_frames.at(1);
+
+//            // Show rectification
+//            Mat rectified;
+//            hconcat(rectified_frames.at(0),rectified_frames.at(1),rectified);
+//            resize(rectified,rectified,Size(),0.5,0.5,INTER_LINEAR);
+//            line(rectified,{0,295},{rectified.cols-1,295},{255,0,0},1);
+//            imwrite("new_rect.png",rectified);
+//            imshow("rectified frames", rectified);
+//            waitKey(0);
+
+            // remove later
+            video_bottom.write(first_frame);
+            video_top.write(second_frame);
+            continue;
+
+            // Resize frames
+            resize(first_frame,first_frame,Size(),0.5,0.5,INTER_LINEAR);
+            resize(second_frame,second_frame,Size(),0.5,0.5,INTER_LINEAR);
 
             // Continue if two frames are present
             if(old_first_frame.empty() == false && old_second_frame.empty() == false){
@@ -224,12 +285,59 @@ void pipeline::run_triangulation_pipeline(){
                 Mat descriptors = feature_handler.get_descriptors(first_frame,keypoints);
                 Mat old_descriptors = feature_handler.get_descriptors(old_first_frame,old_keypoints);
 
+                // Visualize features
+                Mat features, first_features, old_features;
+                drawKeypoints(first_frame,keypoints,first_features,{0,0,255},DrawMatchesFlags::DEFAULT);
+                drawKeypoints(old_first_frame,old_keypoints,old_features,{0,0,255},DrawMatchesFlags::DEFAULT);
+                hconcat(old_features,first_features,features);
+                //resize(features,features,Size(),0.5,0.5,INTER_LINEAR);
+                imshow("Found features", features);
+                waitKey(0);
+
                 // Match features
                 vector<DMatch> matches = feature_handler.match_features(old_descriptors,descriptors);
+
+                // Visualize matches
+                Mat matches_frame;
+                drawMatches(old_first_frame,old_keypoints,first_frame,keypoints,matches,matches_frame);
+                //resize(matches_frame,matches_frame,Size(),0.5,0.5,INTER_LINEAR);
+                imshow("original matches", matches_frame);
+                waitKey(0);
 
                 // Filter matches
                 vector<DMatch> filtered_matches = filtering_sytem.filter_matches(matches,old_keypoints,keypoints);
 
+                // Visualize filtered matches
+                Mat filtered_matches_frame;
+                drawMatches(old_first_frame,old_keypoints,first_frame,keypoints,filtered_matches,filtered_matches_frame);
+                //resize(filtered_matches_frame,filtered_matches_frame,Size(),0.5,0.5,INTER_LINEAR);
+                imshow("filtered matches", filtered_matches_frame);
+                waitKey(0);
+
+                // Compute disparity map
+                Mat disparity_map = stereo_system.get_disparity(second_frame,first_frame);
+                //Mat disparity_map = stereo_system.track_disparity(second_frame,first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+
+                // Visualize filtered disparity map
+                Mat disparity_map_color;
+                disparity_map_color = stereo_system.process_disparity(disparity_map);
+                applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                Mat disparity_combined;
+                hconcat(disparity_map_color,first_frame, disparity_combined);
+                imshow("Chosen disparity map",disparity_combined);
+                waitKey(0);
+
+                // Filter disparity map
+                //Mat filtered_disparity_map = stereo_system.filter_disparity(disparity_map,second_frame,first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+                disparity_map = stereo_system.process_disparity(disparity_map); // should only be done when filtering is used, since it does not excpect disparity maps
+                Mat filtered_disparity_map = filtering_sytem.filter_bilateral(disparity_map);
+
+                // Visualize filtered disparity map
+                applyColorMap(filtered_disparity_map,filtered_disparity_map,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                Mat filtered_disparity_combined;
+                hconcat(filtered_disparity_map,first_frame, filtered_disparity_combined);
+                imshow("Filtered disparity",filtered_disparity_combined);
+                waitKey(0);
             }
         }
     }
@@ -237,3 +345,4 @@ void pipeline::run_triangulation_pipeline(){
         cout << "Error: " << error.what() << endl;
     }
 }
+

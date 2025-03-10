@@ -29,6 +29,11 @@ public:
     // -- Methods that sets filter settings --
     void set_matching_filter_settings(int match_filter_type = MATCH_FILTER_RANSAC, int min_matches = 10, double threshold = 2.5);
 
+    void set_bilateral_settings(int new_diameter, double new_sigma_color, double new_sigma_space);
+
+    // -- Methods for filtering/blurring frames --
+    cv::Mat filter_bilateral(cv::Mat frame);
+
 
 private:
     // -- Filters used for different filtering --
@@ -37,6 +42,11 @@ private:
     // -- Filter settings --
     int ransac_min_matches;
     double ransac_threshold;
+
+    // -- Bilateral filter paramter --
+    int diameter;
+    double sigma_color;
+    double sigma_space;
 
 };
 

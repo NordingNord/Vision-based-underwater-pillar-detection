@@ -103,3 +103,28 @@ void filters::set_matching_filter_settings(int match_filter_type, int min_matche
         cout << "Error: " << error.what() << endl;
     }
 }
+
+void filters::set_bilateral_settings(int new_diameter, double new_sigma_color, double new_sigma_space){
+    try{
+        diameter = new_diameter;
+        sigma_color = new_sigma_color;
+        sigma_space = new_sigma_space;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+
+// -- Methods for filtering/blurring frames --
+Mat filters::filter_bilateral(Mat frame){
+    Mat filtered_frame;
+    try{
+        bilateralFilter(frame,filtered_frame,diameter,sigma_color,sigma_space);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_frame;
+}
+

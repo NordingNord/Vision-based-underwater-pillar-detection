@@ -1185,3 +1185,31 @@
 //    obstacle_detection detection;
 
 //    detection.estimation_3d(bottom_video,top_video);
+
+
+// Write shorter video
+//VideoCapture cap_bottom(bottom_video);
+//VideoCapture cap_top(top_video);
+
+//int frame_width = cap_bottom.get(cv::CAP_PROP_FRAME_WIDTH);
+//int frame_height = cap_bottom.get(cv::CAP_PROP_FRAME_HEIGHT);
+
+
+//VideoWriter video_bottom("/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv",CV_FOURCC('M','J','P','G'),10, Size(frame_width,frame_height));
+//VideoWriter video_top("/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv",CV_FOURCC('M','J','P','G'),10, Size(frame_width,frame_height));
+//Mat frame_bottom, frame_top;
+//int cap_start = 6930;
+//int count = 0;
+//while(true){
+//    // Read frames
+//    cap_bottom >> frame_bottom;
+//    cap_top >> frame_top;
+//    count++;
+//    if(count >= cap_start){
+//        video_bottom.write(frame_bottom);
+//        video_top.write(frame_top);
+//    }
+//    if(frame_bottom.empty() || frame_top.empty()){
+//        break;
+//    }
+//}

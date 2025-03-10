@@ -127,4 +127,19 @@ struct rectification_parameters{
     cv::Mat second_y_map;
 };
 
+// Disparity settings
+struct disparity_parameters{
+    int min_disparity;
+    int num_disparities;
+    int block_size;
+    int p1;
+    int p2;
+    int disp_12_max_diff;
+    int pre_filter_cap;
+    int uniqueness_ratio;
+    int speckle_window_size;
+    int speckle_range;
+    int mode;
+};
+
 #endif

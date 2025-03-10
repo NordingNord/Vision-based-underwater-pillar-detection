@@ -47,6 +47,12 @@ public:
 
     void set_match_filter_parameters(int type,int min_matches, double threshold);
 
+    void set_disparity_parameters(int min_disp, int num_disp, int block_size, int p1, int p2, int disp_12_max_diff, int prefilter_cap, int uniqueness_ratio, int speckle_window_size, int speckle_range, int mode);
+
+    void set_wsl_parameters(double lamda, double sigma);
+
+    void set_bilateral_parameters(int diameter, double sigma_color, double sigma_space);
+
     // -- The pipelines --
     void run_triangulation_pipeline();
 
