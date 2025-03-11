@@ -16,11 +16,17 @@
 #include "stereo.h"
 #include "feature_handling.h"
 #include "filters.h"
+#include "converting.h"
+#include "estimating_3d.h"
 
 
 // -- Defines --
 static const int CAMERA_SETUP_MONOCAM = 0;
 static const int CAMERA_SETUP_STEREO = 1;
+
+static const int DISPARITY_FILTER_NONE = 0;
+static const int DISPARITY_FILTER_WLS = 1;
+static const int DISPARITY_FILTER_BILATERAL = 2;
 
 // -- Class --
 class pipeline
@@ -54,7 +60,7 @@ public:
     void set_bilateral_parameters(int diameter, double sigma_color, double sigma_space);
 
     // -- The pipelines --
-    void run_triangulation_pipeline();
+    void run_triangulation_pipeline(int disparity_filter);
 
 private:
     // Pipeline mode
@@ -72,6 +78,15 @@ private:
 
     // Filter class
     filters filtering_sytem;
+
+    // Converting class
+    converting converter;
+
+    // Visualization class
+    visualization visualizer;
+
+    // Triangulation class
+    estimating_3d triangulator;
 
     // Settings
     bool callibration_transposed;

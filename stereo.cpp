@@ -324,3 +324,52 @@ Mat stereo::filter_disparity(Mat disparity_map, Mat first_frame, Mat second_fram
     }
     return filtered_disparity;
 }
+
+// -- Methods that handle depth --
+Mat stereo::disparity_to_depth(Mat disparity_map){
+    Mat depth_map;
+    try{
+        reprojectImageTo3D(disparity_map,depth_map,rectification_data.disparity_depth_map);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return depth_map;
+}
+
+// -- Methods that project features --
+vector<vector<Point2f>> stereo::disparity_project_points(Mat disparity_map, vector<cv::Point2f> points){
+    vector<vector<Point2f>> projected_points = {{},{}};
+    try{
+        for(int i = 0; i < points.size(); i++){
+            // Get current point
+            Point2f projected_point = points.at(i);
+            // Get disparity at point
+            float disparity = disparity_map.at<float>(projected_point.x,projected_point.y);
+            // Check if point is valid
+            if(disparity > 0.0 && disparity < 100.0){
+                // Update x value based on disparity (y is the same due to rectification)
+                projected_point.x -= disparity; // Usually -= but i do beleive mine have to be += due to bottom being left rather than top
+                projected_points.at(0).push_back(points.at(i));
+                projected_points.at(1).push_back(projected_point);
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return projected_points;
+}
+
+// -- Methods for getting private parameters --
+vector<Mat> stereo::get_projections(){
+    vector<Mat> projections;
+    try{
+        projections.push_back(rectification_data.first_projection);
+        projections.push_back(rectification_data.second_projection);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return projections;
+}

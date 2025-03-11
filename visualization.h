@@ -21,6 +21,16 @@ public:
 
     // -- Methods for visualizing text --
     void visualize_matrix(cv::Mat matrix, std::string matrix_name);
+
+    // -- Methods for visualizing points --
+    cv::Mat visualize_points(cv::Mat frame, std::vector<cv::Point2f> points, std::vector<cv::Scalar> colors);
+
+    void visualize_3d_points(std::vector<cv::Point3f> points, std::vector<cv::Vec3b> colors);
+
+    // -- Methods for creating colors --
+    std::vector<cv::Scalar> get_colors(int number_of_colors);
+
+    std::vector<cv::Vec3b> get_frame_colors(std::vector<cv::Point2f> points, cv::Mat frame);
 private:
 
 };

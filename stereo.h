@@ -44,6 +44,15 @@ public:
 
     cv::Mat filter_disparity(cv::Mat disparity_map, cv::Mat first_frame, cv::Mat second_frame); // Uses wls filtering
 
+    // -- Methods that handle depth --
+    cv::Mat disparity_to_depth(cv::Mat disparity_map);
+
+    // -- Methods that project features --
+    std::vector<std::vector<cv::Point2f>>  disparity_project_points(cv::Mat disparity_map, std::vector<cv::Point2f> points);
+
+    // -- Methods for getting private parameters --
+    std::vector<cv::Mat> get_projections();
+
     // -- Trackbars --
     void min_disparity_bar(int step){
         disparity_settings.min_disparity = step;

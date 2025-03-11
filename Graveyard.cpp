@@ -1213,3 +1213,23 @@
 //        break;
 //    }
 //}
+
+//// Prepare triangulated matrix
+//Mat estimated_3d_matrix;
+
+//// Run triangulation
+//triangulatePoints(first_projection, second_projection,first_points,second_points,estimated_3d_matrix);
+//cout << second_points.size() << endl;
+
+
+//Point3f temp_3d;
+////homogeneous so we un homogenize it -> homogenous to cartesian space.
+//temp_3d.x = estimated_3d_matrix.at<double>(0,point_index)/estimated_3d_matrix.at<double>(3,point_index);
+//temp_3d.y = estimated_3d_matrix.at<double>(1,point_index)/estimated_3d_matrix.at<double>(3,point_index);
+//temp_3d.z = estimated_3d_matrix.at<double>(2,point_index)/estimated_3d_matrix.at<double>(3,point_index);
+//// push to output
+//triangulated_points.push_back(temp_3d);
+//cout << "(" << temp_3d.x << ", " << temp_3d.y << ", " << temp_3d.z << ")" << endl;
+//cout << "(" << second_points.at(point_index).x << ", " << second_points.at(point_index).y << ")" << endl;
+//cout << "(" << first_points.at(point_index).x << ", " << first_points.at(point_index).y << ")" << endl;
+//cout << estimated_3d_matrix.at<double>(3,point_index) << endl;

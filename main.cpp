@@ -119,7 +119,7 @@ int main(){
 
     // -- Disparity settings --
     int min_disparity = 0;
-    int num_disparities = 96;
+    int num_disparities = 80;
     int block_size = 11;
     int p1 = 1352;
     int p2 = 10816;
@@ -150,6 +150,6 @@ int main(){
     detection_triangulation.set_wsl_parameters(lamda,sigma);
     detection_triangulation.set_bilateral_parameters(diameter,sigma_color,sigma_space);
 
-    detection_triangulation.run_triangulation_pipeline();
+    detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
 
 }
