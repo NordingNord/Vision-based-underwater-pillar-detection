@@ -21,10 +21,20 @@ void visualization::visualize_matrix(Mat matrix, string matrix_name){
         for(int row = 0; row < matrix.rows; row++){
             for(int col = 0; col < matrix.cols; col++){
                 if(col == matrix.cols-1){
-                    cout << setfill(' ') << setw(11) << matrix.at<double>(row,col); // Matrix is currently exprected to be CV_64FC1 -> access using  double
+                    if(matrix.type() == 6){
+                        cout << setfill(' ') << setw(11) << matrix.at<double>(row,col); // Matrix is currently exprected to be CV_64FC1 -> access using  double
+                    }
+                    else if(matrix.type() == 5){
+                        cout << setfill(' ') << setw(11) << matrix.at<float>(row,col); // Matrix is currently exprected to be CV_32FC1 -> access using  float
+                    }
                 }
                 else{
-                    cout << setfill(' ') << setw(11) << matrix.at<double>(row,col) << ", ";
+                    if(matrix.type() == 6){
+                        cout << setfill(' ') << setw(11) << matrix.at<double>(row,col) << ", ";
+                    }
+                    else if(matrix.type() == 5){
+                         cout << setfill(' ') << setw(11) << matrix.at<float>(row,col) << ", ";
+                    }
                 }
             }
             cout << endl;

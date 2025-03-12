@@ -230,6 +230,14 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                 break;
             }
 
+            // Show original åre transpose
+            Mat original_pre;
+            hconcat(first_frame,second_frame,original_pre);
+            resize(original_pre,original_pre,Size(),0.5,0.5,INTER_LINEAR);
+            imwrite("0.png",original_pre);
+            imshow("Original frames pre transposed", original_pre);
+            waitKey(0);
+
             // Transpose frames if transposed during callibration
             if(callibration_transposed == true){
                 transpose(first_frame,first_frame);
@@ -240,6 +248,7 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
             Mat original;
             hconcat(first_frame,second_frame,original);
             resize(original,original,Size(),0.5,0.5,INTER_LINEAR);
+            imwrite("1.png",original);
             imshow("Original frames", original);
             waitKey(0);
 
@@ -253,17 +262,17 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
             hconcat(rectified_frames.at(0),rectified_frames.at(1),rectified);
             resize(rectified,rectified,Size(),0.5,0.5,INTER_LINEAR);
             line(rectified,{0,295},{rectified.cols-1,295},{255,0,0},1);
-            imwrite("new_rect.png",rectified);
+            imwrite("2.png",rectified);
             imshow("rectified frames", rectified);
             waitKey(0);
 
             // Resize frames
-            resize(first_frame,first_frame,Size(),0.5,0.5,INTER_LINEAR);
-            resize(second_frame,second_frame,Size(),0.5,0.5,INTER_LINEAR);
+            //resize(first_frame,first_frame,Size(),0.5,0.5,INTER_LINEAR);
+            //resize(second_frame,second_frame,Size(),0.5,0.5,INTER_LINEAR);
 
             // Continue if two frames are present (WARNING: For some reason i have to swith first and second frame order from this point out for things to work. Dont know why)
             if(old_first_frame.empty() == false && old_second_frame.empty() == false){
-                // Find features in both first camera frames
+                // Find features in both second camera frames
                 vector<KeyPoint> keypoints = feature_handler.find_features(second_frame);
                 vector<KeyPoint> old_keypoints = feature_handler.find_features(old_second_frame);
 
@@ -276,7 +285,8 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                 drawKeypoints(second_frame,keypoints,second_features,{0,0,255},DrawMatchesFlags::DEFAULT);
                 drawKeypoints(old_second_frame,old_keypoints,old_features,{0,0,255},DrawMatchesFlags::DEFAULT);
                 hconcat(old_features,second_features,features);
-                //resize(features,features,Size(),0.5,0.5,INTER_LINEAR);
+                resize(features,features,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("3.png",features);
                 imshow("Found features", features);
                 waitKey(0);
 
@@ -286,7 +296,8 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                 // Visualize matches
                 Mat matches_frame;
                 drawMatches(old_second_frame,old_keypoints,second_frame,keypoints,matches,matches_frame);
-                //resize(matches_frame,matches_frame,Size(),0.5,0.5,INTER_LINEAR);
+                resize(matches_frame,matches_frame,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("4.png",matches_frame);
                 imshow("original matches", matches_frame);
                 waitKey(0);
 
@@ -296,7 +307,8 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                 // Visualize filtered matches
                 Mat filtered_matches_frame;
                 drawMatches(old_second_frame,old_keypoints,second_frame,keypoints,filtered_matches,filtered_matches_frame);
-                //resize(filtered_matches_frame,filtered_matches_frame,Size(),0.5,0.5,INTER_LINEAR);
+                resize(filtered_matches_frame,filtered_matches_frame,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("5.png",filtered_matches_frame);
                 imshow("filtered matches", filtered_matches_frame);
                 waitKey(0);
 
@@ -309,14 +321,17 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                 Mat disparity_map = stereo_system.get_disparity(second_frame,first_frame);
                 Mat old_disparity_map = stereo_system.get_disparity(old_second_frame,old_first_frame);
 
-                //Mat disparity_map = stereo_system.track_disparity(second_frame,first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+//                Mat disparity_map = stereo_system.track_disparity(second_frame,first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+//                Mat old_disparity_map;
 
                 // Visualize filtered disparity map
                 Mat disparity_map_color;
                 disparity_map_color = stereo_system.process_disparity(disparity_map);
                 applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
                 Mat disparity_combined;
-                hconcat(disparity_map_color,second_frame, disparity_combined);
+                hconcat(disparity_map_color,first_frame, disparity_combined);
+                resize(disparity_combined,disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("6.png",disparity_combined);
                 imshow("Chosen disparity map",disparity_combined);
                 waitKey(0);
 
@@ -333,10 +348,10 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                     old_disparity_map = filtering_sytem.filter_bilateral(old_disparity_map);
                 }
                 else if(disparity_filter == DISPARITY_FILTER_NONE){
-                    disparity_map.convertTo(disparity_map,CV_32F);
-                    disparity_map = disparity_map/16.0;//stereo_system.process_disparity(disparity_map);
-                    old_disparity_map.convertTo(old_disparity_map,CV_32F);
-                    old_disparity_map = old_disparity_map/16.0;//stereo_system.process_disparity(old_disparity_map);
+                    disparity_map.convertTo(disparity_map,CV_32F,1.0/16);
+                    //disparity_map = disparity_map/16.0;//stereo_system.process_disparity(disparity_map);
+                    old_disparity_map.convertTo(old_disparity_map,CV_32F,1.0/16);
+                    //old_disparity_map = old_disparity_map/16.0;//stereo_system.process_disparity(old_disparity_map);
 
                     double min,max;
                     minMaxLoc(disparity_map,&min,&max);
@@ -347,6 +362,7 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                     applyColorMap(disparity_map,disparity_map,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
                     Mat filtered_disparity_combined;
                     hconcat(disparity_map,second_frame, filtered_disparity_combined);
+                    resize(filtered_disparity_combined,filtered_disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
                     imshow("Filtered disparity",filtered_disparity_combined);
                     waitKey(0);
                 }
@@ -355,7 +371,7 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                 Mat depth_map = stereo_system.disparity_to_depth(disparity_map);
 
                 // Write depth map for testing
-                converter.write_3d_points("points_3d.csv",depth_map);
+                converter.write_3d_points("points_3d.csv",depth_map,second_frame);
 
                 // Get points in second frame
                 vector<Point2f> second_points = converter.keypoints_to_points(keypoints);
@@ -380,6 +396,8 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                 Mat visualized_second_points = visualizer.visualize_points(second_frame,second_points,colors);
                 Mat points_combined;
                 hconcat(visualized_second_points, visualized_first_points, points_combined);
+                resize(points_combined,points_combined,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("7.png",points_combined);
                 imshow("Projected points", points_combined);
                 waitKey(0);
 
@@ -389,8 +407,11 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
                 Mat second_projection = projections.at(1);
                 vector<Point3f> estimated_points = triangulator.triangulate_points(second_points,first_points, second_projection, first_projection);
 
-                // Visualize results
+                // Write triangulation for testing
                 vector<Vec3b> frame_colors = visualizer.get_frame_colors(second_points,second_frame);
+                converter.write_3d_points("points_3d_triangulation.csv",estimated_points,frame_colors);
+
+                // Visualize results
                 visualizer.visualize_3d_points(estimated_points,frame_colors);
             }
         }

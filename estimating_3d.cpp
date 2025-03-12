@@ -30,14 +30,14 @@ vector<Point3f> estimating_3d::triangulate_points(vector<Point2f> first_points, 
             temp_3d.y = temp_position.at<double>(1)/temp_position.at<double>(3);
             temp_3d.z = temp_position.at<double>(2)/temp_position.at<double>(3);
 
-            // Test zone
-            visualization visualizer;
-            visualizer.visualize_matrix(first_point,"first point");
-            visualizer.visualize_matrix(second_point,"second point");
-            visualizer.visualize_matrix(first_projection, "first projection");
-            visualizer.visualize_matrix(second_projection, "second projection");
-            cout << "(" << temp_3d.x << ", " << temp_3d.y << ", " << temp_3d.z << ")" << endl;
-            // Test zone done
+//            // Test zone
+//            visualization visualizer;
+//            visualizer.visualize_matrix(first_point,"first point");
+//            visualizer.visualize_matrix(second_point,"second point");
+//            visualizer.visualize_matrix(first_projection, "first projection");
+//            visualizer.visualize_matrix(second_projection, "second projection");
+//            cout << "(" << temp_3d.x << ", " << temp_3d.y << ", " << temp_3d.z << ")" << endl;
+//            // Test zone done
 
             // Push to output
             triangulated_points.push_back(temp_3d);

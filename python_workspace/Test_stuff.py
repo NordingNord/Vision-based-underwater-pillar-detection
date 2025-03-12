@@ -8,6 +8,9 @@ import math
 import statistics 
 import cv2 as cv
 import time
+import csv
+import ellipsis as el
+import open3d as o3d
 
 # DLT from: https://temugeb.github.io/opencv/python/2021/02/02/stereo-camera-calibration-and-triangulation.html
 # Used for comparison to my own c++ implementation
@@ -48,13 +51,61 @@ import time
 # point_2 = np.array([51.9658,85.7148])
 # p3d = DLT(P1,P2,point_1,point_2)
 
-first_projection = np.array([[1437.368512, 0.0, 573.360367, -86.409523], [0.0, 1437.368512, 922.768173, 0.0], [0.0, 0.0, 1.0, 0.0]])
-second_projection = np.array([[1437.368512, 0.0, 573.360367, 0.0],[0.0, 1437.368512, 922.768173, 0.0],[0.0, 0.0, 1.0, 0.0]])
+# first_projection = np.array([[1437.368512, 0.0, 573.360367, -86.409523], [0.0, 1437.368512, 922.768173, 0.0], [0.0, 0.0, 1.0, 0.0]])
+# second_projection = np.array([[1437.368512, 0.0, 573.360367, 0.0],[0.0, 1437.368512, 922.768173, 0.0],[0.0, 0.0, 1.0, 0.0]])
 
-first_point = np.array([235.007416, 664.029175])
-second_point = np.array([183.132416, 664.029175])
+# first_point = np.array([235.007416, 664.029175])
+# second_point = np.array([183.132416, 664.029175])
 
-Q = cv.triangulatePoints(first_projection, second_projection, first_point.T, second_point.T)
-Q = np.transpose(Q[:3] / Q[3])
+# Q = cv.triangulatePoints(first_projection, second_projection, first_point.T, second_point.T)
+# Q = np.transpose(Q[:3] / Q[3])
 
-print(Q)
+# print(Q)
+
+# -- Read 3d data --
+x_coordinates = []
+y_coordinates = []
+z_coordinates = []
+points_3d = []
+colors = []
+
+with open('points_3d.csv',mode = 'r') as file:
+    csv_file = csv.DictReader(file)
+    for line in csv_file:
+        x_coordinates.append(float(line.get("x")))
+        y_coordinates.append(float(line.get("y")))
+        z_coordinates.append(float(line.get("z")))
+
+        point_3d = []
+        point_3d.append(float(line.get("x")))
+        point_3d.append(float(line.get("y")))
+        point_3d.append(float(line.get("z")))
+        points_3d.append(np.array(point_3d))
+
+        color = []
+        color.append(float(line.get("r"))/255.0)
+        color.append(float(line.get("g"))/255.0)
+        color.append(float(line.get("b"))/255.0)
+        colors.append(np.array(color))
+colors = np.array(colors)
+points_3d = np.array(points_3d)
+
+
+# -- point cloud --
+point_cloud = o3d.geometry.PointCloud()
+point_cloud.points = o3d.utility.Vector3dVector(points_3d)
+point_cloud.colors = o3d.utility.Vector3dVector(colors)
+o3d.visualization.draw_geometries([point_cloud])
+
+
+# -- 3D plot --
+# figure_3d = plt.figure()
+# axis = plt.axes(projection='3d')
+# print(len(colors))
+# print(len(x_coordinates))
+# axis.scatter(x_coordinates,y_coordinates,z_coordinates,)
+# axis.set_title('3D estimation')
+# axis.set_xlabel('x', fontsize=12)
+# axis.set_ylabel('y', fontsize=12)
+# axis.set_zlabel('z', fontsize=12)
+# plt.show()

@@ -71,6 +71,11 @@ void stereo::prepare_rectify(Mat first_intrinsics, Mat second_intrinsics, Mat fi
         Mat first_transform, second_transform, first_projection, second_projection, disparity_depth_map;
         Rect region_of_intrest[2]; // Region in each image where the algorithm beleives only correct matches are atained. (Used for cropping)
 
+        // Test
+        stereoRectify(second_intrinsics, second_distortion, first_intrinsics, first_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
+        Q_test = disparity_depth_map;
+        // Test done
+
         stereoRectify(first_intrinsics, first_distortion, second_intrinsics, second_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
 
         // Initialize undistortion
@@ -330,6 +335,34 @@ Mat stereo::disparity_to_depth(Mat disparity_map){
     Mat depth_map;
     try{
         reprojectImageTo3D(disparity_map,depth_map,rectification_data.disparity_depth_map);
+
+        // TEMP:
+        Mat Q;
+        Q_test.convertTo(Q,CV_32FC1);
+
+        visualization visualizer;
+        visualizer.visualize_matrix(Q_test, "Q:");
+        visualizer.visualize_matrix(Q, "Q converted:");
+        cout << Q_test.type() << endl;
+        cout << Q.type() << endl;
+
+        cv::Mat_<cv::Vec3f> XYZ(disparity_map.rows,disparity_map.cols);   // Output point cloud
+        cv::Mat_<float> vec_tmp(4,1);
+        for(int y=0; y<disparity_map.rows; ++y) {
+            for(int x=0; x<disparity_map.cols; ++x) {
+                vec_tmp(0)=x;
+                vec_tmp(1)=y;
+                vec_tmp(2)=disparity_map.at<float>(y,x);
+                vec_tmp(3)=1;
+                vec_tmp = Q*vec_tmp;
+                vec_tmp /= vec_tmp(3);
+                cv::Vec3f &point = XYZ.at<cv::Vec3f>(y,x);
+                point[0] = vec_tmp(0);
+                point[1] = vec_tmp(1);
+                point[2] = vec_tmp(2);
+            }
+        }
+        depth_map = XYZ;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -345,11 +378,11 @@ vector<vector<Point2f>> stereo::disparity_project_points(Mat disparity_map, vect
             // Get current point
             Point2f projected_point = points.at(i);
             // Get disparity at point
-            float disparity = disparity_map.at<float>(projected_point.x,projected_point.y);
+            float disparity = disparity_map.at<float>(projected_point);
             // Check if point is valid
-            if(disparity > 0.0 && disparity < 100.0){
+            if(disparity > 0.0 && disparity < 150.0){
                 // Update x value based on disparity (y is the same due to rectification)
-                projected_point.x -= disparity; // Usually -= but i do beleive mine have to be += due to bottom being left rather than top
+                projected_point.x -= disparity;
                 projected_points.at(0).push_back(points.at(i));
                 projected_points.at(1).push_back(projected_point);
             }

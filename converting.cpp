@@ -55,19 +55,22 @@ vector<vector<KeyPoint>> converting::remove_unmatches_keypoints(vector<DMatch> m
 }
 
 // -- Methods for writing data to files --
-void converting::write_3d_points(string filename, Mat points){
+void converting::write_3d_points(string filename, Mat points, Mat color_frame){
     try{
         // open file
         ofstream point_file(filename);
 
         // write first line
-        point_file << "x,y,z,\n";
+        point_file << "x,y,z,r,g,b,\n";
 
         // write to file
         for(int row = 0; row < points.rows; row++){
             for(int col = 0; col < points.cols; col++){
                 Vec3f point = points.at<Vec3f>(row,col);
-                point_file << point[0] << ", " << point[1] << ", " << point[2] << ",\n";
+                Vec3b color = color_frame.at<Vec3b>(row,col);
+                if(isinf(point[0]) == false && isinf(point[1]) == false && isinf(point[2]) == false && isnan(point[0]) == false && isnan(point[1]) == false && isnan(point[2]) == false ){
+                    point_file << point[0] << "," << point[1] << "," << point[2] << "," << float(color[2]) << "," << float(color[1]) << "," << float(color[0]) << ",\n";
+                }
             }
         }
         point_file.close();
@@ -76,3 +79,27 @@ void converting::write_3d_points(string filename, Mat points){
         cout << "Error: " << error.what() << endl;
     }
 }
+
+void converting::write_3d_points(string filename, vector<Point3f> points, vector<Vec3b> colors){
+    try{
+        // open file
+        ofstream point_file(filename);
+
+        // write first line
+        point_file << "x,y,z,r,g,b,\n";
+
+        // write to file
+        for(int point_index = 0; point_index < points.size(); point_index++){
+            Point3f point = points.at(point_index);
+            Vec3b color = colors.at(point_index);
+            if(isinf(point.x) == false && isinf(point.y) == false && isinf(point.z) == false && isnan(point.x) == false && isnan(point.y) == false && isnan(point.z) == false ){
+                point_file << point.x << "," << point.y << "," << point.z << "," << float(color[2]) << "," << float(color[1]) << "," << float(color[0]) << ",\n";
+            }
+        }
+        point_file.close();
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+

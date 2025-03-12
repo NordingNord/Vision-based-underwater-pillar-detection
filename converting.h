@@ -28,7 +28,9 @@ public:
     std::vector<std::vector<cv::KeyPoint>> remove_unmatches_keypoints(std::vector<cv::DMatch> matches, std::vector<cv::KeyPoint> query_keypoints, std::vector<cv::KeyPoint> train_keypoints);
 
     // -- Methods for writing data to files --
-    void write_3d_points(std::string filename, cv::Mat points);
+    void write_3d_points(std::string filename, cv::Mat points, cv::Mat color_frame);
+    void write_3d_points(std::string filename, std::vector<cv::Point3f> points, std::vector<cv::Vec3b> colors);
+
 
 private:
 };

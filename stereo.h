@@ -111,6 +111,9 @@ private:
     double lamda;
     double sigma;
 
+    // -- Test gab gab --
+    cv::Mat Q_test;
+
 };
 
 #endif // STEREO_H
