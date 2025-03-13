@@ -10,6 +10,7 @@
 #include "opencv2/ximgproc.hpp"
 #include "Data_Structures.h"
 #include "visualization.h"
+#include "filters.h"
 
 // -- Defines --
 static const double VALID = 0.0;
@@ -46,6 +47,8 @@ public:
 
     // -- Methods that handle depth --
     cv::Mat disparity_to_depth(cv::Mat disparity_map);
+
+    cv::Mat get_filtered_depth_map(cv::Mat depth_map);
 
     // -- Methods that project features --
     std::vector<std::vector<cv::Point2f>>  disparity_project_points(cv::Mat disparity_map, std::vector<cv::Point2f> points);

@@ -128,3 +128,66 @@ Mat filters::filter_bilateral(Mat frame){
     return filtered_frame;
 }
 
+
+// -- Filters to remove outliers --
+vector<float> filters::filter_iqr(vector<float> data_points){
+    vector<float> filtered_data;
+    try{
+        filtered_data = filter_ipr(data_points,0.25,0.75);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_data;
+}
+
+vector<float> filters::filter_ipr(vector<float> data_points, float lower_percentile, float upper_percentile){
+    vector<float> filtered_data;
+    try{
+        // sort vector
+        vector<float> sorted_data_points = data_points;
+        sort(sorted_data_points.begin(),sorted_data_points.end());
+
+        // Find quantiles
+        int lower_index = lower_percentile*sorted_data_points.size();
+        int upper_index = upper_percentile*sorted_data_points.size();
+
+        float lower_quantile = sorted_data_points.at(lower_index);
+        float upper_quantile = sorted_data_points.at(upper_index);
+
+        // Determine range
+        float inter_quantile_range = upper_quantile-lower_quantile;
+
+        // Determine bounds
+        float lower_bound = lower_quantile-1.5*inter_quantile_range;
+        float upper_bound = upper_quantile+1.5*inter_quantile_range;
+
+        // Filter points
+        bool bottom_found = false;
+        bool top_found = false;
+        int low_index,high_index;
+        for(int indent = 0; indent < sorted_data_points.size(); indent++){
+            float lower_val = sorted_data_points.at(indent);
+            float upper_val = sorted_data_points.at(sorted_data_points.size()-(indent+1));
+
+            if(lower_val >= lower_bound && bottom_found == false){
+                low_index = indent;
+                bottom_found = true;
+            }
+            if(upper_val <= upper_bound && top_found == false){
+                high_index = indent;
+                top_found = true;
+            }
+            if(top_found == true && bottom_found == true){
+                break;
+            }
+        }
+
+        filtered_data.assign(sorted_data_points.begin()+low_index,sorted_data_points.end()-high_index);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_data;
+}
+

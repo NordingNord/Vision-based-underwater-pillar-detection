@@ -1233,3 +1233,41 @@
 //cout << "(" << second_points.at(point_index).x << ", " << second_points.at(point_index).y << ")" << endl;
 //cout << "(" << first_points.at(point_index).x << ", " << first_points.at(point_index).y << ")" << endl;
 //cout << estimated_3d_matrix.at<double>(3,point_index) << endl;
+
+//// Get max and min depth
+//Mat depth_channel;
+//extractChannel(depth_map,depth_channel,2);
+
+//float min_depth = 0.0;
+//float max_depth = 0.0;
+//vector<float> depths;
+//bool init = true;
+//for(int row_index = 0; row_index < depth_channel.rows; row_index++){
+//    for(int col_index = 0; col_index < depth_channel.cols; col_index++){
+//        float depth = depth_channel.at<float>(Point(col_index,row_index));
+//        if(isinf(depth) == false && isinf(depth) == false && isinf(depth) == false && isnan(depth) == false && isnan(depth) == false && isnan(depth) == false){
+//            if(init == true){
+//                min_depth = depth;
+//                max_depth = min_depth;
+//                init = false;
+//                cout << "First depth: " << depth << endl;
+//            }
+//            else{
+//                if(depth < min_depth){
+//                    min_depth = depth;
+//                }
+//                if(depth > max_depth){
+//                    max_depth = depth;
+//                }
+//            }
+//            depths.push_back(depth);
+//        }
+//    }
+//}
+
+//// Find 75 percentile
+//sort(depths.begin(), depths.end());
+//cout << depths.at(depths.size()-1) << endl;
+//int index = (0.95*depths.size()); // If percentile is inbetween two values, the lowest is taken.
+//float percentile_value = depths.at(index);
+//max_depth = percentile_value;

@@ -150,6 +150,7 @@ int main(){
     detection_triangulation.set_wsl_parameters(lamda,sigma);
     detection_triangulation.set_bilateral_parameters(diameter,sigma_color,sigma_space);
 
-    detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
+    //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
+    detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
 
 }

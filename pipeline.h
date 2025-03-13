@@ -18,6 +18,7 @@
 #include "filters.h"
 #include "converting.h"
 #include "estimating_3d.h"
+#include "detecting.h"
 
 
 // -- Defines --
@@ -62,6 +63,8 @@ public:
     // -- The pipelines --
     void run_triangulation_pipeline(int disparity_filter);
 
+    void run_triangulation_pipeline_test(int disparity_filter);
+
 private:
     // Pipeline mode
     int mode;
@@ -87,6 +90,9 @@ private:
 
     // Triangulation class
     estimating_3d triangulator;
+
+    // Detector class
+    detecting detector;
 
     // Settings
     bool callibration_transposed;

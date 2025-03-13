@@ -34,6 +34,12 @@ public:
     // -- Methods for filtering/blurring frames --
     cv::Mat filter_bilateral(cv::Mat frame);
 
+    // -- Filters to remove outliers --
+    std::vector<float> filter_iqr(std::vector<float> data_points); // inter quantile range
+
+    std::vector<float> filter_ipr(std::vector<float> data_points, float lower_percentile, float upper_percentile); // inter percentile range
+
+
 
 private:
     // -- Filters used for different filtering --

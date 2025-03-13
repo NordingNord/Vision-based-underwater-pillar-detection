@@ -421,3 +421,254 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
     }
 }
 
+
+
+// TEST ZONE
+
+void pipeline::run_triangulation_pipeline_test(int disparity_filter){
+    try{
+        // Visualize camera data
+        first_camera.visualize_camera_data("First/Left/Bottom camera data: ");
+        second_camera.visualize_camera_data("Second/Right/Top camera data: ");
+
+        // Prepare rectification
+        stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
+
+        // Initialize some loop paramters
+        int frame_index = 0;
+        Mat first_frame, second_frame, old_first_frame, old_second_frame;
+
+        // Begin to go through video feed
+        while(true){
+
+            // Update old frames
+            if(frame_index > 0){
+                old_first_frame = first_frame;
+                old_second_frame = second_frame;
+            }
+
+            // Read frames
+            first_frame = first_camera.get_next_frame();
+            second_frame = second_camera.get_next_frame();
+
+            // Increment index
+            frame_index++;
+
+            // Break if no more frames any of the videos
+            if(first_frame.empty() || second_frame.empty()){
+                cout << "Reached end of a video stream" << endl;
+                // Error notification if one video ends prematurely
+                if(first_frame.empty() == false){
+                    throw runtime_error("Second video was limited by first video length.");
+                }
+                else if(second_frame.empty() == false){
+                    throw runtime_error("First video was limited by second video length.");
+                }
+                break;
+            }
+
+            // Show original åre transpose
+            Mat original_pre;
+            hconcat(first_frame,second_frame,original_pre);
+            resize(original_pre,original_pre,Size(),0.5,0.5,INTER_LINEAR);
+            imwrite("0.png",original_pre);
+            imshow("Original frames pre transposed", original_pre);
+            waitKey(0);
+
+            // Transpose frames if transposed during callibration
+            if(callibration_transposed == true){
+                //transpose(first_frame,first_frame);
+                //transpose(second_frame,second_frame);
+                rotate(first_frame, first_frame, ROTATE_90_CLOCKWISE);
+                rotate(second_frame, second_frame, ROTATE_90_CLOCKWISE);
+            }
+
+            // Show original
+            Mat original;
+            hconcat(first_frame,second_frame,original);
+            resize(original,original,Size(),0.5,0.5,INTER_LINEAR);
+            imwrite("1.png",original);
+            imshow("Original frames", original);
+            waitKey(0);
+
+            // Rectify frames
+            vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
+            first_frame = rectified_frames.at(0);
+            second_frame = rectified_frames.at(1);
+
+            // Show rectification
+            Mat rectified;
+            hconcat(rectified_frames.at(0),rectified_frames.at(1),rectified);
+            resize(rectified,rectified,Size(),0.5,0.5,INTER_LINEAR);
+            line(rectified,{0,295},{rectified.cols-1,295},{255,0,0},1);
+            imwrite("2.png",rectified);
+            imshow("rectified frames", rectified);
+            waitKey(0);
+
+            // Resize frames
+            //resize(first_frame,first_frame,Size(),0.5,0.5,INTER_LINEAR);
+            //resize(second_frame,second_frame,Size(),0.5,0.5,INTER_LINEAR);
+
+            // Continue if two frames are present (WARNING: For some reason i have to swith first and second frame order from this point out for things to work. Dont know why)
+            if(old_first_frame.empty() == false && old_second_frame.empty() == false){
+                // Find features in both first camera frames
+                vector<KeyPoint> keypoints = feature_handler.find_features(first_frame);
+                vector<KeyPoint> old_keypoints = feature_handler.find_features(old_first_frame);
+
+                // Find descriptors
+                Mat descriptors = feature_handler.get_descriptors(first_frame,keypoints);
+                Mat old_descriptors = feature_handler.get_descriptors(old_first_frame,old_keypoints);
+
+                // Visualize features
+                Mat features, second_features, old_features;
+                drawKeypoints(first_frame,keypoints,second_features,{0,0,255},DrawMatchesFlags::DEFAULT);
+                drawKeypoints(old_first_frame,old_keypoints,old_features,{0,0,255},DrawMatchesFlags::DEFAULT);
+                hconcat(old_features,second_features,features);
+                resize(features,features,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("3.png",features);
+                imshow("Found features", features);
+                waitKey(0);
+
+                // Match features
+                vector<DMatch> matches = feature_handler.match_features(old_descriptors,descriptors);
+
+                // Visualize matches
+                Mat matches_frame;
+                drawMatches(old_first_frame,old_keypoints,first_frame,keypoints,matches,matches_frame);
+                resize(matches_frame,matches_frame,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("4.png",matches_frame);
+                imshow("original matches", matches_frame);
+                waitKey(0);
+
+                // Filter matches
+                vector<DMatch> filtered_matches = filtering_sytem.filter_matches(matches,old_keypoints,keypoints);
+
+                // Visualize filtered matches
+                Mat filtered_matches_frame;
+                drawMatches(old_first_frame,old_keypoints,first_frame,keypoints,filtered_matches,filtered_matches_frame);
+                resize(filtered_matches_frame,filtered_matches_frame,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("5.png",filtered_matches_frame);
+                imshow("filtered matches", filtered_matches_frame);
+                waitKey(0);
+
+                // Filter points based on matches
+                vector<vector<KeyPoint>> remaining_keypoints = converter.remove_unmatches_keypoints(matches,old_keypoints,keypoints);
+                old_keypoints = remaining_keypoints.at(0);
+                keypoints = remaining_keypoints.at(1);
+
+                // Compute disparity map
+                Mat disparity_map = stereo_system.get_disparity(first_frame,second_frame);
+                Mat old_disparity_map = stereo_system.get_disparity(old_first_frame,old_second_frame);
+
+//                Mat disparity_map = stereo_system.track_disparity(second_frame,first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+//                Mat old_disparity_map;
+
+                // Visualize filtered disparity map
+                Mat disparity_map_color;
+                disparity_map_color = stereo_system.process_disparity(disparity_map);
+                applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                Mat disparity_combined;
+                hconcat(disparity_map_color,first_frame, disparity_combined);
+                resize(disparity_combined,disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("6.png",disparity_combined);
+                imshow("Chosen disparity map",disparity_combined);
+                waitKey(0);
+
+                // Filter disparity map
+                if(disparity_filter == DISPARITY_FILTER_WLS){
+                    disparity_map = stereo_system.filter_disparity(disparity_map,first_frame,second_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+                    old_disparity_map = stereo_system.filter_disparity(old_disparity_map,old_first_frame,old_second_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+                }
+                else if(disparity_filter == DISPARITY_FILTER_BILATERAL){
+                    disparity_map = stereo_system.process_disparity(disparity_map); // should only be done when filtering is used, since it does not excpect disparity maps
+                    disparity_map = filtering_sytem.filter_bilateral(disparity_map);
+
+                    old_disparity_map = stereo_system.process_disparity(old_disparity_map); // should only be done when filtering is used, since it does not excpect disparity maps
+                    old_disparity_map = filtering_sytem.filter_bilateral(old_disparity_map);
+                }
+                else if(disparity_filter == DISPARITY_FILTER_NONE){
+                    disparity_map.convertTo(disparity_map,CV_32F,1.0/16);
+                    //disparity_map = disparity_map/16.0;//stereo_system.process_disparity(disparity_map);
+                    old_disparity_map.convertTo(old_disparity_map,CV_32F,1.0/16);
+                    //old_disparity_map = old_disparity_map/16.0;//stereo_system.process_disparity(old_disparity_map);
+
+                    double min,max;
+                    minMaxLoc(disparity_map,&min,&max);
+                    cout << min << " -> " << max << endl;
+                }
+                if(disparity_filter != DISPARITY_FILTER_NONE){
+                    // Visualize filtered disparity map
+                    applyColorMap(disparity_map,disparity_map,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                    Mat filtered_disparity_combined;
+                    hconcat(disparity_map,first_frame, filtered_disparity_combined);
+                    resize(filtered_disparity_combined,filtered_disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
+                    imshow("Filtered disparity",filtered_disparity_combined);
+                    waitKey(0);
+                }
+
+                // Get depth map
+                Mat depth_map = stereo_system.disparity_to_depth(disparity_map);
+
+                // Write depth map for testing
+                converter.write_3d_points("points_3d.csv",depth_map,first_frame);
+
+                // Visualize depth information
+                Mat depth_frame = visualizer.show_depths(first_frame,depth_map);
+
+                // Find edges in depth
+                Mat filtered_depth_map = stereo_system.get_filtered_depth_map(depth_map);
+                Mat depth_difference = detector.get_depth_difference(filtered_depth_map);
+
+                // Visualize depth map
+                resize(depth_frame,depth_frame,Size(),0.5,0.5,INTER_LINEAR);
+                imshow("Frame depth",depth_frame);
+                waitKey(0);
+
+                // Get points in second frame
+                vector<Point2f> first_points = converter.keypoints_to_points(keypoints);
+                vector<Point2f> old_first_points = converter.keypoints_to_points(old_keypoints);
+
+                // Get disparity matched points
+                vector<vector<Point2f>> disparity_points = stereo_system.disparity_project_points(disparity_map,first_points);
+                vector<vector<Point2f>> old_disparity_points = stereo_system.disparity_project_points(old_disparity_map,old_first_points);
+
+                first_points = disparity_points.at(0);
+                vector<Point2f> second_points = disparity_points.at(1);
+
+                old_first_points = old_disparity_points.at(0);
+                vector<Point2f> old_second_points = old_disparity_points.at(1);
+                cout << first_points.size() << endl;
+                cout << second_points.size() << endl;
+
+
+                // Visualize points in first and second frame
+                vector<Scalar> colors = visualizer.get_colors(first_points.size());
+                Mat visualized_first_points = visualizer.visualize_points(first_frame,first_points,colors);
+                Mat visualized_second_points = visualizer.visualize_points(second_frame,second_points,colors);
+                Mat points_combined;
+                hconcat(visualized_first_points, visualized_second_points, points_combined);
+                resize(points_combined,points_combined,Size(),0.5,0.5,INTER_LINEAR);
+                imwrite("7.png",points_combined);
+                imshow("Projected points", points_combined);
+                waitKey(0);
+
+                // Triangulate points
+                vector<Mat> projections = stereo_system.get_projections();
+                Mat first_projection = projections.at(0);
+                Mat second_projection = projections.at(1);
+                vector<Point3f> estimated_points = triangulator.triangulate_points(first_points,second_points, first_projection, second_projection);
+
+                // Write triangulation for testing
+                vector<Vec3b> frame_colors = visualizer.get_frame_colors(first_points,first_frame);
+                converter.write_3d_points("points_3d_triangulation.csv",estimated_points,frame_colors);
+
+                // Visualize results
+                visualizer.visualize_3d_points(estimated_points,frame_colors);
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+

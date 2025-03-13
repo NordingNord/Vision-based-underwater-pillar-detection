@@ -138,3 +138,105 @@ vector<Vec3b> visualization::get_frame_colors(vector<Point2f> points, Mat frame)
     return colors;
 }
 
+
+// -- Methods for visualizing depth --
+Mat visualization::show_depths(Mat frame, Mat depth_map){
+    Mat depth_frame = frame.clone();
+    try{
+        // Get depth channel
+        Mat depth_channel;
+        extractChannel(depth_map,depth_channel,2);
+
+        // Get all valid points
+        vector<float> depths;
+        for(int row_index = 0; row_index < depth_channel.rows; row_index++){
+            for(int col_index = 0; col_index < depth_channel.cols; col_index++){
+                float depth = depth_channel.at<float>(Point(col_index,row_index));
+                if(isinf(depth) == false && isinf(depth) == false && isinf(depth) == false && isnan(depth) == false && isnan(depth) == false && isnan(depth) == false){
+                    depths.push_back(depth);
+                }
+            }
+        }
+
+        // Filter outliers
+        filters filter;
+        vector<float> filtered_depths = filter.filter_ipr(depths,0.25,0.90);
+
+        // Determine min and max depth
+        float min_depth = filtered_depths.front();
+        float max_depth = filtered_depths.back();
+
+        cout << min_depth << " -> " << max_depth << endl;
+        Mat temp_depth = depth_map.clone();
+        // Get depth for each pixel
+        for(int row_index = 0; row_index < frame.rows; row_index++){
+            for(int col_index = 0; col_index < frame.cols; col_index++){
+                // Get depth / z-coordinate
+                Vec3f coordinates = depth_map.at<Vec3f>(Point(col_index,row_index));
+                float depth = coordinates[2];
+
+                // Set to max if Nan or inf or bigger than percentile
+                if(isinf(depth) == true || isinf(depth) == true || isinf(depth) == true || isnan(depth) == true || isnan(depth) == true || isnan(depth) == true || depth > max_depth){
+                    depth = max_depth;
+                }
+                // If smaller set to min
+                if(depth < min_depth){
+                    depth = min_depth;
+                }
+
+                // temp norm
+                float temp_norm = 255.0-(depth-min_depth)/(max_depth-min_depth)*255.0;
+                temp_depth.at<Vec3f>(Point(col_index,row_index))[2] = temp_norm;
+
+                // Normalise between 0 and 510 (first 255 -> blue/green for far away, last 255 -> yellow/red for close by)
+                float depth_normalized = (depth-min_depth)/(max_depth-min_depth)*510.0;
+                // Reverse to have red be close and blue be far away
+                depth_normalized = 510.0-depth_normalized;
+
+                // Determine color
+                Vec3b color;
+                if(depth_normalized <= 255.0){
+                    // Blue -> close to 0, green -> close to 255
+                    int blue = 255-int(depth_normalized);
+                    int green = int(depth_normalized);
+                    int red = 0;
+                    color[0] = blue;
+                    color[1] = green;
+                    color[2] = red;
+                }
+                else if(depth_normalized > 255.0){
+                    // Yellow -> close to 255, red -> close to 510
+                    float temp_depth_normalized = depth_normalized-255.0;
+                    int blue = 0;
+                    int green = 255-int(temp_depth_normalized);
+                    int red = int(temp_depth_normalized);
+                    color[0] = blue;
+                    color[1] = green;
+                    color[2] = red;
+                }
+                else{
+                    string error_message = "Unrecognised normalized depth of " + to_string(depth_normalized) + ".";
+                    throw runtime_error(error_message);
+                }
+                // Mark area
+                circle(depth_frame,Point(col_index,row_index),1,color,-1);
+            }
+        }
+        // Test stuff
+        Mat colored_depth, small_depth;
+        extractChannel(temp_depth,depth_channel,2);
+        depth_channel.convertTo(small_depth,CV_8U);
+        applyColorMap(small_depth,colored_depth,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+
+        // Make transparent
+        addWeighted(depth_frame,0.5,frame,1-0.5,0,depth_frame); // img1, weight of img1, img2, weight of img2, added scalar, output, depth
+
+        // test
+        //addWeighted(colored_depth,0.5,frame,1-0.5,0,depth_frame);
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return depth_frame;
+}

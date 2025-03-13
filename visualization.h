@@ -9,6 +9,7 @@
 #include <opencv2/highgui.hpp>
 #include <pcl/visualization/cloud_viewer.h>
 #include "Data_Structures.h"
+#include "filters.h"
 
 // -- Defines --
 
@@ -31,6 +32,9 @@ public:
     std::vector<cv::Scalar> get_colors(int number_of_colors);
 
     std::vector<cv::Vec3b> get_frame_colors(std::vector<cv::Point2f> points, cv::Mat frame);
+
+    // -- Methods for visualizing depth --
+    cv::Mat show_depths(cv::Mat frame, cv::Mat depth_map);
 private:
 
 };

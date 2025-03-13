@@ -72,7 +72,8 @@ void stereo::prepare_rectify(Mat first_intrinsics, Mat second_intrinsics, Mat fi
         Rect region_of_intrest[2]; // Region in each image where the algorithm beleives only correct matches are atained. (Used for cropping)
 
         // Test
-        stereoRectify(second_intrinsics, second_distortion, first_intrinsics, first_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
+        // Invert rotation and translation
+        stereoRectify(first_intrinsics, first_distortion, second_intrinsics, second_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
         Q_test = disparity_depth_map;
         // Test done
 
@@ -334,40 +335,98 @@ Mat stereo::filter_disparity(Mat disparity_map, Mat first_frame, Mat second_fram
 Mat stereo::disparity_to_depth(Mat disparity_map){
     Mat depth_map;
     try{
-        reprojectImageTo3D(disparity_map,depth_map,rectification_data.disparity_depth_map);
+        Mat temp_disp;
+        disparity_map.convertTo(temp_disp,CV_8U);
+        //temp_disp = disparity_map.clone();
+        reprojectImageTo3D(temp_disp,depth_map,rectification_data.disparity_depth_map);
 
-        // TEMP:
-        Mat Q;
-        Q_test.convertTo(Q,CV_32FC1);
+//        // TEMP:
+//        Mat Q;
+//        //Q_test.convertTo(Q,CV_32FC1);
+//        rectification_data.disparity_depth_map.convertTo(Q, CV_32FC1);
 
-        visualization visualizer;
-        visualizer.visualize_matrix(Q_test, "Q:");
-        visualizer.visualize_matrix(Q, "Q converted:");
-        cout << Q_test.type() << endl;
-        cout << Q.type() << endl;
+//        visualization visualizer;
+//        visualizer.visualize_matrix(Q_test, "Q:");
+//        visualizer.visualize_matrix(Q, "Q converted:");
+//        cout << Q_test.type() << endl;
+//        cout << Q.type() << endl;
 
-        cv::Mat_<cv::Vec3f> XYZ(disparity_map.rows,disparity_map.cols);   // Output point cloud
-        cv::Mat_<float> vec_tmp(4,1);
-        for(int y=0; y<disparity_map.rows; ++y) {
-            for(int x=0; x<disparity_map.cols; ++x) {
-                vec_tmp(0)=x;
-                vec_tmp(1)=y;
-                vec_tmp(2)=disparity_map.at<float>(y,x);
-                vec_tmp(3)=1;
-                vec_tmp = Q*vec_tmp;
-                vec_tmp /= vec_tmp(3);
-                cv::Vec3f &point = XYZ.at<cv::Vec3f>(y,x);
-                point[0] = vec_tmp(0);
-                point[1] = vec_tmp(1);
-                point[2] = vec_tmp(2);
-            }
-        }
-        depth_map = XYZ;
+//        cv::Mat_<cv::Vec3f> XYZ(disparity_map.rows,disparity_map.cols);   // Output point cloud
+//        cv::Mat_<float> vec_tmp(4,1);
+//        for(int y=0; y<disparity_map.rows; ++y) {
+//            for(int x=0; x<disparity_map.cols; ++x) {
+//                vec_tmp(0)=x;
+//                vec_tmp(1)=y;
+//                vec_tmp(2)=disparity_map.at<float>(y,x);
+//                vec_tmp(3)=1;
+//                vec_tmp = Q*vec_tmp;
+//                vec_tmp /= vec_tmp(3);
+//                cv::Vec3f &point = XYZ.at<cv::Vec3f>(y,x);
+//                point[0] = vec_tmp(0);
+//                point[1] = vec_tmp(1);
+//                point[2] = vec_tmp(2);
+//            }
+//        }
+//        depth_map = XYZ;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
     return depth_map;
+}
+
+
+Mat stereo::get_filtered_depth_map(Mat depth_map){
+    Mat cleaned_depth_map;
+    try{
+        // Get depth channel
+        Mat depth_channel;
+        extractChannel(depth_map,depth_channel,2);
+
+        // Get all valid points
+        vector<float> depths;
+        for(int row_index = 0; row_index < depth_channel.rows; row_index++){
+            for(int col_index = 0; col_index < depth_channel.cols; col_index++){
+                float depth = depth_channel.at<float>(Point(col_index,row_index));
+                if(isinf(depth) == false && isinf(depth) == false && isinf(depth) == false && isnan(depth) == false && isnan(depth) == false && isnan(depth) == false){
+                    depths.push_back(depth);
+                }
+            }
+        }
+
+        // Filter outliers
+        filters filter;
+        vector<float> filtered_depths = filter.filter_ipr(depths,0.25,0.90);
+
+        // Determine min and max depth
+        float min_depth = filtered_depths.front();
+        float max_depth = filtered_depths.back();
+
+        // Get depth for each pixel
+        for(int row_index = 0; row_index < depth_map.rows; row_index++){
+            for(int col_index = 0; col_index < depth_map.cols; col_index++){
+                // Get depth / z-coordinate
+                Vec3f coordinates = depth_map.at<Vec3f>(Point(col_index,row_index));
+                float depth = coordinates[2];
+
+                // Set to max if Nan or inf or bigger than percentile
+                if(isinf(depth) == true || isinf(depth) == true || isinf(depth) == true || isnan(depth) == true || isnan(depth) == true || isnan(depth) == true || depth > max_depth){
+                    depth = max_depth;
+                }
+                // If smaller set to min
+                if(depth < min_depth){
+                    depth = min_depth;
+                }
+
+                depth_channel.at<float>(Point(col_index,row_index)) = depth;
+            }
+        }
+        cleaned_depth_map = depth_channel;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return cleaned_depth_map;
 }
 
 // -- Methods that project features --
