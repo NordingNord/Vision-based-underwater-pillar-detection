@@ -8,6 +8,7 @@
 #include <string>
 #include <iomanip>
 #include <opencv2/opencv.hpp>
+#include "opencv2/ximgproc.hpp"
 #include "Data_Structures.h"
 #include "visualization.h"
 

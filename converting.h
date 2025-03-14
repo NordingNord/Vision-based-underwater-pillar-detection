@@ -10,6 +10,7 @@
 #include <opencv2/opencv.hpp>
 #include "Data_Structures.h"
 #include "visualization.h"
+#include "filters.h"
 
 // -- Defines --
 
@@ -30,6 +31,9 @@ public:
     // -- Methods for writing data to files --
     void write_3d_points(std::string filename, cv::Mat points, cv::Mat color_frame);
     void write_3d_points(std::string filename, std::vector<cv::Point3f> points, std::vector<cv::Vec3b> colors);
+
+    // -- Methods for normalization --
+    cv::Mat normalize_depth(cv::Mat depth_map, float range);
 
 
 private:

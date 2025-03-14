@@ -56,6 +56,9 @@ public:
     // -- Methods for getting private parameters --
     std::vector<cv::Mat> get_projections();
 
+    // -- Methods for cleaning maps after disparity mapping --
+    cv::Mat remove_invalid_edge(cv::Mat frame); // Removes edge made by disparity mapping
+
     // -- Trackbars --
     void min_disparity_bar(int step){
         disparity_settings.min_disparity = step;

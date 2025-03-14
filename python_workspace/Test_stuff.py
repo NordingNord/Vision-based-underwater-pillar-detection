@@ -69,7 +69,7 @@ z_coordinates = []
 points_3d = []
 colors = []
 
-with open('points_3d.csv',mode = 'r') as file:
+with open('points_3d_good.csv',mode = 'r') as file:
     csv_file = csv.DictReader(file)
     for line in csv_file:
         x_coordinates.append(float(line.get("x")))

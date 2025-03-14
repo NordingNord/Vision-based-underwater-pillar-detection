@@ -465,3 +465,16 @@ vector<Mat> stereo::get_projections(){
     }
     return projections;
 }
+
+
+// -- Methods for cleaning maps after disparity mapping --
+Mat stereo::remove_invalid_edge(Mat frame){
+    Mat frame_without_edge;
+    try{
+        frame_without_edge = frame(Range(0,frame.rows),Range(disparity_settings.num_disparities,frame.cols));
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return frame_without_edge;
+}

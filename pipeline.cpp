@@ -615,9 +615,16 @@ void pipeline::run_triangulation_pipeline_test(int disparity_filter){
                 // Visualize depth information
                 Mat depth_frame = visualizer.show_depths(first_frame,depth_map);
 
+                // Remove black border from depth
+                Mat cleaned_depth_map = stereo_system.remove_invalid_edge(depth_map);
+
+                // Normalize depth
+                Mat normalized_depth_map = converter.normalize_depth(cleaned_depth_map,255.0);
+
                 // Find edges in depth
-                Mat filtered_depth_map = stereo_system.get_filtered_depth_map(depth_map);
-                Mat depth_difference = detector.get_depth_difference(filtered_depth_map);
+                //Mat filtered_depth_map = stereo_system.get_filtered_depth_map(depth_map); // Removes Nan and inf but normalize also does that.
+
+                Mat depth_difference = detector.get_depth_difference(normalized_depth_map);
 
                 // Visualize depth map
                 resize(depth_frame,depth_frame,Size(),0.5,0.5,INTER_LINEAR);
