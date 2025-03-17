@@ -145,23 +145,23 @@ Mat converting::normalize_depth(Mat depth_map, float range){
                 if(isinf(depth) == true || isinf(depth) == true || isinf(depth) == true || isnan(depth) == true || isnan(depth) == true || isnan(depth) == true){
                     float area_sum = 0.0;
                     int values = 0;
-                    int start_col = col_index-20;
-                    int end_col = col_index+20;
-                    int start_row = row_index-20;
-                    int end_row = row_index+20;
+//                    int start_col = col_index-20;
+//                    int end_col = col_index+20;
+//                    int start_row = row_index-20;
+//                    int end_row = row_index+20;
 
-                    if(start_col < 0){
-                        start_col = 0;
-                    }
-                    if(end_col > depth_channel.cols-1){
-                        end_col = depth_channel.cols-1;
-                    }
-                    if(start_row < 0){
-                        start_row = 0;
-                    }
-                    if(end_row > depth_channel.rows-1){
-                        end_row = depth_channel.rows-1;
-                    }
+//                    if(start_col < 0){
+//                        start_col = 0;
+//                    }
+//                    if(end_col > depth_channel.cols-1){
+//                        end_col = depth_channel.cols-1;
+//                    }
+//                    if(start_row < 0){
+//                        start_row = 0;
+//                    }
+//                    if(end_row > depth_channel.rows-1){
+//                        end_row = depth_channel.rows-1;
+//                    }
 //                    if(col_index > 0){
 //                        start_col = col_index-1;
 //                    }
@@ -174,22 +174,63 @@ Mat converting::normalize_depth(Mat depth_map, float range){
 //                    if(row_index < depth_channel.rows-1){
 //                        end_row = row_index+1;
 //                    }
-                    for(int kernel_row = start_row; kernel_row <= end_row; kernel_row++){
-                        for(int kernel_col = start_col; kernel_col <= end_col; kernel_col++){
-                            // get depth
-                            Vec3f channel_data = depth_map.at<Vec3f>(Point(kernel_col,kernel_row));
-                            float kernel_depth = channel_data[2]; // Important to take from initial depth map, since depth channel is manipulated during runtime.
-                            // check if valid
-                            if(isinf(kernel_depth) == false && isinf(kernel_depth) == false && isinf(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false){
-                                area_sum += kernel_depth;
-                                values++;
+                    int min_row = max(row_index,depth_channel.rows-row_index);
+                    int min_col = max(col_index, depth_channel.cols-col_index);
+
+                    int max_ring = max(min_row,min_col);
+                    bool found = false;
+                    for(int ring = 1; ring < max_ring; ring++){
+                        int start_row = max(0,row_index-ring);
+                        int end_row = min(depth_channel.rows-1,row_index+ring);
+
+                        int start_col = max(0,col_index-ring);
+                        int end_col = min(depth_channel.cols-1,col_index+ring);
+
+                        for(int current_row = start_row; current_row <= end_row; current_row++){
+                            for(int current_col = start_col; current_col <= end_col; current_col++){
+                                // get depth
+                                Vec3f channel_data = depth_map.at<Vec3f>(Point(current_col,current_row));
+                                float kernel_depth = channel_data[2]; // Important to take from initial depth map, since depth channel is manipulated during runtime.
+                                // check if valid
+                                if(isinf(kernel_depth) == false && isinf(kernel_depth) == false && isinf(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false){
+                                    area_sum += kernel_depth;
+                                    values++;
+                                    found = true;
+                                }
                             }
                         }
+                        if(found == true){
+                            break;
+                        }
                     }
+
+//                    bool found = false;
+//                    int found_col, found_row;
+//                    for(int kernel_row = start_row; kernel_row <= end_row; kernel_row++){
+//                        for(int kernel_col = start_col; kernel_col <= end_col; kernel_col++){
+
+//                            if(found == true && found_col != kernel_col+20 && found_row != kernel_row+20){ // + 20 to add a couple layers of info
+//                                break;
+//                            }
+//                            // get depth
+//                            Vec3f channel_data = depth_map.at<Vec3f>(Point(kernel_col,kernel_row));
+//                            float kernel_depth = channel_data[2]; // Important to take from initial depth map, since depth channel is manipulated during runtime.
+//                            // check if valid
+//                            if(isinf(kernel_depth) == false && isinf(kernel_depth) == false && isinf(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false){
+//                                area_sum += kernel_depth;
+//                                values++;
+//                                found = true;
+//                                found_col = kernel_col;
+//                                found_row = kernel_row;
+//                            }
+//                        }
+//                    }
                     // if no neighbors found, set to max. otherwise set to average
                     if(area_sum == 0.0){
-                        cout << "no valid neighbors" << endl;
-                        depth = max_depth;
+                        depth = 0.0;
+//                        cout << max_ring << endl;
+//                        cout << "no valid neighbors" << endl;
+//                        depth = max_depth;
                     }
                     else{
                         depth = area_sum/values;

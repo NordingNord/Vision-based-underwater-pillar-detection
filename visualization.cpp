@@ -240,3 +240,24 @@ Mat visualization::show_depths(Mat frame, Mat depth_map){
     }
     return depth_frame;
 }
+
+
+// -- Methods for visualizing warnings --
+Mat visualization::show_possible_obstacles(vector<Mat> possible_obstacles, Mat frame){
+    Mat warning_frame;
+    try{
+        // Create color mask
+        Mat color_mask = frame.clone(); //Mat::ones(frame.size(),CV_8UC3);
+
+        for(int i = 0; i < possible_obstacles.size(); i++){
+            color_mask.setTo(Scalar(0,140,255),possible_obstacles.at(i));
+        }
+        // Apply color mask translucent over frame
+        addWeighted(color_mask,0.5,frame,1-0.5,0,warning_frame);
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return warning_frame;
+}

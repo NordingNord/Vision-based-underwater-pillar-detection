@@ -65,6 +65,8 @@ public:
 
     void run_triangulation_pipeline_test(int disparity_filter);
 
+    void run_disparity_pipeline(int disparity_filter);
+
 private:
     // Pipeline mode
     int mode;

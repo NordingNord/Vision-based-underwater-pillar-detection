@@ -23,7 +23,10 @@ public:
     detecting();
 
     // -- Methods for analysing depth differences --
-    cv::Mat get_depth_difference(cv::Mat depth_map);
+    std::vector<cv::Mat> get_depth_difference(cv::Mat depth_map);
+
+    // -- Methods for filtering possible obstacles --
+    std::vector<cv::Mat> filter_obstacles(std::vector<cv::Mat> obstacles, cv::Mat frame);
 
 private:
 };

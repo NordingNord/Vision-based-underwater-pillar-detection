@@ -35,6 +35,9 @@ public:
 
     // -- Methods for visualizing depth --
     cv::Mat show_depths(cv::Mat frame, cv::Mat depth_map);
+
+    // -- Methods for visualizing warnings --
+    cv::Mat show_possible_obstacles(std::vector<cv::Mat> possible_obstacles, cv::Mat frame);
 private:
 
 };
