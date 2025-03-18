@@ -262,3 +262,18 @@ Mat converting::normalize_depth(Mat depth_map, float range){
     }
     return normalized_depth;
 }
+
+// -- Methods for reding specific obstacle data vectors --
+vector<Mat> converting::get_obstacle_masks(vector<obstacle> obstacles){
+    vector<Mat> masks;
+    try{
+        for(int i = 0; i < obstacles.size(); i++){
+            masks.push_back(obstacles.at(i).mask);
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return masks;
+}

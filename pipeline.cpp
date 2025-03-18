@@ -624,7 +624,11 @@ void pipeline::run_triangulation_pipeline_test(int disparity_filter){
                 // Find edges in depth
                 //Mat filtered_depth_map = stereo_system.get_filtered_depth_map(depth_map); // Removes Nan and inf but normalize also does that.
 
-                vector<Mat> danger_zones = detector.get_depth_difference(normalized_depth_map);
+                // Find edges in depth
+                vector<obstacle> obstacles = detector.get_depth_difference(normalized_depth_map);
+
+                // Get danger zones
+                vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
 
                 Mat cut_first_frame = stereo_system.remove_invalid_edge(first_frame);
                 Mat warning_frame = visualizer.show_possible_obstacles(danger_zones,cut_first_frame);
@@ -806,7 +810,10 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             Mat normalized_depth_map = converter.normalize_depth(cleaned_depth_map,255.0);
 
             // Find edges in depth
-            vector<Mat> danger_zones = detector.get_depth_difference(normalized_depth_map);
+            vector<obstacle> obstacles = detector.get_depth_difference(normalized_depth_map);
+
+            // Get danger zones
+            vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
 
             // Prepare vizualization of possible obstacles
             Mat cut_first_frame = stereo_system.remove_invalid_edge(first_frame);
@@ -816,6 +823,20 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             resize(warning_temp,warning_temp,Size(),0.5,0.5,INTER_LINEAR);
             imshow("warning", warning_temp);
             waitKey(0);
+
+            // Filter obstacles
+            vector<obstacle> filtered_obstacles = detector.filter_obstacles(obstacles,first_frame);
+
+            // Visualize final obstacles
+            Mat final_warning = visualizer.show_obstacles(filtered_obstacles,cut_first_frame);
+
+            Mat final_warning_temp = final_warning.clone();
+            resize(final_warning_temp,final_warning_temp,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("final warning", final_warning_temp);
+            waitKey(0);
+
+            // Destroy windows before new run
+            destroyAllWindows();
         }
     }
     catch(const exception& error){

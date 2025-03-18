@@ -261,3 +261,31 @@ Mat visualization::show_possible_obstacles(vector<Mat> possible_obstacles, Mat f
     }
     return warning_frame;
 }
+
+Mat visualization::show_obstacles(vector<obstacle> obstacles, Mat frame){
+    Mat warning_frame = frame.clone();
+    try{
+        // Generate color for each obstacle
+        vector<Scalar> colors = get_colors(obstacles.size());
+
+        for(int i = 0; i < obstacles.size(); i++){
+            // Create color mask
+            Mat color_mask = frame.clone();
+            // Set color
+            color_mask.setTo(colors.at(i),obstacles.at(i).mask);
+            // get mask center
+            Moments current_moments = moments(obstacles.at(i).mask);
+            int center_x = int(current_moments.m10/current_moments.m00);
+            int center_y = int(current_moments.m01/current_moments.m00);
+
+            // Apply color mask translucent over frame
+            addWeighted(color_mask,0.5,warning_frame,1-0.5,0,warning_frame);
+
+            putText(warning_frame,obstacles.at(i).type,Point(center_x,center_y),FONT_HERSHEY_SIMPLEX,1.0,(0,0,0),5);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return warning_frame;
+}

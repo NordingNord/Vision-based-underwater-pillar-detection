@@ -142,4 +142,11 @@ struct disparity_parameters{
     int mode;
 };
 
+// Information about obstacle
+struct obstacle{
+    cv::Mat mask;
+    std::vector<cv::Point> contour;
+    std::string type;
+};
+
 #endif

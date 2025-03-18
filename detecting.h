@@ -11,6 +11,7 @@
 #include "opencv2/ximgproc.hpp"
 #include "Data_Structures.h"
 #include "visualization.h"
+#include "calculator.h"
 
 // -- Defines --
 
@@ -23,12 +24,14 @@ public:
     detecting();
 
     // -- Methods for analysing depth differences --
-    std::vector<cv::Mat> get_depth_difference(cv::Mat depth_map);
+    std::vector<obstacle> get_depth_difference(cv::Mat depth_map);
 
     // -- Methods for filtering possible obstacles --
-    std::vector<cv::Mat> filter_obstacles(std::vector<cv::Mat> obstacles, cv::Mat frame);
+    std::vector<obstacle> filter_obstacles(std::vector<obstacle> obstacles, cv::Mat frame);
 
 private:
+    // calculation class
+    calculator calculations;
 };
 
 #endif // DETECTING_H

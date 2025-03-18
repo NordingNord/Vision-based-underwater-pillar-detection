@@ -35,6 +35,9 @@ public:
     // -- Methods for normalization --
     cv::Mat normalize_depth(cv::Mat depth_map, float range);
 
+    // -- Methods for reding specific obstacle data vectors --
+    std::vector<cv::Mat> get_obstacle_masks(std::vector<obstacle> obstacles);
+
 
 private:
 };

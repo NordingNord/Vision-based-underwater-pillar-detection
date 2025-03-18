@@ -38,6 +38,8 @@ public:
 
     // -- Methods for visualizing warnings --
     cv::Mat show_possible_obstacles(std::vector<cv::Mat> possible_obstacles, cv::Mat frame);
+
+    cv::Mat show_obstacles(std::vector<obstacle> obstacles, cv::Mat frame);
 private:
 
 };

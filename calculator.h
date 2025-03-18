@@ -28,6 +28,8 @@ public:
 
     //std::vector<keypoint_data> determine_velocity(std::vector<keypoint_data> data,float fps, int frames);
 
+    // -- Methods for calculating aspects of lines --
+    double calculate_angle(cv::Point start, cv::Point end);
 
 
 private:
