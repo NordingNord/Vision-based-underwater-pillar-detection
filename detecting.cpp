@@ -265,6 +265,13 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles, Mat fra
             Mat bounding_box = Mat::zeros(mask.size(),CV_8U);
             drawContours(bounding_box,points,0,255,-1,LINE_8);
 
+            Mat viz_box = mask.clone();
+            drawContours(viz_box,points,0,150,3,LINE_8);
+            resize(viz_box,viz_box,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("Bounding box and mask", viz_box);
+            waitKey(0);
+
+
             // Check if bounding box contains more than 50 percent error
             Mat error_mask = bounding_box-mask;
 
@@ -273,6 +280,7 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles, Mat fra
 
             if(error_count > int(mask_count*0.5)){
                 // Split into two
+                cout << "Ill fit" << endl;
 
                 // step 1: find edges in mask
                 Mat edge_mask;
@@ -283,55 +291,11 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles, Mat fra
                 imshow("edge mask", glop);
                 waitKey(0);
 
-                // step 2: find best line
-                vector<Vec4i> lines;
-                HoughLinesP(edge_mask,lines,1,CV_PI/180,10,50,10);
-                int most_intersections = 0;
-                Vec4i best_line;
-                Vec4i non_extended_best_line;
-                double best_angle;
-                for(int i = 0; i < lines.size(); i++){
-                    // get points
-                    Point start = Point(lines.at(i)[0],lines.at(i)[1]);
-                    Point end = Point(lines.at(i)[2],lines.at(i)[3]);
-
-//                    Mat baz = Mat::zeros(mask.size(),CV_8U);
-//                    line(baz,start,end,255,3);
-//                    resize(baz,baz,Size(),0.5,0.5,INTER_LINEAR);
-//                    imshow("current line", baz);
-//                    waitKey(0);
-
-                    // Extent lines
-                    double angle = calculations.calculate_angle(start,end);
-                    angle = angle + (90*M_PI/180); // Shift to align with x-axis
-                    double a = cos(angle);
-                    double b = sin(angle);
-                    start.x = cvRound(start.x + frame.cols*(-b));
-                    start.y = cvRound(start.y + frame.rows*(a));
-                    end.x = cvRound(end.x - frame.cols*(-b));
-                    end.y = cvRound(end.y - frame.rows*(a));
-
-                    // Create mask
-                    Mat line_mask = Mat::zeros(mask.size(),CV_8U);
-                    line(line_mask,start,end,255,10,LINE_AA);
-
-                    // Count number of intersections
-                    Mat intersection_mask = edge_mask & line_mask;
-                    int current_intersections = countNonZero(intersection_mask);
-
-                    // Check if bigger than previous
-                    if(current_intersections > most_intersections){
-                        most_intersections = current_intersections;
-                        non_extended_best_line = lines.at(i);
-                        lines.at(i)[0] = start.x;
-                        lines.at(i)[1] = start.y;
-                        lines.at(i)[2] = end.x;
-                        lines.at(i)[3] = end.y;
-
-                        best_line = lines.at(i);
-                        best_angle = angle;
-                    }
-                }
+                // ---------------------------------------------- SIMPLIFICATION ZONE -------------------
+                // step 2: Find best line
+                line_data best_line_data = get_best_line(edge_mask,10,50.0,10.0);
+                Vec4i best_line = best_line_data.line;
+                double best_angle = best_line_data.angle;
 
                 // step 3: Create mask of best line
                 Mat best_line_mask = Mat::zeros(mask.size(),CV_8U);
@@ -340,82 +304,12 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles, Mat fra
                 // step 4: remove edges under line mask
                 edge_mask = edge_mask-best_line_mask;
 
-                Mat fu = edge_mask.clone();
-                resize(fu,fu,Size(),0.5,0.5,INTER_LINEAR);
-                imshow("new edge", fu);
-                waitKey(0);
-
                 // step 5: Find new best line
-                HoughLinesP(edge_mask,lines,1,CV_PI/180,10,50,10);
-
-                most_intersections = 0;
-                Vec4i second_best_line;
-                bool second_found = false;
-                Vec4i non_extended_second_best_line;
-                double second_best_angle;
-                for(int i = 0; i < lines.size(); i++){
-                    // get points
-                    Point start = Point(lines.at(i)[0],lines.at(i)[1]);
-                    Point end = Point(lines.at(i)[2],lines.at(i)[3]);
-
-//                    Mat baz = Mat::zeros(mask.size(),CV_8U);
-//                    line(baz,start,end,255,3);
-//                    resize(baz,baz,Size(),0.5,0.5,INTER_LINEAR);
-//                    imshow("current line", baz);
-//                    waitKey(0);
-
-                    // Extent lines
-                    double angle = calculations.calculate_angle(start,end);
-                    angle = angle + (90*M_PI/180); // Shift to align with x-axis
-                    double a = cos(angle);
-                    double b = sin(angle);
-                    start.x = cvRound(start.x + frame.cols*(-b));
-                    start.y = cvRound(start.y + frame.rows*(a));
-                    end.x = cvRound(end.x - frame.cols*(-b));
-                    end.y = cvRound(end.y - frame.rows*(a));
-
-                    // Create mask
-                    Mat line_mask = Mat::zeros(mask.size(),CV_8U);
-                    line(line_mask,start,end,255,10,LINE_AA);
-
-                    // Count number of intersections
-                    Mat intersection_mask = edge_mask & line_mask;
-                    int current_intersections = countNonZero(intersection_mask);
-
-                    // Check if bigger than previous and ensure angle is not similar to best line
-//                    cout << current_intersections << endl;
-//                    cout << most_intersections << endl;
-//                    cout << angle*180/M_PI << endl;
-//                    cout << best_angle*180/M_PI << endl;
-//                    cout << abs(angle-best_angle)*180/M_PI << endl;
-                    if(current_intersections > most_intersections && abs(angle-best_angle) >= (45*M_PI/180)){
-                        second_found = true;
-                        most_intersections = current_intersections;
-                        non_extended_second_best_line = lines.at(i);
-                        lines.at(i)[0] = start.x;
-                        lines.at(i)[1] = start.y;
-                        lines.at(i)[2] = end.x;
-                        lines.at(i)[3] = end.y;
-
-                        second_best_line = lines.at(i);
-                        second_best_angle = angle;
-                    }
-                }
-
-                if(second_found == false){ // Maybe change to continuing with current line just to get something
-                    cout << "could not split. Removing obstacle." << endl;
-                    break;
-                }
+                line_data second_best_line_data = get_best_line(edge_mask,10,50.0,10.0,true,best_angle,45.0);
+                Vec4i second_best_line = second_best_line_data.line;
+                double second_best_angle = second_best_line_data.angle;
 
                 // step 6: Add line to mask for visualization
-                Mat viz_org = Mat::zeros(mask.size(),CV_8U);
-                line(viz_org,Point(non_extended_second_best_line[0],non_extended_second_best_line[1]),Point(non_extended_second_best_line[2],non_extended_second_best_line[3]),255,3,LINE_AA);
-                line(viz_org,Point(non_extended_best_line[0],non_extended_best_line[1]),Point(non_extended_best_line[2],non_extended_best_line[3]),255,3,LINE_AA);
-
-                Mat flap = viz_org.clone();
-                resize(flap,flap,Size(),0.5,0.5,INTER_LINEAR);
-                imshow("Best lines org", flap);
-                waitKey(0);
 
                 Mat viz =  Mat::zeros(mask.size(),CV_8U);
                 line(viz,Point(second_best_line[0],second_best_line[1]),Point(second_best_line[2],second_best_line[3]),255,3,LINE_AA);
@@ -426,302 +320,22 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles, Mat fra
                 imshow("Best lines", flop);
                 waitKey(0);
 
-                // Split contour using the found lines
-                // find best direction for best line
-                Vec4i first_line;
-                Vec4i last_line;
-                bool first_found = false;
-                int steps_since_change = 0;
-                if(best_angle*180/M_PI < abs(best_angle*180/M_PI-90)){
-                    // vertical edge
-                    cout << "Vertical" << endl;
+                // Detemine direction of obstacle based on both lines
+                int direction = get_obstacle_direction(best_angle,best_line,mask);
+                int second_direction = get_obstacle_direction(second_best_angle, second_best_line,mask);
+
+                // Determine borders of split obstalces
+                vector<Vec4i> borders = get_line_borders(direction,best_line,mask,5,0.75);
+                Vec4i first_line = borders.at(0);
+                Vec4i last_line = borders.at(1);
+
+                vector<Vec4i> second_borders = get_line_borders(second_direction,second_best_line,mask,5,0.75);
+                Vec4i second_first_line = second_borders.at(0);
+                Vec4i second_last_line = second_borders.at(1);
+
+                // -------------------------------------------------------------------------------------------------------------------- simplification performed above ---------------------------
 
 
-                    // create directional linemasks
-                    Mat left_mask = Mat::zeros(mask.size(),CV_8U);
-                    Mat right_mask = Mat::zeros(mask.size(),CV_8U);
-                    line(left_mask,Point(best_line[0]-1,best_line[1]),Point(best_line[2]-1,best_line[3]),255,3,LINE_AA); // Move one pixel left
-                    line(right_mask,Point(best_line[0]+1,best_line[1]),Point(best_line[2]+1,best_line[3]),255,3,LINE_AA); // Move one pixel right
-
-                    // Find direction with most matches
-                    Mat left_match_mat = left_mask & mask;
-                    Mat right_match_mat = right_mask & mask;
-                    int left_matches = countNonZero(left_match_mat);
-                    int right_matches = countNonZero(right_match_mat);
-
-                    int direction_sign = 1;
-                    int max_index = mask.cols;
-                    if(left_matches > right_matches){
-                        cout << "Left" << endl;
-                        // set last line as border if no other border is found
-                        last_line[0] = 0;
-                        last_line[1] = 0;
-                        last_line[2] = 0;
-                        last_line[3] = frame.rows-1;
-                        direction_sign = -1;
-                        max_index = min(best_line[0],best_line[2]);
-                    }
-                    else{
-                        cout << "Right" << endl;
-                        last_line[0] = frame.cols-1;
-                        last_line[1] = 0;
-                        last_line[2] = frame.cols-1;
-                        last_line[3] = frame.rows-1;
-                    }
-                    int most_matches = 0;//max(left_matches,right_matches);
-                    int last_matches = 0;
-                    for(int x_index = 0; x_index < max_index; x_index++){
-                        // Get new mask
-                        Mat new_mask =  Mat::zeros(mask.size(),CV_8U);
-                        line(new_mask,Point(best_line[0]+(x_index*direction_sign),best_line[1]),Point(best_line[2]+(x_index*direction_sign),best_line[3]),255,3,LINE_AA);
-
-                        // Count matches
-                        Mat match_mask = new_mask & mask;
-                        int match_count = countNonZero(match_mask);
-                        // Check if better than previous
-                        if(most_matches < match_count && first_found == false){
-                            most_matches = match_count;
-                            first_line[0] = best_line[0]+(x_index*direction_sign);
-                            first_line[1] = best_line[1];
-                            first_line[2] = best_line[2]+(x_index*direction_sign);
-                            first_line[3] = best_line[3];
-                            steps_since_change = 0;
-                        }
-                        else{
-                            steps_since_change++;
-                            if(steps_since_change >= 5){
-                                first_found = true;
-                            }
-                        }
-                        // Check if begining to decline
-                        if(match_count < last_matches*0.75|| x_index+1 == max_index){
-                            cout << match_count << endl;
-                            cout << last_matches << endl;
-                            last_line[0] = best_line[0]+((x_index-1)*direction_sign);
-                            last_line[1] = best_line[1];
-                            last_line[2] = best_line[2]+((x_index-1)*direction_sign);
-                            last_line[3] = best_line[3];
-                            break;
-                        }
-                        last_matches = match_count;
-                    }
-                }
-                else{
-                    // horizontal edge
-                    cout << "Horizontal" << endl;
-
-                    // create directional linemasks
-                    Mat up_mask = Mat::zeros(mask.size(),CV_8U);
-                    Mat down_mask = Mat::zeros(mask.size(),CV_8U);
-                    line(up_mask,Point(best_line[0],best_line[1]-1),Point(best_line[2],best_line[3]-1),255,3,LINE_AA); // Move one pixel up
-                    line(down_mask,Point(best_line[0],best_line[1]+1),Point(best_line[2],best_line[3]+1),255,3,LINE_AA); // Move one pixel down
-
-                    // Find direction with most matches
-                    Mat up_match_mat = up_mask & mask;
-                    Mat down_match_mat = down_mask & mask;
-                    int up_matches = countNonZero(up_match_mat);
-                    int down_matches = countNonZero(down_match_mat);
-
-                    int direction_sign = 1;
-                    int max_index = mask.rows;
-                    if(up_matches > down_matches){
-                        cout << "Top" << endl;
-                        last_line[0] = 0;
-                        last_line[1] = 0;
-                        last_line[2] = frame.cols-1;
-                        last_line[3] = 0;
-                        direction_sign = -1;
-                        max_index = min(best_line[1],best_line[3]);
-                    }
-                    else{
-                        last_line[0] = 0;
-                        last_line[1] = frame.rows-1;
-                        last_line[2] = frame.cols-1;
-                        last_line[3] = frame.rows-1;
-                        cout << "Bottom" << endl;
-                    }
-                    int most_matches = 0;
-                    int last_matches = 0;
-                    for(int y_index = 0; y_index < max_index; y_index++){
-                        // Get new mask
-                        Mat new_mask =  Mat::zeros(mask.size(),CV_8U);
-                        line(new_mask,Point(best_line[0],best_line[1]+(y_index*direction_sign)),Point(best_line[2],best_line[3]+(y_index*direction_sign)),255,3,LINE_AA);
-                        // Count matches
-                        Mat match_mask = new_mask & mask;
-                        int match_count = countNonZero(match_mask);
-                        // Check if better than previous
-                        if(most_matches < match_count && first_found == false){
-                            most_matches = match_count;
-                            first_line[0] = best_line[0];
-                            first_line[1] = best_line[1]+(y_index*direction_sign);
-                            first_line[2] = best_line[2];
-                            first_line[3] = best_line[3]+(y_index*direction_sign);
-                            steps_since_change = 0;
-                            cout << "winner" << endl;
-                        }
-                        else{
-                            steps_since_change++;
-                            if(steps_since_change >= 2){
-                                first_found = true;
-                            }
-                        }
-                        // Check if begining to decline
-                        if(match_count < last_matches*0.75 || y_index+1 == max_index){
-                            last_line[0] = best_line[0];
-                            last_line[1] = best_line[1]+((y_index-1)*direction_sign);
-                            last_line[2] = best_line[2];
-                            last_line[3] = best_line[3]+((y_index-1)*direction_sign);
-                            break;
-                        }
-                        last_matches = match_count;
-                    }
-                }
-
-                // find best direction for second best line
-                Vec4i second_first_line;
-                Vec4i second_last_line;
-                steps_since_change = 0;
-                first_found = false;
-                if(second_best_angle*180/M_PI < abs(second_best_angle*180/M_PI-90)){
-                    // vertical edge
-                    cout << "Vertical" << endl;
-
-                    // create directional linemasks
-                    Mat left_mask = Mat::zeros(mask.size(),CV_8U);
-                    Mat right_mask = Mat::zeros(mask.size(),CV_8U);
-                    line(left_mask,Point(second_best_line[0]-1,second_best_line[1]),Point(second_best_line[2]-1,second_best_line[3]),255,3,LINE_AA); // Move one pixel left
-                    line(right_mask,Point(second_best_line[0]+1,second_best_line[1]),Point(second_best_line[2]+1,second_best_line[3]),255,3,LINE_AA); // Move one pixel right
-
-                    // Find direction with most matches
-                    Mat left_match_mat = left_mask & mask;
-                    Mat right_match_mat = right_mask & mask;
-                    int left_matches = countNonZero(left_match_mat);
-                    int right_matches = countNonZero(right_match_mat);
-
-                    int direction_sign = 1;
-                    int max_index = mask.cols;
-                    if(left_matches > right_matches){
-                        cout << "Left" << endl;
-                        second_last_line[0] = 0;
-                        second_last_line[1] = 0;
-                        second_last_line[2] = 0;
-                        second_last_line[3] = frame.rows-1;
-                        direction_sign = -1;
-                        max_index = min(second_best_line[0],second_best_line[2]);
-                    }
-                    else{
-                        cout << "Right" << endl;
-                        second_last_line[0] = frame.cols-1;
-                        second_last_line[1] = 0;
-                        second_last_line[2] = frame.cols-1;
-                        second_last_line[3] = frame.rows-1;
-                    }
-                    int most_matches = 0;
-                    int last_matches = 0;
-                    for(int x_index = 0; x_index < max_index; x_index++){
-                        // Get new mask
-                        Mat new_mask =  Mat::zeros(mask.size(),CV_8U);
-                        line(new_mask,Point(second_best_line[0]+(x_index*direction_sign),second_best_line[1]),Point(second_best_line[2]+(x_index*direction_sign),second_best_line[3]),255,3,LINE_AA);
-
-                        // Count matches
-                        Mat match_mask = new_mask & mask;
-                        int match_count = countNonZero(match_mask);
-                        // Check if better than previous
-                        if(most_matches < match_count && first_found == false){
-                            most_matches = match_count;
-                            second_first_line[0] = second_best_line[0]+(x_index*direction_sign);
-                            second_first_line[1] = second_best_line[1];
-                            second_first_line[2] = second_best_line[2]+(x_index*direction_sign);
-                            second_first_line[3] = second_best_line[3];
-                            steps_since_change = 0;
-                        }
-                        else{
-                            steps_since_change++;
-                            if(steps_since_change >= 5){
-                                first_found = true;
-                            }
-                        }
-                        // Check if begining to decline
-                        if(match_count < last_matches*0.75|| x_index+1 == max_index){
-                            second_last_line[0] = second_best_line[0]+((x_index-1)*direction_sign);
-                            second_last_line[1] = second_best_line[1];
-                            second_last_line[2] = second_best_line[2]+((x_index-1)*direction_sign);
-                            second_last_line[3] = second_best_line[3];
-                            break;
-                        }
-                        last_matches = match_count;
-                    }
-                }
-                else{
-                    // horizontal edge
-                    cout << "Horizontal" << endl;
-
-                    // create directional linemasks
-                    Mat up_mask = Mat::zeros(mask.size(),CV_8U);
-                    Mat down_mask = Mat::zeros(mask.size(),CV_8U);
-                    line(up_mask,Point(second_best_line[0],second_best_line[1]-1),Point(second_best_line[2],second_best_line[3]-1),255,3,LINE_AA); // Move one pixel up
-                    line(down_mask,Point(second_best_line[0],second_best_line[1]+1),Point(second_best_line[2],second_best_line[3]+1),255,3,LINE_AA); // Move one pixel down
-
-                    // Find direction with most matches
-                    Mat up_match_mat = up_mask & mask;
-                    Mat down_match_mat = down_mask & mask;
-                    int up_matches = countNonZero(up_match_mat);
-                    int down_matches = countNonZero(down_match_mat);
-
-                    int direction_sign = 1;
-                    int max_index = mask.rows;
-                    if(up_matches > down_matches){
-                        cout << "Top" << endl;
-                        second_last_line[0] = 0;
-                        second_last_line[1] = 0;
-                        second_last_line[2] = frame.cols-1;
-                        second_last_line[3] = 0;
-                        direction_sign = -1;
-                        max_index = min(second_best_line[1],second_best_line[3]);
-                    }
-                    else{
-                        second_last_line[0] = 0;
-                        second_last_line[1] = frame.rows-1;
-                        second_last_line[2] = frame.cols-1;
-                        second_last_line[3] = frame.rows-1;
-                        cout << "Bottom" << endl;
-                    }
-                    int most_matches = 0;//max(up_matches,down_matches)
-                    int last_matches = 0;
-                    for(int y_index = 0; y_index < max_index; y_index++){
-                        // Get new mask
-                        Mat new_mask =  Mat::zeros(mask.size(),CV_8U);
-                        line(new_mask,Point(second_best_line[0],second_best_line[1]+(y_index*direction_sign)),Point(second_best_line[2],second_best_line[3]+(y_index*direction_sign)),255,3,LINE_AA);
-
-                        // Count matches
-                        Mat match_mask = new_mask & mask;
-                        int match_count = countNonZero(match_mask);
-                        // Check if better than previous
-                        if(most_matches < match_count && first_found == false){
-                            most_matches = match_count;
-                            second_first_line[0] = second_best_line[0];
-                            second_first_line[1] = second_best_line[1]+(y_index*direction_sign);
-                            second_first_line[2] = second_best_line[2];
-                            second_first_line[3] = second_best_line[3]+(y_index*direction_sign);
-                            steps_since_change = 0;
-                        }
-                        else{
-                            steps_since_change++;
-                            if(steps_since_change >= 5){
-                                first_found = true;
-                            }
-                        }
-                        // Check if begining to decline
-                        if(match_count < last_matches*0.75 || y_index+1 == max_index){
-                            second_last_line[0] = second_best_line[0];
-                            second_last_line[1] = second_best_line[1]+((y_index-1)*direction_sign);
-                            second_last_line[2] = second_best_line[2];
-                            second_last_line[3] = second_best_line[3]+((y_index-1)*direction_sign);
-                            break;
-                        }
-                        last_matches = match_count;
-                    }
-                }
                 // Draw edges of best lines
                 Mat best_shape = Mat::zeros(mask.size(),CV_8U);
                 line(best_shape,Point(first_line[0],first_line[1]),Point(first_line[2],first_line[3]),255,3,LINE_AA);
@@ -776,6 +390,9 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles, Mat fra
                 imshow("second mask", mask_2);
                 waitKey(0);
 
+                // Cut masks into only including a single obstacle
+
+
                 // Keep if not empty
                 obstacle first_obstacle, second_obstacle;
                 if(hasNonZero(first_mask) == true){
@@ -801,4 +418,395 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles, Mat fra
         cout << "Error: " << error.what() << endl;
     }
     return final_obstacles;
+}
+
+// -- Methods for assisting with obstacle detection --
+vector<Vec4i> detecting::get_line_borders(int direction, Vec4i initial_line, Mat mask, int step_threshold, float decline_threshold){
+    vector<Vec4i> obstacle_lines;
+    try{
+        // determine sign based on direction
+        int direction_sign;
+        if(direction == DIRECTION_LEFT || direction == DIRECTION_UP){
+            direction_sign = -1; // Both left and upwards movement are movements in the negative
+        }
+        else if(direction == DIRECTION_RIGHT || direction == DIRECTION_DOWN){
+            direction_sign = 1; // Both right and downwards movement are movements in the positive
+        }
+        else{
+            throw runtime_error("Unknwon direction.");
+        }
+
+        // determine max index based on direction (distance from current line to border)
+        int max_index;
+        if(direction == DIRECTION_LEFT){
+            // Max steps to the left is the biggest x-coordinate in the line due to the border being at x = 0 and that the obstacle might extent past the frame edges
+            max_index = max(initial_line[0],initial_line[2]);
+        }
+        else if(direction == DIRECTION_RIGHT){
+            // Max steps to the right is difference between number of cols and ,on x-coordinate in line
+            max_index = (mask.cols-1)-min(initial_line[0],initial_line[2]);
+        }
+        if(direction == DIRECTION_UP){
+            // Max step up is the biggest y-coordinate in the line due to the border being at y = 0
+            max_index = max(initial_line[1],initial_line[3]);
+        }
+        else if(direction == DIRECTION_DOWN){
+            // Max steps down is difference between number of rows and min y-coordinate in line
+            max_index = (mask.rows-1)-min(initial_line[1],initial_line[3]);
+        }
+
+        // Prepare loop variables
+        int steps_since_change = 0;
+        bool begining_found = false;
+        int most_matches = 0;
+        Vec4i begin_line, end_line;
+        Mat initial_line_mask =  Mat::zeros(mask.size(),CV_8U);
+        line(initial_line_mask,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),255,3,LINE_AA);
+        int initial_line_size = countNonZero(initial_line_mask);
+
+        // Move line until beginning and end of obstacle is found
+        for(int step = 0; step <= max_index; step++){
+            // Get line mask
+            Mat line_mask =  Mat::zeros(mask.size(),CV_8U);
+            if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
+                line(line_mask,Point(initial_line[0]+(step*direction_sign),initial_line[1]),Point(initial_line[2]+(step*direction_sign),initial_line[3]),255,3,LINE_AA);
+            }
+            else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
+                line(line_mask,Point(initial_line[0],initial_line[1]+(step*direction_sign)),Point(initial_line[2],initial_line[3]+(step*direction_sign)),255,3,LINE_AA);
+            }
+
+            // Count size of line
+            int line_size = countNonZero(line_mask);
+
+            // Find scale factor
+            float scale_factor = float(line_size)/float(initial_line_size);
+            // Avoid edge case where line is completely on border and thus half missing
+            if(scale_factor > 1.0){
+                scale_factor = 1.0;
+            }
+
+            // Count matches
+            Mat match_mask = line_mask & mask;
+            int match_count = countNonZero(match_mask);
+
+            // Determine if better than previous
+            if(most_matches < match_count && begining_found == false){
+                // Update most matches and steps since change
+                most_matches = match_count;
+                steps_since_change = 0;
+
+                // Update begin line
+                if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
+                    begin_line[0] = initial_line[0]+(step*direction_sign);
+                    begin_line[1] = initial_line[1];
+                    begin_line[2] = initial_line[2]+(step*direction_sign);
+                    begin_line[3] = initial_line[3];
+                }
+                else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
+                    begin_line[0] = initial_line[0];
+                    begin_line[1] = initial_line[1]+(step*direction_sign);
+                    begin_line[2] = initial_line[2];
+                    begin_line[3] = initial_line[3]+(step*direction_sign);
+                }
+            }
+            else if(begining_found == false && match_count != 0){ // Zero matches means we havent found begining yet
+                // If worse or equal update steps since change
+                steps_since_change++;
+                // If steps above threshold conclude on begining
+                if(steps_since_change >= step_threshold){
+                    begining_found = true;
+                }
+            }
+
+            // Check if decline is found or last line
+            if(match_count < (most_matches*scale_factor) * decline_threshold || step == max_index){
+                cout << match_count << " | " << most_matches << " | " << scale_factor << endl;
+                // Update end line
+                if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
+                    end_line[0] = initial_line[0]+((step-1)*direction_sign);
+                    end_line[1] = initial_line[1];
+                    end_line[2] = initial_line[2]+((step-1)*direction_sign);
+                    end_line[3] = initial_line[3];
+                }
+                else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
+                    end_line[0] = initial_line[0];
+                    end_line[1] = initial_line[1]+((step-1)*direction_sign);
+                    end_line[2] = initial_line[2];
+                    end_line[3] = initial_line[3]+((step-1)*direction_sign);
+                }
+                if(step == max_index){
+                    cout << "ended due to index" << endl;
+                }
+                else{
+                    cout << "ended due to threshold" << endl;
+                }
+
+                // Break since no reason to continue
+                break;
+            }
+        }
+        // Prepare output
+        obstacle_lines = {begin_line, end_line};
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return obstacle_lines;
+}
+
+
+int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask){
+    int direction = 0;
+    try{
+        // Check if angle is closer to 0 degrees (Vertical) else it must be horizontal
+        if(angle*180/M_PI < abs(angle*180/M_PI-90)){
+            // Create directional line masks
+            Mat left_mask = Mat::zeros(mask.size(),CV_8U);
+            Mat right_mask = Mat::zeros(mask.size(),CV_8U);
+
+            line(left_mask,Point(initial_line[0]-1,initial_line[1]),Point(initial_line[2]-1,initial_line[3]),255,3,LINE_AA); // Move one pixel left
+            line(right_mask,Point(initial_line[0]+1,initial_line[1]),Point(initial_line[2]+1,initial_line[3]),255,3,LINE_AA); // Move one pixel right
+
+            // Count matches with mask for both directions
+            Mat left_match_mat = left_mask & mask;
+            Mat right_match_mat = right_mask & mask;
+
+            int left_matches = countNonZero(left_match_mat);
+            int right_matches = countNonZero(right_match_mat);
+
+            // Determine direction
+            if(left_matches > right_matches){
+                direction = DIRECTION_LEFT;
+            }
+            else{
+                direction = DIRECTION_RIGHT;
+            }
+        }
+        else{
+            // create directional linemasks
+            Mat up_mask = Mat::zeros(mask.size(),CV_8U);
+            Mat down_mask = Mat::zeros(mask.size(),CV_8U);
+            line(up_mask,Point(initial_line[0],initial_line[1]-1),Point(initial_line[2],initial_line[3]-1),255,3,LINE_AA); // Move one pixel up
+            line(down_mask,Point(initial_line[0], initial_line[1]+1),Point(initial_line[2], initial_line[3]+1),255,3,LINE_AA); // Move one pixel down
+
+            // Count matches with mask for both directions
+            Mat up_match_mat = up_mask & mask;
+            Mat down_match_mat = down_mask & mask;
+            int up_matches = countNonZero(up_match_mat);
+            int down_matches = countNonZero(down_match_mat);
+
+            if(up_matches > down_matches){
+                direction = DIRECTION_UP;
+            }
+            else{
+                direction = DIRECTION_DOWN;
+            }
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return direction;
+}
+
+line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_length, double max_gap, bool compare, double compare_angle, double angle_threshold){
+    line_data best_line;
+    try{
+        // Find all lines
+        vector<Vec4i> lines;
+        HoughLinesP(edge_mask,lines,1,CV_PI/180,threshold,min_length,max_gap);
+
+        // Prepare loop variables
+        int most_intersections = 0;
+
+        // Go through all lines
+        for(int i = 0; i < lines.size(); i++){
+            // get start and end points of line
+            Point start = Point(lines.at(i)[0],lines.at(i)[1]);
+            Point end = Point(lines.at(i)[2],lines.at(i)[3]);
+
+            // Extent lines
+            double angle = calculations.calculate_angle(start,end);
+            angle = angle + (90*M_PI/180); // Shift to align with x-axis
+            double a = cos(angle);
+            double b = sin(angle);
+            start.x = cvRound(start.x + edge_mask.cols*(-b));
+            start.y = cvRound(start.y + edge_mask.rows*(a));
+            end.x = cvRound(end.x - edge_mask.cols*(-b));
+            end.y = cvRound(end.y - edge_mask.rows*(a));
+
+            // Create mask
+            Mat line_mask = Mat::zeros(edge_mask.size(),CV_8U);
+            line(line_mask,start,end,255,10,LINE_AA);
+
+            // Count number of intersections
+            Mat intersection_mask = edge_mask & line_mask;
+            int current_intersections = countNonZero(intersection_mask);
+
+            // Check if bigger than previous
+            bool approved = true;
+            if(compare == true){
+                if(abs(angle-compare_angle) < (angle_threshold*M_PI/180) || abs(angle-(compare_angle+180*M_PI/180)) < (angle_threshold*M_PI/180) ){
+                    approved = false;
+                }
+            }
+
+            if(current_intersections > most_intersections && approved == true){
+                most_intersections = current_intersections;
+
+                // Limit to border with weird non-math method
+                Mat border_mask = Mat::zeros(edge_mask.size(),CV_8U);
+                rectangle(border_mask,Point(0,0),Point(edge_mask.cols-1,edge_mask.rows-1),255,1);
+
+                Mat slim_line = Mat::zeros(edge_mask.size(),CV_8U);
+                line(slim_line,start,end,255,1,LINE_AA);
+
+                Mat ends = border_mask & slim_line;
+                Mat locations;
+                findNonZero(ends,locations);
+
+                Point best_start;
+                Point best_end;
+                double best_angle = angle;
+
+                if(countNonZero(ends) > 2){
+                    float biggest_distance = 0.0;
+                    double best_angle_diff = 90;
+                    // if more than two points chose, the ones furthest from eachother
+                    for(int first_index = 0; first_index < locations.rows; first_index++){
+                        for(int second_index = 0; second_index < locations.rows; second_index++){
+                            Point first = locations.at<Point>(first_index);
+                            Point second = locations.at<Point>(second_index);
+                            float distance = abs(calculations.calculate_euclidean_distance(first.x,first.y,second.x,second.y));
+                            float new_angle = calculations.calculate_angle(first,second) + (90*M_PI/180);
+                            double angle_diff = abs(new_angle*180/M_PI-angle*180/M_PI);
+                            if(distance > biggest_distance && angle_diff < best_angle_diff){
+                                best_start = first;
+                                best_end = second;
+                                biggest_distance = distance;
+                                best_angle_diff = angle_diff;
+                                best_angle = new_angle;
+                            }
+                        }
+                    }
+                }
+                else if(countNonZero(ends) == 2){
+                    best_start = locations.at<Point>(0);
+                    best_end = locations.at<Point>(1);
+                }
+                else{
+                    throw runtime_error("Line does not hit border");
+                }
+
+                // Update line
+                lines.at(i)[0] = best_start.x;
+                lines.at(i)[1] = best_start.y;
+                lines.at(i)[2] = best_end.x;
+                lines.at(i)[3] = best_end.y;
+
+                // Assign to best line
+                best_line.line = lines.at(i);
+                best_line.angle = best_angle;
+            }
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return best_line;
+}
+
+
+Mat detecting::ensure_single_obstacle(Mat mask, Vec4i first_line, Vec4i last_line){
+    Mat single_obstacle_mask;
+    try{
+        // Make line perpendicular to first and last line
+        Vec4i work_line;
+        work_line[0] = first_line[0];
+        work_line[1] = first_line[1];
+        work_line[2] = last_line[0];
+        work_line[3] = last_line[1];
+
+        // Determine its angle
+        double angle = calculations.calculate_angle(Point(work_line[0],work_line[1]),Point(work_line[2],work_line[3])) + (90*M_PI/180);
+
+        // Determine direction
+        int direction = get_obstacle_direction(angle,work_line,mask);
+
+        // use direction to extend line and change to going right or down
+        if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
+            work_line[0] = 0;
+            work_line[2] = mask.cols-1;
+            direction = DIRECTION_RIGHT;
+
+        }
+        else{
+            work_line[1] = 0;
+            work_line[3] = mask.rows-1;
+            direction = DIRECTION_DOWN;
+        }
+
+        // Get start and end line
+        vector<Vec4i> borders = get_line_borders(direction,work_line,mask,5,0.75);
+        Vec4i first_line = borders.at(0);
+        Vec4i last_line = borders.at(1);
+
+        // Create mask
+        vector<Point> bounding;
+        bounding.push_back(Point(first_line[0],first_line[1]));
+        bounding.push_back(Point(last_line[0],last_line[1]));
+        bounding.push_back(Point(last_line[2],last_line[3]));
+        bounding.push_back(Point(first_line[2],first_line[3]));
+
+        Mat bounding_mat = Mat::zeros(mask.size(),CV_8U);
+        vector<vector<Point>> polygons;
+        polygons.push_back(bounding);
+        fillPoly(bounding_mat,polygons,255);
+
+        // Take only intersection
+        single_obstacle_mask = bounding_mat & mask;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return single_obstacle_mask;
+}
+
+
+// FIX THISSSSSS
+Mat ensure_single_obstacle(Mat mask){
+    Mat single_obstacle_mask;
+    try{
+        // Draw bounding rectangle
+        Mat temp_mask = mask.clone();
+        rectangle(temp_mask,Point(0,0),Point(mask.cols-1,mask.rows-1),255,1);
+
+        // Find contours
+        vector<vector<Point>> contours;
+        vector<Vec4i> hierarchy;
+        findContours(temp_mask,contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+        // Keep biggest one that is not the entire frame
+        int biggest = 0;
+        for(vector<vector<Point>>::iterator it = contours.begin(); it!=contours.end(); ){
+            int current_size = it->size();
+
+            if(current_size > biggest && current_size < ){
+                biggest = current_size;
+            }
+            else{
+                ++it;
+            }
+        }
+
+
+
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return single_obstacle_mask;
 }

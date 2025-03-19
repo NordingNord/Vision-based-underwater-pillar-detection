@@ -1271,3 +1271,428 @@
 //int index = (0.95*depths.size()); // If percentile is inbetween two values, the lowest is taken.
 //float percentile_value = depths.at(index);
 //max_depth = percentile_value;
+
+
+
+
+// ----------------------------------------------------------------------------------------------------------------------------------
+
+//// Split contour using the found lines
+//// find best direction for best line
+//Vec4i first_line;
+//Vec4i last_line;
+//bool first_found = false;
+//int steps_since_change = 0;
+//if(best_angle*180/M_PI < abs(best_angle*180/M_PI-90)){
+//    // vertical edge
+//    cout << "Vertical" << endl;
+
+
+//    // create directional linemasks
+//    Mat left_mask = Mat::zeros(mask.size(),CV_8U);
+//    Mat right_mask = Mat::zeros(mask.size(),CV_8U);
+//    line(left_mask,Point(best_line[0]-1,best_line[1]),Point(best_line[2]-1,best_line[3]),255,3,LINE_AA); // Move one pixel left
+//    line(right_mask,Point(best_line[0]+1,best_line[1]),Point(best_line[2]+1,best_line[3]),255,3,LINE_AA); // Move one pixel right
+
+//    // Find direction with most matches
+//    Mat left_match_mat = left_mask & mask;
+//    Mat right_match_mat = right_mask & mask;
+//    int left_matches = countNonZero(left_match_mat);
+//    int right_matches = countNonZero(right_match_mat);
+
+//    int direction_sign = 1;
+//    int max_index = mask.cols;
+//    if(left_matches > right_matches){
+//        cout << "Left" << endl;
+//        // set last line as border if no other border is found
+//        last_line[0] = 0;
+//        last_line[1] = 0;
+//        last_line[2] = 0;
+//        last_line[3] = frame.rows-1;
+//        direction_sign = -1;
+//        max_index = min(best_line[0],best_line[2]);
+//    }
+//    else{
+//        cout << "Right" << endl;
+//        last_line[0] = frame.cols-1;
+//        last_line[1] = 0;
+//        last_line[2] = frame.cols-1;
+//        last_line[3] = frame.rows-1;
+//    }
+//    int most_matches = 0;//max(left_matches,right_matches);
+//    int last_matches = 0;
+//    for(int x_index = 0; x_index < max_index; x_index++){
+//        // Get new mask
+//        Mat new_mask =  Mat::zeros(mask.size(),CV_8U);
+//        line(new_mask,Point(best_line[0]+(x_index*direction_sign),best_line[1]),Point(best_line[2]+(x_index*direction_sign),best_line[3]),255,3,LINE_AA);
+
+//        // Count matches
+//        Mat match_mask = new_mask & mask;
+//        int match_count = countNonZero(match_mask);
+//        // Check if better than previous
+//        if(most_matches < match_count && first_found == false){
+//            most_matches = match_count;
+//            first_line[0] = best_line[0]+(x_index*direction_sign);
+//            first_line[1] = best_line[1];
+//            first_line[2] = best_line[2]+(x_index*direction_sign);
+//            first_line[3] = best_line[3];
+//            steps_since_change = 0;
+//        }
+//        else{
+//            steps_since_change++;
+//            if(steps_since_change >= 5){
+//                first_found = true;
+//            }
+//        }
+//        // Check if begining to decline
+//        if(match_count < last_matches*0.75|| x_index+1 == max_index){
+//            cout << match_count << endl;
+//            cout << last_matches << endl;
+//            last_line[0] = best_line[0]+((x_index-1)*direction_sign);
+//            last_line[1] = best_line[1];
+//            last_line[2] = best_line[2]+((x_index-1)*direction_sign);
+//            last_line[3] = best_line[3];
+//            break;
+//        }
+//        last_matches = match_count;
+//    }
+//}
+//else{
+//    // horizontal edge
+//    cout << "Horizontal" << endl;
+
+//    // create directional linemasks
+//    Mat up_mask = Mat::zeros(mask.size(),CV_8U);
+//    Mat down_mask = Mat::zeros(mask.size(),CV_8U);
+//    line(up_mask,Point(best_line[0],best_line[1]-1),Point(best_line[2],best_line[3]-1),255,3,LINE_AA); // Move one pixel up
+//    line(down_mask,Point(best_line[0],best_line[1]+1),Point(best_line[2],best_line[3]+1),255,3,LINE_AA); // Move one pixel down
+
+//    // Find direction with most matches
+//    Mat up_match_mat = up_mask & mask;
+//    Mat down_match_mat = down_mask & mask;
+//    int up_matches = countNonZero(up_match_mat);
+//    int down_matches = countNonZero(down_match_mat);
+
+//    int direction_sign = 1;
+//    int max_index = mask.rows;
+//    if(up_matches > down_matches){
+//        cout << "Top" << endl;
+//        last_line[0] = 0;
+//        last_line[1] = 0;
+//        last_line[2] = frame.cols-1;
+//        last_line[3] = 0;
+//        direction_sign = -1;
+//        max_index = min(best_line[1],best_line[3]);
+//    }
+//    else{
+//        last_line[0] = 0;
+//        last_line[1] = frame.rows-1;
+//        last_line[2] = frame.cols-1;
+//        last_line[3] = frame.rows-1;
+//        cout << "Bottom" << endl;
+//    }
+//    int most_matches = 0;
+//    int last_matches = 0;
+//    for(int y_index = 0; y_index < max_index; y_index++){
+//        // Get new mask
+//        Mat new_mask =  Mat::zeros(mask.size(),CV_8U);
+//        line(new_mask,Point(best_line[0],best_line[1]+(y_index*direction_sign)),Point(best_line[2],best_line[3]+(y_index*direction_sign)),255,3,LINE_AA);
+//        // Count matches
+//        Mat match_mask = new_mask & mask;
+//        int match_count = countNonZero(match_mask);
+//        // Check if better than previous
+//        if(most_matches < match_count && first_found == false){
+//            most_matches = match_count;
+//            first_line[0] = best_line[0];
+//            first_line[1] = best_line[1]+(y_index*direction_sign);
+//            first_line[2] = best_line[2];
+//            first_line[3] = best_line[3]+(y_index*direction_sign);
+//            steps_since_change = 0;
+//            cout << "winner" << endl;
+//        }
+//        else{
+//            steps_since_change++;
+//            if(steps_since_change >= 2){
+//                first_found = true;
+//            }
+//        }
+//        // Check if begining to decline
+//        if(match_count < last_matches*0.75 || y_index+1 == max_index){
+//            last_line[0] = best_line[0];
+//            last_line[1] = best_line[1]+((y_index-1)*direction_sign);
+//            last_line[2] = best_line[2];
+//            last_line[3] = best_line[3]+((y_index-1)*direction_sign);
+//            break;
+//        }
+//        last_matches = match_count;
+//    }
+//}
+
+//// find best direction for second best line
+//Vec4i second_first_line;
+//Vec4i second_last_line;
+//steps_since_change = 0;
+//first_found = false;
+//if(second_best_angle*180/M_PI < abs(second_best_angle*180/M_PI-90)){
+//    // vertical edge
+//    cout << "Vertical" << endl;
+
+//    // create directional linemasks
+//    Mat left_mask = Mat::zeros(mask.size(),CV_8U);
+//    Mat right_mask = Mat::zeros(mask.size(),CV_8U);
+//    line(left_mask,Point(second_best_line[0]-1,second_best_line[1]),Point(second_best_line[2]-1,second_best_line[3]),255,3,LINE_AA); // Move one pixel left
+//    line(right_mask,Point(second_best_line[0]+1,second_best_line[1]),Point(second_best_line[2]+1,second_best_line[3]),255,3,LINE_AA); // Move one pixel right
+
+//    // Find direction with most matches
+//    Mat left_match_mat = left_mask & mask;
+//    Mat right_match_mat = right_mask & mask;
+//    int left_matches = countNonZero(left_match_mat);
+//    int right_matches = countNonZero(right_match_mat);
+
+//    int direction_sign = 1;
+//    int max_index = mask.cols;
+//    if(left_matches > right_matches){
+//        cout << "Left" << endl;
+//        second_last_line[0] = 0;
+//        second_last_line[1] = 0;
+//        second_last_line[2] = 0;
+//        second_last_line[3] = frame.rows-1;
+//        direction_sign = -1;
+//        max_index = min(second_best_line[0],second_best_line[2]);
+//    }
+//    else{
+//        cout << "Right" << endl;
+//        second_last_line[0] = frame.cols-1;
+//        second_last_line[1] = 0;
+//        second_last_line[2] = frame.cols-1;
+//        second_last_line[3] = frame.rows-1;
+//    }
+//    int most_matches = 0;
+//    int last_matches = 0;
+//    for(int x_index = 0; x_index < max_index; x_index++){
+//        // Get new mask
+//        Mat new_mask =  Mat::zeros(mask.size(),CV_8U);
+//        line(new_mask,Point(second_best_line[0]+(x_index*direction_sign),second_best_line[1]),Point(second_best_line[2]+(x_index*direction_sign),second_best_line[3]),255,3,LINE_AA);
+
+//        // Count matches
+//        Mat match_mask = new_mask & mask;
+//        int match_count = countNonZero(match_mask);
+//        // Check if better than previous
+//        if(most_matches < match_count && first_found == false){
+//            most_matches = match_count;
+//            second_first_line[0] = second_best_line[0]+(x_index*direction_sign);
+//            second_first_line[1] = second_best_line[1];
+//            second_first_line[2] = second_best_line[2]+(x_index*direction_sign);
+//            second_first_line[3] = second_best_line[3];
+//            steps_since_change = 0;
+//        }
+//        else{
+//            steps_since_change++;
+//            if(steps_since_change >= 5){
+//                first_found = true;
+//            }
+//        }
+//        // Check if begining to decline
+//        if(match_count < last_matches*0.75|| x_index+1 == max_index){
+//            second_last_line[0] = second_best_line[0]+((x_index-1)*direction_sign);
+//            second_last_line[1] = second_best_line[1];
+//            second_last_line[2] = second_best_line[2]+((x_index-1)*direction_sign);
+//            second_last_line[3] = second_best_line[3];
+//            break;
+//        }
+//        last_matches = match_count;
+//    }
+//}
+//else{
+//    // horizontal edge
+//    cout << "Horizontal" << endl;
+
+//    // create directional linemasks
+//    Mat up_mask = Mat::zeros(mask.size(),CV_8U);
+//    Mat down_mask = Mat::zeros(mask.size(),CV_8U);
+//    line(up_mask,Point(second_best_line[0],second_best_line[1]-1),Point(second_best_line[2],second_best_line[3]-1),255,3,LINE_AA); // Move one pixel up
+//    line(down_mask,Point(second_best_line[0],second_best_line[1]+1),Point(second_best_line[2],second_best_line[3]+1),255,3,LINE_AA); // Move one pixel down
+
+//    // Find direction with most matches
+//    Mat up_match_mat = up_mask & mask;
+//    Mat down_match_mat = down_mask & mask;
+//    int up_matches = countNonZero(up_match_mat);
+//    int down_matches = countNonZero(down_match_mat);
+
+//    int direction_sign = 1;
+//    int max_index = mask.rows;
+//    if(up_matches > down_matches){
+//        cout << "Top" << endl;
+//        second_last_line[0] = 0;
+//        second_last_line[1] = 0;
+//        second_last_line[2] = frame.cols-1;
+//        second_last_line[3] = 0;
+//        direction_sign = -1;
+//        max_index = min(second_best_line[1],second_best_line[3]);
+//    }
+//    else{
+//        second_last_line[0] = 0;
+//        second_last_line[1] = frame.rows-1;
+//        second_last_line[2] = frame.cols-1;
+//        second_last_line[3] = frame.rows-1;
+//        cout << "Bottom" << endl;
+//    }
+//    int most_matches = 0;//max(up_matches,down_matches)
+//    int last_matches = 0;
+//    for(int y_index = 0; y_index < max_index; y_index++){
+//        // Get new mask
+//        Mat new_mask =  Mat::zeros(mask.size(),CV_8U);
+//        line(new_mask,Point(second_best_line[0],second_best_line[1]+(y_index*direction_sign)),Point(second_best_line[2],second_best_line[3]+(y_index*direction_sign)),255,3,LINE_AA);
+
+//        // Count matches
+//        Mat match_mask = new_mask & mask;
+//        int match_count = countNonZero(match_mask);
+//        // Check if better than previous
+//        if(most_matches < match_count && first_found == false){
+//            most_matches = match_count;
+//            second_first_line[0] = second_best_line[0];
+//            second_first_line[1] = second_best_line[1]+(y_index*direction_sign);
+//            second_first_line[2] = second_best_line[2];
+//            second_first_line[3] = second_best_line[3]+(y_index*direction_sign);
+//            steps_since_change = 0;
+//        }
+//        else{
+//            steps_since_change++;
+//            if(steps_since_change >= 5){
+//                first_found = true;
+//            }
+//        }
+//        // Check if begining to decline
+//        if(match_count < last_matches*0.75 || y_index+1 == max_index){
+//            second_last_line[0] = second_best_line[0];
+//            second_last_line[1] = second_best_line[1]+((y_index-1)*direction_sign);
+//            second_last_line[2] = second_best_line[2];
+//            second_last_line[3] = second_best_line[3]+((y_index-1)*direction_sign);
+//            break;
+//        }
+//        last_matches = match_count;
+//    }
+//}
+
+
+//                // step 2: find best line
+//                vector<Vec4i> lines;
+//                HoughLinesP(edge_mask,lines,1,CV_PI/180,10,50,10);
+//                int most_intersections = 0;
+//                Vec4i best_line;
+//                Vec4i non_extended_best_line;
+//                double best_angle;
+//                for(int i = 0; i < lines.size(); i++){
+//                    // get points
+//                    Point start = Point(lines.at(i)[0],lines.at(i)[1]);
+//                    Point end = Point(lines.at(i)[2],lines.at(i)[3]);
+
+////                    Mat baz = Mat::zeros(mask.size(),CV_8U);
+////                    line(baz,start,end,255,3);
+////                    resize(baz,baz,Size(),0.5,0.5,INTER_LINEAR);
+////                    imshow("current line", baz);
+////                    waitKey(0);
+
+//                    // Extent lines
+//                    double angle = calculations.calculate_angle(start,end);
+//                    angle = angle + (90*M_PI/180); // Shift to align with x-axis
+//                    double a = cos(angle);
+//                    double b = sin(angle);
+//                    start.x = cvRound(start.x + frame.cols*(-b));
+//                    start.y = cvRound(start.y + frame.rows*(a));
+//                    end.x = cvRound(end.x - frame.cols*(-b));
+//                    end.y = cvRound(end.y - frame.rows*(a));
+
+//                    // Create mask
+//                    Mat line_mask = Mat::zeros(mask.size(),CV_8U);
+//                    line(line_mask,start,end,255,10,LINE_AA);
+
+//                    // Count number of intersections
+//                    Mat intersection_mask = edge_mask & line_mask;
+//                    int current_intersections = countNonZero(intersection_mask);
+
+//                    // Check if bigger than previous
+//                    if(current_intersections > most_intersections){
+//                        most_intersections = current_intersections;
+//                        non_extended_best_line = lines.at(i);
+//                        lines.at(i)[0] = start.x;
+//                        lines.at(i)[1] = start.y;
+//                        lines.at(i)[2] = end.x;
+//                        lines.at(i)[3] = end.y;
+
+//                        best_line = lines.at(i);
+//                        best_angle = angle;
+//                    }
+//                }
+
+
+//                HoughLinesP(edge_mask,lines,1,CV_PI/180,10,50,10);
+
+//                most_intersections = 0;
+//                Vec4i second_best_line;
+//                bool second_found = false;
+//                Vec4i non_extended_second_best_line;
+//                double second_best_angle;
+//                for(int i = 0; i < lines.size(); i++){
+//                    // get points
+//                    Point start = Point(lines.at(i)[0],lines.at(i)[1]);
+//                    Point end = Point(lines.at(i)[2],lines.at(i)[3]);
+
+////                    Mat baz = Mat::zeros(mask.size(),CV_8U);
+////                    line(baz,start,end,255,3);
+////                    resize(baz,baz,Size(),0.5,0.5,INTER_LINEAR);
+////                    imshow("current line", baz);
+////                    waitKey(0);
+
+//                    // Extent lines
+//                    double angle = calculations.calculate_angle(start,end);
+//                    angle = angle + (90*M_PI/180); // Shift to align with x-axis
+//                    double a = cos(angle);
+//                    double b = sin(angle);
+//                    start.x = cvRound(start.x + frame.cols*(-b));
+//                    start.y = cvRound(start.y + frame.rows*(a));
+//                    end.x = cvRound(end.x - frame.cols*(-b));
+//                    end.y = cvRound(end.y - frame.rows*(a));
+
+//                    // Create mask
+//                    Mat line_mask = Mat::zeros(mask.size(),CV_8U);
+//                    line(line_mask,start,end,255,10,LINE_AA);
+
+//                    // Count number of intersections
+//                    Mat intersection_mask = edge_mask & line_mask;
+//                    int current_intersections = countNonZero(intersection_mask);
+
+//                    // Check if bigger than previous and ensure angle is not similar to best line
+////                    cout << current_intersections << endl;
+////                    cout << most_intersections << endl;
+////                    cout << angle*180/M_PI << endl;
+////                    cout << best_angle*180/M_PI << endl;
+////                    cout << abs(angle-best_angle)*180/M_PI << endl;
+//                    if(current_intersections > most_intersections && abs(angle-best_angle) >= (45*M_PI/180)){
+//                        second_found = true;
+//                        most_intersections = current_intersections;
+//                        non_extended_second_best_line = lines.at(i);
+//                        lines.at(i)[0] = start.x;
+//                        lines.at(i)[1] = start.y;
+//                        lines.at(i)[2] = end.x;
+//                        lines.at(i)[3] = end.y;
+
+//                        second_best_line = lines.at(i);
+//                        second_best_angle = angle;
+//                    }
+//                }
+
+//                if(second_found == false){ // Maybe change to continuing with current line just to get something
+//                    cout << "could not split. Removing obstacle." << endl;
+//                    break;
+//                }
+
+
+//                Mat viz_org = Mat::zeros(mask.size(),CV_8U);
+//                line(viz_org,Point(non_extended_second_best_line[0],non_extended_second_best_line[1]),Point(non_extended_second_best_line[2],non_extended_second_best_line[3]),255,3,LINE_AA);
+//                line(viz_org,Point(non_extended_best_line[0],non_extended_best_line[1]),Point(non_extended_best_line[2],non_extended_best_line[3]),255,3,LINE_AA);
+
+//                Mat flap = viz_org.clone();
+//                resize(flap,flap,Size(),0.5,0.5,INTER_LINEAR);
+//                imshow("Best lines org", flap);
+//                waitKey(0);

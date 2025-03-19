@@ -149,4 +149,10 @@ struct obstacle{
     std::string type;
 };
 
+// Information about a line
+struct line_data{
+    cv::Vec4i line;
+    double angle;
+};
+
 #endif
