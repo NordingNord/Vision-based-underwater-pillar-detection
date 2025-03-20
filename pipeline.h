@@ -19,6 +19,7 @@
 #include "converting.h"
 #include "estimating_3d.h"
 #include "detecting.h"
+#include "optical_flow.h"
 
 
 // -- Defines --
@@ -60,12 +61,15 @@ public:
 
     void set_bilateral_parameters(int diameter, double sigma_color, double sigma_space);
 
+    void set_optical_flow_paramters(cv::Size new_window_size, int new_max_pyramid_layers, cv::TermCriteria new_termination_criteria);
+
     // -- The pipelines --
     void run_triangulation_pipeline(int disparity_filter);
 
     void run_triangulation_pipeline_test(int disparity_filter);
 
     void run_disparity_pipeline(int disparity_filter);
+
 
 private:
     // Pipeline mode
@@ -95,6 +99,9 @@ private:
 
     // Detector class
     detecting detector;
+
+    // Optical flow class
+    optical_flow optical_flow_system;
 
     // Settings
     bool callibration_transposed;

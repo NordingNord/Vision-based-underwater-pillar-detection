@@ -187,6 +187,16 @@ void pipeline::set_bilateral_parameters(int diameter, double sigma_color, double
     }
 }
 
+void pipeline::set_optical_flow_paramters(Size new_window_size, int new_max_pyramid_layers, TermCriteria new_termination_criteria){
+    try{
+        optical_flow_system.set_settings(new_window_size,new_max_pyramid_layers,new_termination_criteria);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+
 // -- The pipelines --
 void pipeline::run_triangulation_pipeline(int disparity_filter){
     try{
@@ -704,6 +714,8 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
         // Initialize some loop paramters
         int frame_index = 0;
         Mat first_frame, second_frame;
+        Mat last_first_frame;
+        vector<obstacle> last_obstacles;
 
         // Begin to go through video feed
         while(true){
@@ -827,6 +839,40 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             // Filter obstacles
             vector<obstacle> filtered_obstacles = detector.filter_obstacles(obstacles,first_frame);
 
+            // Find obstacle types
+            filtered_obstacles = detector.detect_type(filtered_obstacles,normalized_depth_map);
+
+            // If no obstacles, use last obstacles
+            vector<obstacle> temp_obstacles = filtered_obstacles;
+            if(filtered_obstacles.size() == 0){
+                // Find features in last and current frame
+                vector<KeyPoint> keypoints = feature_handler.find_features(first_frame);
+                vector<KeyPoint> last_keypoints = feature_handler.find_features(last_first_frame);
+
+                Mat descriptors = feature_handler.get_descriptors(first_frame,keypoints);
+                Mat last_descriptors = feature_handler.get_descriptors(last_first_frame,last_keypoints);
+
+                // Match features
+                vector<DMatch> matches = feature_handler.match_features(last_descriptors,descriptors);
+
+                // Clean matches
+                vector<DMatch> filtered_matches = filtering_sytem.filter_matches(matches,last_keypoints,keypoints);
+                vector<vector<KeyPoint>> remaining_keypoints = converter.remove_unmatches_keypoints(filtered_matches,last_keypoints,keypoints);
+                last_keypoints = remaining_keypoints.at(0);
+
+                // Perform optical flow
+                vector<vector<float>> movement = optical_flow_system.get_optical_flow_movement(converter.keypoints_to_points(last_keypoints),last_first_frame,first_frame);
+
+                // Use optical flow results to move obstacles
+                temp_obstacles = detector.patch_detection_gap(last_obstacles,movement,converter.keypoints_to_points(last_keypoints));
+
+
+            }
+            // Update last info (one of these fucks with things)
+            last_first_frame = first_frame.clone();
+            last_obstacles = filtered_obstacles;
+            filtered_obstacles = temp_obstacles;
+
             // Visualize final obstacles
             Mat final_warning = visualizer.show_obstacles(filtered_obstacles,cut_first_frame);
 
@@ -837,6 +883,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             // Destroy windows before new run
             destroyAllWindows();
+
         }
     }
     catch(const exception& error){

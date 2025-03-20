@@ -1696,3 +1696,181 @@
 //                resize(flap,flap,Size(),0.5,0.5,INTER_LINEAR);
 //                imshow("Best lines org", flap);
 //                waitKey(0);
+
+//vector<obstacle> kept_obstacles;
+//for(int obstacle_index = 0; obstacle_index < obstacles.size(); obstacle_index++){
+//    // Get current data
+//    vector<Point> contour = obstacles.at(obstacle_index).contour;
+//    Mat mask = obstacles.at(obstacle_index).mask;
+//    // Draw bounding box
+//    RotatedRect rectangle = minAreaRect(contour);
+//    Point2f rectangle_points[4];
+//    rectangle.points(rectangle_points);
+//    vector<Point> rectangle_points_vector = {rectangle_points[0],rectangle_points[1],rectangle_points[2],rectangle_points[3]};
+//    vector<vector<Point>> points;
+//    points.push_back(rectangle_points_vector);
+//    Mat bounding_box = Mat::zeros(mask.size(),CV_8U);
+//    drawContours(bounding_box,points,0,255,-1,LINE_8);
+
+//    Mat viz_box = mask.clone();
+//    drawContours(viz_box,points,0,150,3,LINE_8);
+//    resize(viz_box,viz_box,Size(),0.5,0.5,INTER_LINEAR);
+//    imshow("Bounding box and mask", viz_box);
+//    waitKey(0);
+
+
+//    // Check if bounding box contains more than 50 percent error
+//    Mat error_mask = bounding_box-mask;
+
+//    int mask_count = countNonZero(mask);
+//    int error_count = countNonZero(error_mask);
+
+//    if(error_count > int(mask_count*0.5)){
+//        // Split into two
+
+//        // step 1: find edges in mask
+//        Mat edge_mask;
+//        Canny(mask,edge_mask,50,200,3);
+
+//        Mat glop = edge_mask.clone();
+//        resize(glop,glop,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("edge mask", glop);
+//        waitKey(0);
+
+//        // ---------------------------------------------- SIMPLIFICATION ZONE -------------------
+//        // step 2: Find best line
+//        line_data best_line_data = get_best_line(edge_mask,10,50.0,10.0,false,0.0);
+//        Vec4i best_line = best_line_data.line;
+//        double best_angle = best_line_data.angle;
+
+//        // step 3: Create mask of best line
+//        Mat best_line_mask = Mat::zeros(mask.size(),CV_8U);
+//        line(best_line_mask,Point(best_line[0],best_line[1]),Point(best_line[2],best_line[3]),255,10,LINE_AA);
+
+//        // step 4: remove edges under line mask
+//        edge_mask = edge_mask-best_line_mask;
+
+//        // step 5: Find new best line
+//        line_data second_best_line_data = get_best_line(edge_mask,10,50.0,10.0,true,best_angle,45.0);
+//        Vec4i second_best_line = second_best_line_data.line;
+//        double second_best_angle = second_best_line_data.angle;
+
+//        // step 6: Add line to mask for visualization
+
+//        Mat viz =  Mat::zeros(mask.size(),CV_8U);
+//        line(viz,Point(second_best_line[0],second_best_line[1]),Point(second_best_line[2],second_best_line[3]),255,3,LINE_AA);
+//        line(viz,Point(best_line[0],best_line[1]),Point(best_line[2],best_line[3]),255,3,LINE_AA);
+
+//        Mat flop = viz.clone();
+//        resize(flop,flop,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("Best lines", flop);
+//        waitKey(0);
+
+//        // Detemine direction of obstacle based on both lines
+//        int direction = get_obstacle_direction(best_angle,best_line,mask);
+//        int second_direction = get_obstacle_direction(second_best_angle, second_best_line,mask);
+
+//        // Determine borders of split obstalces
+//        vector<Vec4i> borders = get_line_borders(direction,best_line,mask,5,0.75);
+//        Vec4i first_line = borders.at(0);
+//        Vec4i last_line = borders.at(1);
+
+//        vector<Vec4i> second_borders = get_line_borders(second_direction,second_best_line,mask,5,0.75);
+//        Vec4i second_first_line = second_borders.at(0);
+//        Vec4i second_last_line = second_borders.at(1);
+
+//        // -------------------------------------------------------------------------------------------------------------------- simplification performed above ---------------------------
+
+
+//        // Draw edges of best lines
+//        Mat best_shape = Mat::zeros(mask.size(),CV_8U);
+//        line(best_shape,Point(first_line[0],first_line[1]),Point(first_line[2],first_line[3]),255,3,LINE_AA);
+//        line(best_shape,Point(last_line[0],last_line[1]),Point(last_line[2],last_line[3]),255,3,LINE_AA);
+
+//        line(best_shape,Point(second_first_line[0],second_first_line[1]),Point(second_first_line[2],second_first_line[3]),255,3,LINE_AA);
+//        line(best_shape,Point(second_last_line[0],second_last_line[1]),Point(second_last_line[2],second_last_line[3]),255,3,LINE_AA);
+
+//        Mat mask_test = mask.clone();
+//        resize(mask_test,mask_test,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("mask", mask_test);
+//        waitKey(0);
+
+//        Mat test = best_shape.clone();
+//        resize(test,test,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("best shape", test);
+//        waitKey(0);
+
+//        // Fill area and view split obstacles
+//        vector<Point> first_bounding;
+//        first_bounding.push_back(Point(first_line[0],first_line[1]));
+//        first_bounding.push_back(Point(last_line[0],last_line[1]));
+//        first_bounding.push_back(Point(last_line[2],last_line[3]));
+//        first_bounding.push_back(Point(first_line[2],first_line[3]));
+
+//        Mat first_bounding_mat = Mat::zeros(mask.size(),CV_8U);
+//        vector<vector<Point>> polygons;
+//        polygons.push_back(first_bounding);
+//        fillPoly(first_bounding_mat,polygons,255);
+//        Mat first_mask = first_bounding_mat & mask;
+
+//        vector<Point> second_bounding;
+//        second_bounding.push_back(Point(second_first_line[0],second_first_line[1]));
+//        second_bounding.push_back(Point(second_last_line[0],second_last_line[1]));
+//        second_bounding.push_back(Point(second_last_line[2],second_last_line[3]));
+//        second_bounding.push_back(Point(second_first_line[2],second_first_line[3]));
+
+//        vector<vector<Point>> second_polygons;
+//        second_polygons.push_back(second_bounding);
+
+//        Mat second_bounding_mat = Mat::zeros(mask.size(),CV_8U);
+//        fillPoly(second_bounding_mat,second_polygons,255);
+//        Mat second_mask = second_bounding_mat & mask;
+
+//        // Cut masks into only including a single obstacle
+//        first_mask = ensure_single_obstacle(first_mask);
+//        second_mask = ensure_single_obstacle(second_mask);
+
+//        // Ensure remaining mask is not forgotten
+//        Mat remaining_mask = mask-first_mask;
+//        remaining_mask = remaining_mask-second_mask;
+
+//        Mat mask_1 = first_mask.clone();
+//        resize(mask_1,mask_1,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("first mask", mask_1);
+//        waitKey(0);
+
+//        Mat mask_2 = second_mask.clone();
+//        resize(mask_2,mask_2,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("second mask", mask_2);
+//        waitKey(0);
+
+//        Mat mask_3 = remaining_mask.clone();
+//        resize(mask_3,mask_3,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("remaining mask", mask_3);
+//        waitKey(0);
+
+//        // Keep if not empty
+//        obstacle first_obstacle, second_obstacle, remaining_obstacle;
+//        if(hasNonZero(first_mask) == true){
+//            first_obstacle.mask = first_mask;
+//            first_obstacle.contour = first_bounding;
+//            obstacles.push_back(first_obstacle);
+//        }
+//        if(hasNonZero(second_mask) == true){
+//            second_obstacle.mask = second_mask;
+//            second_obstacle.contour = second_bounding;
+//            obstacles.push_back(second_obstacle);
+//        }
+//        if(hasNonZero(remaining_mask) == true){
+//            remaining_obstacle.mask = remaining_mask;
+//            remaining_obstacle.original_mask = mask;
+//            obstacles.push_back(remaining_obstacle);
+//        }
+//    }
+//    else{
+//        // Keep obstacle if box is good fit
+//        obstacles.at(obstacle_index).type = "Unknown";
+//        kept_obstacles.push_back(obstacles.at(obstacle_index));
+//    }
+//}
+//final_obstacles = kept_obstacles;

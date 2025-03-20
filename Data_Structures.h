@@ -145,6 +145,7 @@ struct disparity_parameters{
 // Information about obstacle
 struct obstacle{
     cv::Mat mask;
+    cv::Mat original_mask;
     std::vector<cv::Point> contour;
     std::string type;
 };

@@ -139,6 +139,12 @@ int main(){
     double sigma_color = 100.0;
     double sigma_space = 100.0;
 
+    // -- Optical flow parameters --
+    Size window_size = cv::Size(15,15); // search window at each level
+    int max_pyramid_layers = 2;  // 2 -> 3 layers max, since 1 -> 2 layers and 0 -> 1 layers = no pyramid
+    TermCriteria termination_criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03); //  count is the maximum number of iterations while eps is epsilon is a limit for how little the window is allowed to be moved before stopping the proecess
+
+
     // -- RUN PIPELINE --
     pipeline detection_triangulation(bottom_video,top_video); // Setup mode and video feeds
     detection_triangulation.set_parameter_paths(bottom_paramter_path, top_parameter_path); // Setup camera data
@@ -149,6 +155,7 @@ int main(){
     detection_triangulation.set_disparity_parameters(min_disparity,num_disparities,block_size,p1,p2,disp_12_max_diff,pre_filter_cap,uniqueness_ratio,speckle_window_size,speckle_range,mode);
     detection_triangulation.set_wsl_parameters(lamda,sigma);
     detection_triangulation.set_bilateral_parameters(diameter,sigma_color,sigma_space);
+    detection_triangulation.set_optical_flow_paramters(window_size,max_pyramid_layers,termination_criteria);
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
