@@ -197,6 +197,17 @@ void pipeline::set_optical_flow_paramters(Size new_window_size, int new_max_pyra
 }
 
 
+void pipeline::set_obstacle_candidate_settings(int blur_size, double low_thresh, double high_thresh, int sobel_size, bool l2_status, int size_thresh, cv::Mat line_kernel, cv::Mat contour_kernel, cv::Mat border_kernel, float border_threshold){
+    try{
+        detector.set_possible_obstacles_settings(blur_size, low_thresh, high_thresh, sobel_size, l2_status, size_thresh, line_kernel, contour_kernel, border_kernel, border_threshold);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+
+
 // -- The pipelines --
 void pipeline::run_triangulation_pipeline(int disparity_filter){
     try{
@@ -763,9 +774,16 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             waitKey(0);
 
             // Rectify frames
+            auto start = chrono::high_resolution_clock::now();
+
             vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
             first_frame = rectified_frames.at(0);
             second_frame = rectified_frames.at(1);
+
+            auto stop = chrono::high_resolution_clock::now();
+            auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Rectification done in  " << duration.count() << " ms using." << endl;
+
 
             // Show rectification
             Mat rectified;
@@ -777,7 +795,14 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             waitKey(0);
 
             // Compute disparity map
+            start = chrono::high_resolution_clock::now();
+
             Mat disparity_map = stereo_system.get_disparity(first_frame,second_frame);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Disparity map found in  " << duration.count() << " ms using." << endl;
+
 
             // Visualize filtered disparity map
             Mat disparity_map_color;
@@ -791,6 +816,8 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             waitKey(0);
 
             // Filter disparity map
+            start = chrono::high_resolution_clock::now();
+
             if(disparity_filter == DISPARITY_FILTER_WLS){
                 disparity_map = stereo_system.filter_disparity(disparity_map,first_frame,second_frame);
             }
@@ -812,20 +839,52 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
                 waitKey(0);
             }
 
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Disparity map filtered in  " << duration.count() << " ms using." << endl;
+
+
             // Get depth map
+            start = chrono::high_resolution_clock::now();
+
             Mat depth_map = stereo_system.disparity_to_depth(disparity_map);
 
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Depth map found in  " << duration.count() << " ms using." << endl;
+
             // Remove black border from depth
+            start = chrono::high_resolution_clock::now();
+
             Mat cleaned_depth_map = stereo_system.remove_invalid_edge(depth_map);
 
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "border removal done in  " << duration.count() << " ms using." << endl;
+
+
             // Normalize depth
+            start = chrono::high_resolution_clock::now();
+
             Mat normalized_depth_map = converter.normalize_depth(cleaned_depth_map,255.0);
 
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Normalized in  " << duration.count() << " ms using." << endl;
+
+
             // Find edges in depth
+            start = chrono::high_resolution_clock::now();
+
             vector<obstacle> obstacles = detector.get_depth_difference(normalized_depth_map);
 
             // Get danger zones
             vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Found possible obstacles in  " << duration.count() << " ms using." << endl;
+
 
             // Prepare vizualization of possible obstacles
             Mat cut_first_frame = stereo_system.remove_invalid_edge(first_frame);
@@ -837,10 +896,25 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             waitKey(0);
 
             // Filter obstacles
+            start = chrono::high_resolution_clock::now();
+
             vector<obstacle> filtered_obstacles = detector.filter_obstacles(obstacles,first_frame);
 
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Filtered obstacles in  " << duration.count() << " ms using." << endl;
+
+
             // Find obstacle types
+            start = chrono::high_resolution_clock::now();
+
             filtered_obstacles = detector.detect_type(filtered_obstacles,normalized_depth_map);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Identified obstacles in  " << duration.count() << " ms using." << endl;
+
+
 
             // If no obstacles, use last obstacles
             vector<obstacle> temp_obstacles = filtered_obstacles;
@@ -868,7 +942,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
 
             }
-            // Update last info (one of these fucks with things)
+            // Update last info
             last_first_frame = first_frame.clone();
             last_obstacles = filtered_obstacles;
             filtered_obstacles = temp_obstacles;

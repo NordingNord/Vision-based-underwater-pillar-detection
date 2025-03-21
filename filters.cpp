@@ -146,7 +146,7 @@ vector<float> filters::filter_ipr(vector<float> data_points, float lower_percent
     try{
         // sort vector
         vector<float> sorted_data_points = data_points;
-        sort(sorted_data_points.begin(),sorted_data_points.end());
+        sort(sorted_data_points.begin(),sorted_data_points.end()); // This is where all time issues arise from
 
         // Find quantiles
         int lower_index = lower_percentile*sorted_data_points.size();
@@ -159,31 +159,13 @@ vector<float> filters::filter_ipr(vector<float> data_points, float lower_percent
         float inter_quantile_range = upper_quantile-lower_quantile;
 
         // Determine bounds
-        float lower_bound = lower_quantile-1.5*inter_quantile_range;
-        float upper_bound = upper_quantile+1.5*inter_quantile_range;
+        float lower_bound_val = lower_quantile-1.5*inter_quantile_range;
+        float upper_bound_val = upper_quantile+1.5*inter_quantile_range;
 
         // Filter points
-        bool bottom_found = false;
-        bool top_found = false;
-        int low_index,high_index;
-        for(int indent = 0; indent < sorted_data_points.size(); indent++){
-            float lower_val = sorted_data_points.at(indent);
-            float upper_val = sorted_data_points.at(sorted_data_points.size()-(indent+1));
-
-            if(lower_val >= lower_bound && bottom_found == false){
-                low_index = indent;
-                bottom_found = true;
-            }
-            if(upper_val <= upper_bound && top_found == false){
-                high_index = indent;
-                top_found = true;
-            }
-            if(top_found == true && bottom_found == true){
-                break;
-            }
-        }
-
-        filtered_data.assign(sorted_data_points.begin()+low_index,sorted_data_points.end()-high_index);
+        auto bottom = lower_bound(sorted_data_points.begin(), sorted_data_points.end(),lower_bound_val);
+        auto top = lower_bound(sorted_data_points.begin(), sorted_data_points.end(),upper_bound_val);
+        filtered_data.assign(bottom,top);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

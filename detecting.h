@@ -73,13 +73,51 @@ public:
     // -- Methods for handling gaps in detections --
     std::vector<obstacle> patch_detection_gap(std::vector<obstacle> last_obstacles, std::vector<std::vector<float>> movements, std::vector<cv::Point2f> points);
 
+    // -- Methods that sets settings --
+    void set_possible_obstacles_settings(int blur_size, double low_thresh, double high_thresh, int sobel_size, bool l2_status, int size_thresh, cv::Mat line_kernel, cv::Mat contour_kernel, cv::Mat border_kernel, float border_threshold);
 
+    void set_obstacle_filter_settings(int rectangle_threshold, int size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh);
 
 
 
 private:
     // calculation class
     calculator calculations;
+
+    // -- Settings used to find possible obstacles --
+    int median_blur_size;
+
+    double canny_bottom_thresh;
+    double canny_top_thresh;
+    int sobel_kernel;
+    bool use_l2;
+
+    cv::Mat line_closing_kernel;
+
+    int contour_size_threshold;
+
+    cv::Mat contour_closing_kernel;
+
+    cv::Mat border_kernel;
+
+    float deeper_threshold;
+
+    // -- Settings used to filter obstacles --
+    int accepth_rectangle_threshold;
+
+    int obstacle_size_limit;
+
+    // Maybe reuse canny?
+
+    int hough_threshold;
+    double min_line_length;
+    double max_line_gap;
+
+    int step_threshold;
+
+    float decline_threshold;
+
+
 };
 
 #endif // DETECTING_H

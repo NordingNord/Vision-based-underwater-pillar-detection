@@ -63,6 +63,8 @@ public:
 
     void set_optical_flow_paramters(cv::Size new_window_size, int new_max_pyramid_layers, cv::TermCriteria new_termination_criteria);
 
+    void set_obstacle_candidate_settings(int blur_size, double low_thresh, double high_thresh, int sobel_size, bool l2_status, int size_thresh, cv::Mat line_kernel, cv::Mat contour_kernel, cv::Mat border_kernel, float border_threshold);
+
     // -- The pipelines --
     void run_triangulation_pipeline(int disparity_filter);
 

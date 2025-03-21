@@ -116,145 +116,86 @@ Mat converting::normalize_depth(Mat depth_map, float range){
             depth_channel = depth_map.clone();
         }
 
-        // Get all valid points
-        vector<float> depths;
-        for(int row_index = 0; row_index < depth_channel.rows; row_index++){
-            for(int col_index = 0; col_index < depth_channel.cols; col_index++){
-                float depth = depth_channel.at<float>(Point(col_index,row_index));
-                if(isinf(depth) == false && isinf(depth) == false && isinf(depth) == false && isnan(depth) == false && isnan(depth) == false && isnan(depth) == false){
-                    depths.push_back(depth);
-                }
-            }
-        }
+        // Convert NaN to inf
+        float inf = numeric_limits<double>::infinity();
+        patchNaNs(depth_channel,inf);
+
+        // Get vector of elements
+        vector<float> depths(depth_channel.begin<float>(), depth_channel.end<float>());
+
+        // Remove inf cases
+        depths.erase(remove(depths.begin(), depths.end(), inf), depths.end());
 
         // Filter outliers
         filters filter;
         vector<float> filtered_depths = filter.filter_ipr(depths,0.25,0.50);
 
+        // Timing
+        auto start = chrono::high_resolution_clock::now();
+
         // Determine min and max depth
         float min_depth = filtered_depths.front();
         float max_depth = filtered_depths.back();
-        cout << min_depth << " -> " << max_depth << endl;
+        //cout << min_depth << " -> " << max_depth << endl;
 
-        for(int row_index = 0; row_index < depth_channel.rows; row_index++){
-            for(int col_index = 0; col_index < depth_channel.cols; col_index++){
-                // Get depth / z-coordinate
-                float depth = depth_channel.at<float>(Point(col_index,row_index));
+        // Prepare temp original depth map
+        Mat org_depth = depth_channel.clone();
 
-                // Set to average of soroundings if Nan or inf or bigger than percentile
-                if(isinf(depth) == true || isinf(depth) == true || isinf(depth) == true || isnan(depth) == true || isnan(depth) == true || isnan(depth) == true){
-                    float area_sum = 0.0;
-                    int values = 0;
-//                    int start_col = col_index-20;
-//                    int end_col = col_index+20;
-//                    int start_row = row_index-20;
-//                    int end_row = row_index+20;
+        // Find problem areas
+        Mat inf_mask = org_depth == inf;
+        vector<Point> locations;
+        findNonZero(inf_mask,locations);
 
-//                    if(start_col < 0){
-//                        start_col = 0;
-//                    }
-//                    if(end_col > depth_channel.cols-1){
-//                        end_col = depth_channel.cols-1;
-//                    }
-//                    if(start_row < 0){
-//                        start_row = 0;
-//                    }
-//                    if(end_row > depth_channel.rows-1){
-//                        end_row = depth_channel.rows-1;
-//                    }
-//                    if(col_index > 0){
-//                        start_col = col_index-1;
-//                    }
-//                    if(col_index < depth_channel.cols-1){
-//                        end_col = col_index+1;
-//                    }
-//                    if(row_index > 0){
-//                        start_row = row_index-1;
-//                    }
-//                    if(row_index < depth_channel.rows-1){
-//                        end_row = row_index+1;
-//                    }
-                    int min_row = max(row_index,depth_channel.rows-row_index);
-                    int min_col = max(col_index, depth_channel.cols-col_index);
+        // Go through problem areas and change to mean
+        int start_row, end_row, start_col, end_col;
+        Mat good_areas = Mat::ones(depth_channel.size(),CV_8U);
+        good_areas = good_areas - inf_mask;
 
-                    int max_ring = max(min_row,min_col);
-                    bool found = false;
-                    for(int ring = 1; ring < max_ring; ring++){
-                        int start_row = max(0,row_index-ring);
-                        int end_row = min(depth_channel.rows-1,row_index+ring);
+        for(int i = 0; i < locations.size(); i++){
+            // Do stuff if not already found
+            if(isinf(depth_channel.at<float>(locations.at(i))) == false){
+                int min_row = max(locations.at(i).y,depth_channel.rows-locations.at(i).y);
+                int min_col = max(locations.at(i).x, depth_channel.cols-locations.at(i).x);
 
-                        int start_col = max(0,col_index-ring);
-                        int end_col = min(depth_channel.cols-1,col_index+ring);
+                int max_ring = max(min_row,min_col);
 
-                        for(int current_row = start_row; current_row <= end_row; current_row++){
-                            for(int current_col = start_col; current_col <= end_col; current_col++){
-                                // get depth
-                                Vec3f channel_data = depth_map.at<Vec3f>(Point(current_col,current_row));
-                                float kernel_depth = channel_data[2]; // Important to take from initial depth map, since depth channel is manipulated during runtime.
-                                // check if valid
-                                if(isinf(kernel_depth) == false && isinf(kernel_depth) == false && isinf(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false){
-                                    area_sum += kernel_depth;
-                                    values++;
-                                    found = true;
-                                }
-                            }
-                        }
-                        if(found == true){
-                            break;
-                        }
+                for(int ring = 1; ring < max_ring; ring++){
+                    // Get possible mask
+                    start_row = max(0,locations.at(i).y-ring);
+                    end_row = min(depth_channel.rows-1,locations.at(i).y+ring);
+
+                    start_col = max(0,locations.at(i).x-ring);
+                    end_col = min(depth_channel.cols-1,locations.at(i).x+ring);
+
+                    // Check if valid
+                    if(hasNonZero(good_areas(Range(start_row,end_row+1),Range(start_col,end_col+1))) == true){
+                        break;
                     }
-
-//                    bool found = false;
-//                    int found_col, found_row;
-//                    for(int kernel_row = start_row; kernel_row <= end_row; kernel_row++){
-//                        for(int kernel_col = start_col; kernel_col <= end_col; kernel_col++){
-
-//                            if(found == true && found_col != kernel_col+20 && found_row != kernel_row+20){ // + 20 to add a couple layers of info
-//                                break;
-//                            }
-//                            // get depth
-//                            Vec3f channel_data = depth_map.at<Vec3f>(Point(kernel_col,kernel_row));
-//                            float kernel_depth = channel_data[2]; // Important to take from initial depth map, since depth channel is manipulated during runtime.
-//                            // check if valid
-//                            if(isinf(kernel_depth) == false && isinf(kernel_depth) == false && isinf(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false){
-//                                area_sum += kernel_depth;
-//                                values++;
-//                                found = true;
-//                                found_col = kernel_col;
-//                                found_row = kernel_row;
-//                            }
-//                        }
-//                    }
-                    // if no neighbors found, set to max. otherwise set to average
-                    if(area_sum == 0.0){
-                        depth = 0.0;
-//                        cout << max_ring << endl;
-//                        cout << "no valid neighbors" << endl;
-//                        depth = max_depth;
-                    }
-                    else{
-                        depth = area_sum/values;
-                    }
-
-                }
-                // If bigger than max
-                if(depth > max_depth){
-                    depth = max_depth;
-                }
-                // If smaller set to min
-                if(depth < min_depth){
-                    depth = min_depth;
                 }
 
-                // Normalize
-                float normalized_depth = (depth-min_depth)/(max_depth-min_depth)*range;
-
-                // Assign depth
-                depth_channel.at<float>(Point(col_index,row_index)) = normalized_depth;
+                // get mean
+                Scalar current_mean = mean(org_depth(Range(start_row,end_row+1),Range(start_col,end_col+1)),good_areas(Range(start_row,end_row+1),Range(start_col,end_col+1)));
+                // Set all bad areas within ring
+                depth_channel.setTo(current_mean[0],inf_mask(Range(start_row,end_row+1),Range(start_col,end_col+1)));
+                //depth_channel.at<float>(locations.at(i)) = current_mean[0];
             }
         }
-        // Prepare output
-        normalized_depth = depth_channel;
+
+        // Create mask of min and max elements
+        Mat min_mask = depth_channel < min_depth;
+        Mat max_mask = depth_channel > max_depth;
+
+        // Use mask to set values
+        depth_channel.setTo(min_depth,min_mask);
+        depth_channel.setTo(max_depth,max_mask);
+
+        // Normalize
+        normalized_depth = (depth_channel-min_depth)/(max_depth-min_depth)*range;
+
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Most norm done in  " << duration.count() << " ms using." << endl;
+
 
     }
     catch(const exception& error){

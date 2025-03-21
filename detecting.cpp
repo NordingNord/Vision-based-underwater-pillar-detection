@@ -22,24 +22,24 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         // Histogram equlization
         equalizeHist(temp_depth_map,temp_depth_map);
 
-        // Test stuff
+        // Blur frame
         Mat pre_blur = temp_depth_map.clone();
-        medianBlur(temp_depth_map,temp_depth_map,21);
+        medianBlur(temp_depth_map,temp_depth_map,median_blur_size);
 
-//        Mat viz = pre_blur.clone();
+//        Mat viz = temp_depth_map.clone();
 //        resize(viz,viz,Size(),0.5,0.5,INTER_LINEAR);
 //        imshow("the map",viz);
 //        waitKey(0);
 
-        Canny(temp_depth_map,difference_map, 150,200,3,false); // 100 200
+        Canny(temp_depth_map,difference_map, canny_bottom_thresh,canny_top_thresh,sobel_kernel,use_l2); // 100 200
+
 //        Mat viz_2 = difference_map.clone();
 //        resize(viz_2,viz_2,Size(),0.5,0.5,INTER_LINEAR);
 //        imshow("Difference map", viz_2);
 //        waitKey(0);
 
         // Apply closing
-        Mat kernel = Mat::ones(Size(5,5),CV_8U);
-        morphologyEx(difference_map,difference_map,MORPH_CLOSE,kernel);
+        morphologyEx(difference_map,difference_map,MORPH_CLOSE,line_closing_kernel);
 
 //        Mat viz_3 = difference_map.clone();
 //        resize(viz_3,viz_3,Size(),0.5,0.5,INTER_LINEAR);
@@ -49,11 +49,10 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         // Make bounding box
         rectangle(difference_map,Point(0,0),Point(difference_map.cols-1,difference_map.rows-1),255,1);
 
-
         // Apply thinning
         ximgproc::thinning(difference_map,difference_map,ximgproc::THINNING_ZHANGSUEN);
 
-        Mat viz_thin = difference_map.clone();
+//        Mat viz_thin = difference_map.clone();
 //        resize(viz_thin,viz_thin,Size(),0.5,0.5,INTER_LINEAR);
 //        imshow("Thinned map", viz_thin);
 //        waitKey(0);
@@ -65,7 +64,7 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
 
         // Remove small ones
         for(vector<vector<Point>>::iterator it = contours.begin(); it!=contours.end(); ){
-            if(it->size() < 500){
+            if(it->size() < contour_size_threshold){
                 it=contours.erase(it);
             }
             else{
@@ -78,6 +77,7 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         for(size_t i = 0; i < contours.size(); i++){
             drawContours(drawing,contours,(int)i, 255, 2, LINE_8,hierarchy,0);
         }
+
 //        Mat test_draw = drawing.clone();
 //        resize(test_draw, test_draw,Size(),0.5,0.5,INTER_LINEAR);
 //        imshow("Contours", test_draw);
@@ -91,12 +91,6 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         for(size_t i = 0; i < contours.size(); i++){
             Mat mask = Mat::zeros(difference_map.size(),CV_8U);
 
-            // Simplify
-//            Mat poly;
-//            double epsilon = 0.005*arcLength(contours.at(i),true);
-//            approxPolyDP(contours.at(i),poly,epsilon,true);
-//            vector<Mat> polys = {poly};
-//            drawContours(mask,polys,0, 255, -1, LINE_8,hierarchy,0);
             drawContours(mask,contours,(int)i, 255, -1, LINE_8,hierarchy,0);
 
 //            Mat temp_mask_pre = mask.clone();
@@ -106,9 +100,8 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
 //            waitKey(0);
 
             // Apply closing
-            Mat mask_kernel = Mat::ones(Size(71,71),CV_8U);
-            morphologyEx(mask,mask,MORPH_OPEN,mask_kernel);
-            morphologyEx(mask,mask,MORPH_CLOSE,mask_kernel);
+            morphologyEx(mask,mask,MORPH_OPEN,contour_closing_kernel);
+            morphologyEx(mask,mask,MORPH_CLOSE,contour_closing_kernel);
 
 
             Scalar average_depth = mean(pre_blur,mask);
@@ -116,7 +109,6 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
 
             average_depth_map.setTo(average_depth,mask);
             combined_mask = combined_mask | mask;
-            //drawContours(combined_mask,contours,(int)i, 255, -1, LINE_8,hierarchy,0);
             masks.push_back(mask);
 
 //            Mat temp_mask = mask.clone();
@@ -171,20 +163,20 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
                 contours.push_back(missing_contours.at(i));
             }
         }
-        Mat temp = average_depth_map.clone();
-        resize(temp,temp,Size(),0.5,0.5,INTER_LINEAR);
-        imshow("Average_depth", temp);
-        waitKey(0);
+
+//        Mat temp = average_depth_map.clone();
+//        resize(temp,temp,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("Average_depth", temp);
+//        waitKey(0);
 
         // Get outer border of each mask, by dilating and subtract from original mask
-        Mat kernel_element = getStructuringElement(MORPH_CROSS,Size(3,3),Point(-1,-1));
         vector<Mat> possible_obstacles;
         Mat area_of_interest = Mat::zeros(difference_map.size(),CV_8U);
         for(int mask_index = 0; mask_index < masks.size(); mask_index++){
             Mat current_mask = masks.at(mask_index);
             // Dilate
             Mat dilated_mask;
-            dilate(current_mask,dilated_mask,kernel_element);
+            dilate(current_mask,dilated_mask,border_kernel);
 
             // subtract original mask
             Mat border = dilated_mask-current_mask;
@@ -194,29 +186,17 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
             findNonZero(border,border_indexes);
             // Go through points
             int bigger_depth_count = 0;
-//            cout << "my val: " << static_cast<unsigned>(average_mask_depths.at(mask_index)[0]) << endl;
             for(int point_index = 0; point_index < border_indexes.size().height; point_index++){
                 // Check if value at index is smaller or bigger
                 Point current_point = border_indexes.at<Point>(point_index);
                 uchar average_depth = average_depth_map.at<uchar>(current_point); // Scalar has 4 dim but all values are the same due to image only having one channel
-//                cout << static_cast<unsigned>(average_depth) << endl;
                 if(static_cast<unsigned>(average_depth) > static_cast<unsigned>(average_mask_depths.at(mask_index)[0])){
                     bigger_depth_count++;
                 }
             }
             // Ensure that 90 percent of sorounding pixels are bigger for it to maybe be an obstacle
-            int limit = int(border_indexes.size().height*0.9);
+            int limit = int(border_indexes.size().height*deeper_threshold);
             if(bigger_depth_count >= limit){
-//                // show survivor
-//                Mat temp_survivor = current_mask.clone();
-//                Mat temp_temp;
-//                erode(temp_survivor, temp_temp, getStructuringElement(MORPH_RECT,Size(11,11),Point(1,1)),Point(-1,-1),1);
-//                temp_temp = current_mask-temp_temp;
-//                //dilate(temp_temp, temp_temp, getStructuringElement(MORPH_RECT,Size(71,71),Point(1,1)),Point(-1,-1),3);
-//                current_mask = temp_temp;
-//                resize(temp_temp,temp_temp,Size(),0.5,0.5,INTER_LINEAR);
-//                imshow("possible obstacle", temp_temp);
-//                waitKey(0);
                 obstacle new_obstacle;
                 new_obstacle.mask = current_mask;
                 new_obstacle.contour = contours.at(mask_index);
@@ -364,7 +344,6 @@ vector<Vec4i> detecting::get_line_borders(int direction, Vec4i initial_line, Mat
                 steps_since_change++;
                 // If steps above threshold conclude on begining
                 if(steps_since_change >= step_threshold){
-                    cout << "begining found" << endl;
                     begining_found = true;
                 }
             }
@@ -373,11 +352,9 @@ vector<Vec4i> detecting::get_line_borders(int direction, Vec4i initial_line, Mat
             if(match_count < (most_matches*scale_factor) * decline_threshold || step == max_index){
                 int step_addon;
                 if(step == max_index){
-                    cout << "ended due to index" << endl;
                     step_addon = 0;
                 }
                 else{
-                    cout << "ended due to threshold" << endl;
                     step_addon = -1;
                 }
                 // Update end line
@@ -435,11 +412,9 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
             // Determine direction
             if(left_matches > right_matches){
                 direction = DIRECTION_LEFT;
-                cout << "Direction: Left" << endl;
             }
             else{
                 direction = DIRECTION_RIGHT;
-                cout << "Direction: Right" << endl;
             }
         }
         else{
@@ -457,11 +432,9 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
 
             if(up_matches > down_matches){
                 direction = DIRECTION_UP;
-                cout << "Direction: Up" << endl;
             }
             else{
                 direction = DIRECTION_DOWN;
-                cout << "Direction: Down" << endl;
             }
         }
 
@@ -822,7 +795,8 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
             int mask_count = countNonZero(mask);
             int error_count = countNonZero(error_mask);
 
-            if(error_count > int(mask_count*0.5)){
+            if(error_count > int(mask_count*0.25)){ // usually 50
+                cout << "time to cut" << endl;
                 // Keep isolating most promising areas until remaining mask is empty or contours within very small (add user chosen limit later)
                 Mat remaining_mask = mask.clone();
                 int original_contour_size = countNonZero(remaining_mask);
@@ -980,7 +954,7 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                         int new_mask_count = countNonZero(first_mask);
                         int new_error_count = countNonZero(new_error_mask);
                         // If error low, keep obstacle
-                        if(new_error_count <= int(new_mask_count*0.5)){ // Maybe change threshold
+                        if(new_error_count <= int(new_mask_count*0.25)){ // Maybe change threshold
                             obstacle new_obstacle;
                             new_obstacle.mask = first_mask;
                             new_obstacle.contour = first_bounding;
@@ -1046,7 +1020,6 @@ bool detecting::check_rectangle_shape(obstacle obstacle_to_check, float ratio){
 
         // Determine ratio
         float biggest_ratio = max(first_edge_distance/second_edge_distance, second_edge_distance/first_edge_distance);
-        cout << biggest_ratio << endl;
 
         // Check if bigger than min ratio
         if(biggest_ratio >= ratio){
@@ -1137,9 +1110,7 @@ vector<obstacle> detecting::detect_type(vector<obstacle> obstacles, Mat depth_ma
             // count type instances
             int pillar_count = 0;
             int edge_count = 0;
-            cout << "Votes: " << endl;
             for(int i = 0; i < types.size(); i++){
-                cout << types.at(i) << endl;
                 if(types.at(i) == "Pillar"){
                     pillar_count++;
                 }
@@ -1190,7 +1161,6 @@ string detecting::depth_based_type(obstacle obstacle_to_check, Mat depth_map, fl
 
         // Determine type based on mean_depth to obstacle depth difference
         Scalar diff = mean_depth-mean_obstacle_depth;
-        cout << mean_depth.val[0] << " | " << mean_obstacle_depth.val[0] << " | " << diff.val[0] << endl;
         if(diff.val[0] > threshold){
             type = "Pillar"; // Pillar if depth difference is more than threshold
         }
@@ -1221,7 +1191,6 @@ string detecting::rounding_based_type(obstacle obstacle_to_check, Mat depth_map)
         if(kernel_size % 2 == 0){
             kernel_size++;
         }
-        cout << kernel_size << endl;
         Mat kernel_element = getStructuringElement(MORPH_CROSS,Size(kernel_size,kernel_size),Point(-1,-1));
 
         Mat center_mask;
@@ -1237,7 +1206,6 @@ string detecting::rounding_based_type(obstacle obstacle_to_check, Mat depth_map)
 
         // Get difference
         Scalar diff = mean_edge_depth- mean_center_depth; // edge depth first since they should have bigger depth
-        cout << "diff: " << diff << endl;
 
         // pillar if difference is more than 1% of center average
         if(diff.val[0] > mean_center_depth.val[0]*0.01){
@@ -1256,7 +1224,7 @@ string detecting::rounding_based_type(obstacle obstacle_to_check, Mat depth_map)
 
 
 // -- Methods for handling gaps in detections --
-vector<obstacle> patch_detection_gap(vector<obstacle> last_obstacles, vector<vector<float>> movements, vector<Point2f> points){
+vector<obstacle> detecting::patch_detection_gap(vector<obstacle> last_obstacles, vector<vector<float>> movements, vector<Point2f> points){
     vector<obstacle> moved_obstacles;
     try{
         // Go through all obstacles
@@ -1291,8 +1259,8 @@ vector<obstacle> patch_detection_gap(vector<obstacle> last_obstacles, vector<vec
             float x_sum = accumulate(filtered_x_movements.begin(), filtered_x_movements.end(), 0);
             float y_sum = accumulate(filtered_y_movements.begin(), filtered_y_movements.end(), 0);
 
-            float x_mean = x_sum/filtered_x_movements.size();
-            float y_mean = y_sum/filtered_y_movements.size();
+            float x_mean = -(x_sum/filtered_x_movements.size());
+            float y_mean = -(y_sum/filtered_y_movements.size()); // - is due to counteracting the movement
 
             // Move obstacle with average movement
             vector<Point> contour = current_obstacle.contour;
@@ -1317,5 +1285,41 @@ vector<obstacle> patch_detection_gap(vector<obstacle> last_obstacles, vector<vec
     }
     return moved_obstacles;
 }
+
+// -- Methods that sets settings --
+void detecting::set_possible_obstacles_settings(int blur_size, double low_thresh, double high_thresh, int sobel_size, bool l2_status, int size_thresh, cv::Mat line_kernel, cv::Mat contour_kernel, cv::Mat border_expand, float border_threshold){
+    try{
+        median_blur_size = blur_size;
+        canny_bottom_thresh = low_thresh;
+        canny_top_thresh = high_thresh;
+        sobel_kernel = sobel_size;
+        use_l2 = l2_status;
+        contour_size_threshold = size_thresh;
+        line_closing_kernel = line_kernel;
+        contour_closing_kernel = contour_kernel;
+        border_kernel = border_expand;
+        deeper_threshold = border_threshold;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+void detecting::set_obstacle_filter_settings(int rectangle_threshold, int size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh){
+    try{
+        accepth_rectangle_threshold = rectangle_threshold;
+        obstacle_size_limit = size_limit;
+        hough_threshold = hough_thresh;
+        min_line_length = min_length;
+        max_line_gap = max_gap;
+        step_threshold = step_limit;
+        decline_threshold = decline_thresh;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
 
 

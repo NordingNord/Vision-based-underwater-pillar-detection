@@ -267,22 +267,35 @@ Mat visualization::show_obstacles(vector<obstacle> obstacles, Mat frame){
     try{
         // Generate color for each obstacle
         vector<Scalar> colors = get_colors(obstacles.size());
-
+        Mat combined_color_mask = Mat::zeros(frame.size(),CV_8UC3);
+        Mat combined_mask = Mat::zeros(frame.size(),CV_8U);
         for(int i = 0; i < obstacles.size(); i++){
             // Create color mask
-            Mat color_mask = frame.clone();
+            Mat color_mask = Mat::zeros(frame.size(),CV_8UC3);
             // Set color
             color_mask.setTo(colors.at(i),obstacles.at(i).mask);
+
+            // Combine color masks
+            Mat new_combined_color_mask = combined_color_mask+color_mask;
+            addWeighted(new_combined_color_mask,0.5,combined_color_mask,1-0.5,0,combined_color_mask);
+            combined_mask = combined_mask+obstacles.at(i).mask;
+        }
+        // Apply color mask translucent over frame
+        Mat color_frame = frame.clone();
+        color_frame.setTo(0,combined_mask);
+        color_frame = color_frame+combined_color_mask;
+
+        addWeighted(color_frame,0.5,warning_frame,1-0.5,0,warning_frame);
+
+        for(int i = 0; i < obstacles.size(); i++){
             // get mask center
             Moments current_moments = moments(obstacles.at(i).mask);
             int center_x = int(current_moments.m10/current_moments.m00);
             int center_y = int(current_moments.m01/current_moments.m00);
 
-            // Apply color mask translucent over frame
-            addWeighted(color_mask,0.5,warning_frame,1-0.5,0,warning_frame);
-
             putText(warning_frame,obstacles.at(i).type,Point(center_x,center_y),FONT_HERSHEY_SIMPLEX,1.0,(0,0,0),5);
         }
+
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

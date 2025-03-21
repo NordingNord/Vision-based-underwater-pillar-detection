@@ -1874,3 +1874,121 @@
 //    }
 //}
 //final_obstacles = kept_obstacles;
+
+// Get all valid points
+//vector<float> depths;
+//for(int row_index = 0; row_index < depth_channel.rows; row_index++){
+//    for(int col_index = 0; col_index < depth_channel.cols; col_index++){
+//        float depth = depth_channel.at<float>(Point(col_index,row_index));
+//        if(isinf(depth) == false && isinf(depth) == false && isinf(depth) == false && isnan(depth) == false && isnan(depth) == false && isnan(depth) == false){
+//            depths.push_back(depth);
+//        }
+//    }
+//}
+
+
+//Mat depth_copy = depth_channel.clone();
+//depth_channel = org_depth.clone();
+
+//// Timing
+//start = chrono::high_resolution_clock::now();
+//int baddie_count = 0;
+//for(int row_index = 0; row_index < depth_channel.rows; row_index++){
+//    for(int col_index = 0; col_index < depth_channel.cols; col_index++){
+//        // Get depth / z-coordinate
+//        float depth = depth_channel.at<float>(Point(col_index,row_index));
+
+//        // Set to average of soroundings if Nan or inf or bigger than percentile
+//        if(isinf(depth) == true || isinf(depth) == true || isinf(depth) == true || isnan(depth) == true || isnan(depth) == true || isnan(depth) == true){
+//            baddie_count++;
+//            float area_sum = 0.0;
+//            int values = 0;
+
+//            int min_row = max(row_index,depth_channel.rows-row_index);
+//            int min_col = max(col_index, depth_channel.cols-col_index);
+
+//            int max_ring = max(min_row,min_col);
+//            bool found = false;
+//            int start_row,end_row,start_col,end_col;
+//            for(int ring = 1; ring < max_ring; ring++){
+//                start_row = max(0,row_index-ring);
+//                end_row = min(depth_channel.rows-1,row_index+ring);
+
+//                start_col = max(0,col_index-ring);
+//                end_col = min(depth_channel.cols-1,col_index+ring);
+
+//                for(int current_row = start_row; current_row <= end_row; current_row++){
+//                    for(int current_col = start_col; current_col <= end_col; current_col++){
+//                        // get depth
+//                        Vec3f channel_data = depth_map.at<Vec3f>(Point(current_col,current_row));
+//                        float kernel_depth = channel_data[2]; // Important to take from initial depth map, since depth channel is manipulated during runtime.
+//                        // check if valid
+//                        if(isinf(kernel_depth) == false && isinf(kernel_depth) == false && isinf(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false && isnan(kernel_depth) == false){
+//                            area_sum += kernel_depth;
+//                            values++;
+//                            found = true;
+//                        }
+//                    }
+//                }
+//                if(found == true){
+//                    break;
+//                }
+//            }
+
+
+//            // if no neighbors found, set to max. otherwise set to average
+//            if(area_sum == 0.0){
+//                depth = 0.0;
+//            }
+//            else{
+//                depth = area_sum/values;
+//                //cout << "old: " << depth << endl;
+//                //cout << "new: " << depth_copy.at<float>(Point(col_index,row_index)) << endl;
+//            }
+//            if(baddie_count < 10){
+//                cout << start_col << ", " << start_row << " -> " << end_col << ", " << end_row << " | " << depth << endl;
+//            }
+
+//        }
+
+//        // If bigger than max
+//        if(depth > max_depth){
+//            depth = max_depth;
+//        }
+//        // If smaller set to min
+//        if(depth < min_depth){
+//            depth = min_depth;
+//        }
+
+//        // Normalize
+//        float normalized_depth = (depth-min_depth)/(max_depth-min_depth)*range;
+
+//        // Assign depth
+//        depth_channel.at<float>(Point(col_index,row_index)) = normalized_depth;
+//    }
+//}
+//stop = chrono::high_resolution_clock::now();
+//duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//cout << "Old solution done in  " << duration.count() << " ms using." << endl;
+
+//        bool bottom_found = false;
+//        bool top_found = false;
+//        int low_index,high_index;
+//        for(int indent = 0; indent < sorted_data_points.size(); indent++){
+//            float lower_val = sorted_data_points.at(indent);
+//            float upper_val = sorted_data_points.at(sorted_data_points.size()-(indent+1));
+
+//            if(lower_val >= lower_bound && bottom_found == false){
+//                low_index = indent;
+//                bottom_found = true;
+//            }
+//            if(upper_val <= upper_bound && top_found == false){
+//                high_index = indent;
+//                top_found = true;
+//            }
+//            if(top_found == true && bottom_found == true){
+//                break;
+//            }
+//        }
+
+//        filtered_data.assign(sorted_data_points.begin()+low_index,sorted_data_points.end()-high_index);
