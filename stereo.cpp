@@ -160,7 +160,7 @@ cv::Mat stereo::track_disparity(cv::Mat first_frame, cv::Mat second_frame){
         createTrackbar("Disp 12 Max Diff", "Disparity map", nullptr, 50, disp_max_diff_bar_static,this);
         createTrackbar("Pre filter cap", "Disparity map",nullptr, 50, prefilter_cap_bar_static,this);
         createTrackbar("Uniqueness ratio", "Disparity map", nullptr, 50, uniqueness_ratio_bar_static,this);
-        createTrackbar("Speckle window size", "Disparity map", nullptr, 50, speckle_size_bar_static,this);
+        createTrackbar("Speckle window size", "Disparity map", nullptr, 250, speckle_size_bar_static,this);
         createTrackbar("Speckle range", "Disparity map", nullptr, 50, speckle_range_bar_static,this);
 
         // Initialize Mats
@@ -306,10 +306,27 @@ Mat stereo::process_disparity_stepwise(Mat disparity_map){
 Mat stereo::filter_disparity(Mat disparity_map, Mat first_frame, Mat second_frame){
     Mat filtered_disparity;
     try{
+        // Calculate second disparity (right)
+//        Mat second_disparity_map(second_frame.size(),CV_16S);
+//        Mat flipped_second_disparity(second_frame.size(),CV_16S);
+
+//        Mat flipped_first_frame(first_frame.size(),CV_8U);
+//        Mat flipped_second_frame(second_frame.size(),CV_8U);
+
+//        flip(first_frame,flipped_first_frame,1);
+//        flip(second_frame,flipped_second_frame,1);
+
+//        sgbm->compute(flipped_second_frame,flipped_first_frame,flipped_second_disparity);
+
+//        flip(flipped_second_disparity,second_disparity_map,1);
+
+//        second_disparity_map *= -1;
+
         // Create stereo matcher
         Ptr<StereoMatcher> matcher = ximgproc::createRightMatcher(sgbm);
         // Create filter
         Ptr<ximgproc::DisparityWLSFilter> wls_filter = ximgproc::createDisparityWLSFilter(sgbm);
+        //Ptr<ximgproc::DisparityWLSFilter> wls_filter = ximgproc::createDisparityWLSFilterGeneric(true);
         // Set parameters
         wls_filter->setLambda(lamda);
         wls_filter->setSigmaColor(sigma);
@@ -321,9 +338,9 @@ Mat stereo::filter_disparity(Mat disparity_map, Mat first_frame, Mat second_fram
         cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
         cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
         // Run filter
-        wls_filter->filter(disparity_map,first_gray_frame,filtered_disparity,second_disparity_map,Rect(),second_gray_frame);
+        wls_filter->filter(disparity_map,first_gray_frame,filtered_disparity,second_disparity_map);//,Rect(),second_gray_frame);
         // Process newly found disparity map
-        filtered_disparity = process_disparity(filtered_disparity);
+        //filtered_disparity = process_disparity(filtered_disparity);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -477,4 +494,15 @@ Mat stereo::remove_invalid_edge(Mat frame){
         cout << "Error: " << error.what() << endl;
     }
     return frame_without_edge;
+}
+
+Mat stereo::add_invalid_edge(Mat frame){
+    Mat frame_with_edge = Mat::zeros(Size(frame.cols+disparity_settings.num_disparities,frame.rows),frame.type()); // correct dimension
+    try{
+        copyMakeBorder(frame,frame_with_edge,0,0,disparity_settings.num_disparities,0,BORDER_CONSTANT,-16); // -16 currently due to me only using this with disparity maps 16S1, which has -16 as NaN. Future work is to make it universal
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return frame_with_edge;
 }

@@ -118,26 +118,26 @@ int main(){
     double ransac_threshold = 2.5;
 
     // -- Disparity settings --
-    int min_disparity = 0;
-    int num_disparities = 112; // 80 208 192
-    int block_size = 11;
-    int p1 = 1352;
-    int p2 = 10816;
-    int disp_12_max_diff = 0;
-    int pre_filter_cap = 0;
-    int uniqueness_ratio = 0;
-    int speckle_window_size = 0;
-    int speckle_range = 0;
+    int min_disparity = 0; // 0
+    int num_disparities = 112; // 160 / 112
+    int block_size = 11; // 9 / 11
+    int p1 = 1352; // 648 / 1352
+    int p2 = 10816; // 7776 / 10816
+    int disp_12_max_diff = 14; // 0
+    int pre_filter_cap = 0; // 0
+    int uniqueness_ratio = 5; // 0
+    int speckle_window_size = 100; // 0
+    int speckle_range = 2; // 0
     int mode = StereoSGBM::MODE_SGBM;
 
     // -- WSL settings --
-    double lamda = 8000.0;
-    double sigma = 2.0;
+    double lamda = 2000.0; // Usual value 8000
+    double sigma = 0.8; // Usually 0.8 -> 2.0 small values more sensitive to noise, while big values can result in disparity leakage
 
     // -- Bilateral settings --
-    int diameter = 12;
-    double sigma_color = 100.0;
-    double sigma_space = 100.0;
+    int diameter = 5;
+    double sigma_color = 500.0;
+    double sigma_space = 500.0;
 
     // -- Optical flow parameters --
     Size window_size = cv::Size(15,15); // search window at each level
@@ -156,6 +156,23 @@ int main(){
     cv::Mat border_kernel = getStructuringElement(MORPH_CROSS,Size(3,3),Point(-1,-1));
     float border_threshold = 0.9;
 
+    // -- Obstacle filter settings --
+    float rectangle_acceptance_threshold = 0.25; // The percentage of a bounding rectangle that is allowed to contain out of obstacle pixels. If exceeded, the obstacle must either not be rectangular or contain more than one rectangle.
+    float size_limit = 0.1; // Percentage of original obstacle size needed to continue splitting. If below splitting is stopped.
+    int hough_thresh = 10; // Minimum votes needed to be seen as a line
+    double min_length = 50.0; // Minimum length of a line to be set as a line segment
+    double max_gap = 10.0; // Max allowed gap between points that constitues a line segment.
+    int step_limit = 5; // Number of steps taken without change, before start edge is concluded upon.
+    float decline_thresh = 0.75; // Percentage of decrease in valid pixels before end line is concluded upon
+    float rectangle_ratio = 1.5; // Size ratio that the bounding rectangle must have to be deemed a pillar or pertruding edge. Basically the rectangle must be taller than wide or wider than tall to be accpeted.
+    int obstacle_cutoff = 1920; //  Used to be  max(frame.cols,frame.rows). Basically just a hard size cutoff
+
+    // -- SLIC settings --
+    int slic_method = cv::ximgproc::MSLIC;
+    int region_size = 50;
+    float ruler = 20.0f;
+    int slic_iterations = 2;
+
     // -- RUN PIPELINE --
     pipeline detection_triangulation(bottom_video,top_video); // Setup mode and video feeds
     detection_triangulation.set_parameter_paths(bottom_paramter_path, top_parameter_path); // Setup camera data
@@ -168,10 +185,12 @@ int main(){
     detection_triangulation.set_bilateral_parameters(diameter,sigma_color,sigma_space);
     detection_triangulation.set_optical_flow_paramters(window_size,max_pyramid_layers,termination_criteria);
     detection_triangulation.set_obstacle_candidate_settings(blur_size,low_thresh,high_thresh,sobel_size,l2_status,size_thresh,line_kernel,contour_kernel,border_kernel,border_threshold);
+    detection_triangulation.set_obstacle_filter_settings(rectangle_acceptance_threshold, size_limit, hough_thresh, min_length, max_gap, step_limit, decline_thresh, rectangle_ratio, obstacle_cutoff);
+    detection_triangulation.set_slic_settings(slic_method,region_size,ruler,slic_iterations);
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
-    detection_triangulation.run_disparity_pipeline(DISPARITY_FILTER_NONE);
+    detection_triangulation.run_disparity_pipeline(DISPARITY_FILTER_WLS);
 
 
 }

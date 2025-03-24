@@ -47,7 +47,7 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
 //        waitKey(0);
 
         // Make bounding box
-        rectangle(difference_map,Point(0,0),Point(difference_map.cols-1,difference_map.rows-1),255,1);
+        rectangle(difference_map,Point(0,0),Point(difference_map.cols-1,difference_map.rows-1),WHITE,1);
 
         // Apply thinning
         ximgproc::thinning(difference_map,difference_map,ximgproc::THINNING_ZHANGSUEN);
@@ -75,7 +75,7 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         // Show contours
         Mat drawing = Mat::zeros(difference_map.size(),CV_8U);
         for(size_t i = 0; i < contours.size(); i++){
-            drawContours(drawing,contours,(int)i, 255, 2, LINE_8,hierarchy,0);
+            drawContours(drawing,contours,(int)i, WHITE, 2, LINE_8,hierarchy,0);
         }
 
 //        Mat test_draw = drawing.clone();
@@ -91,7 +91,7 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         for(size_t i = 0; i < contours.size(); i++){
             Mat mask = Mat::zeros(difference_map.size(),CV_8U);
 
-            drawContours(mask,contours,(int)i, 255, -1, LINE_8,hierarchy,0);
+            drawContours(mask,contours,(int)i, WHITE, -1, LINE_8,hierarchy,0);
 
 //            Mat temp_mask_pre = mask.clone();
 //            resize(temp_mask_pre, temp_mask_pre,Size(),0.5,0.5,INTER_LINEAR);
@@ -120,7 +120,7 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
 
         // Make bounding box
         Mat bordered = combined_mask.clone();
-        rectangle(bordered,Point(0,0),Point(bordered.cols-1,bordered.rows-1),255,1);
+        rectangle(bordered,Point(0,0),Point(bordered.cols-1,bordered.rows-1),WHITE,1);
 
 //        Mat temp = average_depth_map.clone();
 //        resize(temp,temp,Size(),0.5,0.5,INTER_LINEAR);
@@ -139,7 +139,7 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         // Get remaining masks
         for(size_t i = 0; i < missing_contours.size(); i++){
             Mat mask = Mat::zeros(difference_map.size(),CV_8U);
-            drawContours(mask,missing_contours,(int)i, 255, -1, LINE_8,hierarchy,0);
+            drawContours(mask,missing_contours,(int)i, WHITE, -1, LINE_8,hierarchy,0);
 
 //            // Perform slight erosion, to ensure that the border does not hit any other mask
             Mat pre_erode_mask = mask.clone();
@@ -231,16 +231,12 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles, Mat fra
     try{
         // Step 1: Split current obstacles into rectangles while removing obstacles unable to fit nicely withing
         vector<obstacle> remaining_obstacles = split_into_rectangles(obstacles);
-
         // Step 2: Remove obstacles that fall bellow the desired ratio of 1.5 and above to indicates obstacles longer than wide like a pillar and pertruding edge.
-        remaining_obstacles = filter_rectangle_shape(remaining_obstacles,1.5);
-
+        remaining_obstacles = filter_rectangle_shape(remaining_obstacles,rectangle_size_ratio);
         // Step 3: Remove obstacles that do not touch any edge.
         remaining_obstacles = filter_border(remaining_obstacles);
-
         // Step 4: Remove tiny obstacles
-        remaining_obstacles = filter_size(remaining_obstacles, max(frame.cols,frame.rows));
-
+        remaining_obstacles = filter_size(remaining_obstacles, obstacle_size_limit);
         // Prepare output
         final_obstacles = remaining_obstacles;
     }
@@ -291,7 +287,7 @@ vector<Vec4i> detecting::get_line_borders(int direction, Vec4i initial_line, Mat
         int most_matches = 0;
         Vec4i begin_line, end_line;
         Mat initial_line_mask =  Mat::zeros(mask.size(),CV_8U);
-        line(initial_line_mask,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),255,3,LINE_AA);
+        line(initial_line_mask,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),WHITE,3,LINE_AA);
         int initial_line_size = countNonZero(initial_line_mask);
 
         // Move line until beginning and end of obstacle is found
@@ -299,10 +295,10 @@ vector<Vec4i> detecting::get_line_borders(int direction, Vec4i initial_line, Mat
             // Get line mask
             Mat line_mask =  Mat::zeros(mask.size(),CV_8U);
             if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
-                line(line_mask,Point(initial_line[0]+(step*direction_sign),initial_line[1]),Point(initial_line[2]+(step*direction_sign),initial_line[3]),255,1,LINE_AA);
+                line(line_mask,Point(initial_line[0]+(step*direction_sign),initial_line[1]),Point(initial_line[2]+(step*direction_sign),initial_line[3]),WHITE,1,LINE_AA);
             }
             else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
-                line(line_mask,Point(initial_line[0],initial_line[1]+(step*direction_sign)),Point(initial_line[2],initial_line[3]+(step*direction_sign)),255,1,LINE_AA);
+                line(line_mask,Point(initial_line[0],initial_line[1]+(step*direction_sign)),Point(initial_line[2],initial_line[3]+(step*direction_sign)),WHITE,1,LINE_AA);
             }
 
             // Count size of line
@@ -399,8 +395,8 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
             Mat left_mask = Mat::zeros(mask.size(),CV_8U);
             Mat right_mask = Mat::zeros(mask.size(),CV_8U);
 
-            line(left_mask,Point(initial_line[0]-1,initial_line[1]),Point(initial_line[2]-1,initial_line[3]),255,3,LINE_AA); // Move one pixel left
-            line(right_mask,Point(initial_line[0]+1,initial_line[1]),Point(initial_line[2]+1,initial_line[3]),255,3,LINE_AA); // Move one pixel right
+            line(left_mask,Point(initial_line[0]-1,initial_line[1]),Point(initial_line[2]-1,initial_line[3]),WHITE,3,LINE_AA); // Move one pixel left
+            line(right_mask,Point(initial_line[0]+1,initial_line[1]),Point(initial_line[2]+1,initial_line[3]),WHITE,3,LINE_AA); // Move one pixel right
 
             // Count matches with mask for both directions
             Mat left_match_mat = left_mask & mask;
@@ -421,8 +417,8 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
             // create directional linemasks
             Mat up_mask = Mat::zeros(mask.size(),CV_8U);
             Mat down_mask = Mat::zeros(mask.size(),CV_8U);
-            line(up_mask,Point(initial_line[0],initial_line[1]-1),Point(initial_line[2],initial_line[3]-1),255,3,LINE_AA); // Move one pixel up
-            line(down_mask,Point(initial_line[0], initial_line[1]+1),Point(initial_line[2], initial_line[3]+1),255,3,LINE_AA); // Move one pixel down
+            line(up_mask,Point(initial_line[0],initial_line[1]-1),Point(initial_line[2],initial_line[3]-1),WHITE,3,LINE_AA); // Move one pixel up
+            line(down_mask,Point(initial_line[0], initial_line[1]+1),Point(initial_line[2], initial_line[3]+1),WHITE,3,LINE_AA); // Move one pixel down
 
             // Count matches with mask for both directions
             Mat up_match_mat = up_mask & mask;
@@ -473,7 +469,7 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
 
             // Create mask
             Mat line_mask = Mat::zeros(edge_mask.size(),CV_8U);
-            line(line_mask,start,end,255,10,LINE_AA);
+            line(line_mask,start,end,WHITE,10,LINE_AA);
 
             // Count number of intersections
             Mat intersection_mask = edge_mask & line_mask;
@@ -492,10 +488,10 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
 
                 // Limit to border with weird non-math method
                 Mat border_mask = Mat::zeros(edge_mask.size(),CV_8U);
-                rectangle(border_mask,Point(0,0),Point(edge_mask.cols-1,edge_mask.rows-1),255,1);
+                rectangle(border_mask,Point(0,0),Point(edge_mask.cols-1,edge_mask.rows-1),WHITE,1);
 
                 Mat slim_line = Mat::zeros(edge_mask.size(),CV_8U);
-                line(slim_line,start,end,255,1,LINE_AA);
+                line(slim_line,start,end,WHITE,1,LINE_AA);
 
                 Mat ends = border_mask & slim_line;
                 Mat locations;
@@ -581,7 +577,7 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
 
             // Create mask
             Mat line_mask = Mat::zeros(edge_mask.size(),CV_8U);
-            line(line_mask,start,end,255,10,LINE_AA);
+            line(line_mask,start,end,WHITE,10,LINE_AA);
 
             // Count number of intersections
             Mat intersection_mask = edge_mask & line_mask;
@@ -606,10 +602,10 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
 
                 // Limit to border with weird non-math method
                 Mat border_mask = Mat::zeros(edge_mask.size(),CV_8U);
-                rectangle(border_mask,Point(0,0),Point(edge_mask.cols-1,edge_mask.rows-1),255,1);
+                rectangle(border_mask,Point(0,0),Point(edge_mask.cols-1,edge_mask.rows-1),WHITE,1);
 
                 Mat slim_line = Mat::zeros(edge_mask.size(),CV_8U);
-                line(slim_line,start,end,255,1,LINE_AA);
+                line(slim_line,start,end,WHITE,1,LINE_AA);
 
                 Mat ends = border_mask & slim_line;
                 Mat locations;
@@ -712,7 +708,7 @@ Mat detecting::ensure_single_obstacle(Mat mask, Vec4i first_line, Vec4i last_lin
         Mat bounding_mat = Mat::zeros(mask.size(),CV_8U);
         vector<vector<Point>> polygons;
         polygons.push_back(bounding);
-        fillPoly(bounding_mat,polygons,255);
+        fillPoly(bounding_mat,polygons,WHITE);
 
         // Take only intersection
         single_obstacle_mask = bounding_mat & mask;
@@ -729,7 +725,7 @@ Mat detecting::ensure_single_obstacle(Mat mask){
     try{
         // Draw bounding rectangle
         Mat temp_mask = mask.clone();
-        //rectangle(temp_mask,Point(0,0),Point(mask.cols-1,mask.rows-1),255,1);
+        //rectangle(temp_mask,Point(0,0),Point(mask.cols-1,mask.rows-1),WHITE,1);
 
         // Find contours
         vector<vector<Point>> contours;
@@ -753,7 +749,7 @@ Mat detecting::ensure_single_obstacle(Mat mask){
 
         // Remove all but that contour
         vector<vector<Point>> temp_contour_vec = {biggest_contour};
-        drawContours(single_obstacle_mask,temp_contour_vec,0,255,-1);
+        drawContours(single_obstacle_mask,temp_contour_vec,0,WHITE,-1);
         single_obstacle_mask = mask & single_obstacle_mask;
     }
     catch(const exception& error){
@@ -780,7 +776,7 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
             vector<vector<Point>> points;
             points.push_back(rectangle_points_vector);
             Mat bounding_box = Mat::zeros(mask.size(),CV_8U);
-            drawContours(bounding_box,points,0,255,-1,LINE_8);
+            drawContours(bounding_box,points,0,WHITE,-1,LINE_8);
 
             // Visualize the bounding rectangle
 //            Mat viz_box = mask.clone();
@@ -794,9 +790,8 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
 
             int mask_count = countNonZero(mask);
             int error_count = countNonZero(error_mask);
-
-            if(error_count > int(mask_count*0.25)){ // usually 50
-                cout << "time to cut" << endl;
+            //cout << error_count << " > " << mask_count << " * " << accept_rectangle_threshold << endl;
+            if(error_count > int(mask_count*accept_rectangle_threshold)){ // usually 50
                 // Keep isolating most promising areas until remaining mask is empty or contours within very small (add user chosen limit later)
                 Mat remaining_mask = mask.clone();
                 int original_contour_size = countNonZero(remaining_mask);
@@ -804,8 +799,8 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                 bool first_iteration = true;
                 Vec4i last_start;
                 Vec4i last_end;
-
-                while(hasNonZero(remaining_mask) == true && biggest_contour_size > original_contour_size*0.1){ // Currently just 10% limit
+                while(hasNonZero(remaining_mask) == true){ //&& biggest_contour_size > original_contour_size*obstacle_size_limit){ // Currently just 10% limit (removed second argument since it would be delayed due to biggest obstacle being found within the loop)
+                    cout << biggest_contour_size << " > " << original_contour_size << " * " << obstacle_size_limit << endl;
                     // Find contours
                     vector<vector<Point>> contours;
                     vector<Vec4i> hierarchy;
@@ -827,7 +822,7 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                     }
                     vector<vector<Point>> temp_contours = {biggest_contour};
                     Mat contour_mask =  Mat::zeros(mask.size(),CV_8U);
-                    drawContours(contour_mask,temp_contours,0,255,-1);
+                    drawContours(contour_mask,temp_contours,0,WHITE,-1);
 
                     // Find edges of biggest contour in mask
                     Mat edge_mask;
@@ -836,12 +831,12 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                     // If not first iteration clean edge map (remove edge created by cutout)
                     if(first_iteration == false){
                         Mat remover = Mat::zeros(mask.size(),CV_8U);
-                        line(remover,Point(last_start[0],last_start[1]),Point(last_start[2],last_start[3]),255,3,LINE_AA);
-                        line(remover,Point(last_end[0],last_end[1]),Point(last_end[2],last_end[3]),255,3,LINE_AA);
+                        line(remover,Point(last_start[0],last_start[1]),Point(last_start[2],last_start[3]),WHITE,3,LINE_AA);
+                        line(remover,Point(last_end[0],last_end[1]),Point(last_end[2],last_end[3]),WHITE,3,LINE_AA);
                         edge_mask = edge_mask-remover;
                     }
 
-//                    // Visualize
+                    // Visualize
 //                    Mat glop = edge_mask.clone();
 //                    resize(glop,glop,Size(),0.5,0.5,INTER_LINEAR);
 //                    imshow("edge mask", glop);
@@ -849,14 +844,14 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
 
                     // Find best line
                     line_data best_line_data;
-                    best_line_data = get_best_line(edge_mask,10,50.0,10.0,false,false);
+                    best_line_data = get_best_line(edge_mask,hough_threshold,min_line_length,max_line_gap,false,false);
 
                     Vec4i best_line = best_line_data.line;
                     double best_angle = best_line_data.angle;
 
                     // visualize line
                     Mat viz =  Mat::zeros(mask.size(),CV_8U);
-                    line(viz,Point(best_line[0],best_line[1]),Point(best_line[2],best_line[3]),255,3,LINE_AA);
+                    line(viz,Point(best_line[0],best_line[1]),Point(best_line[2],best_line[3]),WHITE,3,LINE_AA);
 
 //                    Mat flop = viz.clone();
 //                    resize(flop,flop,Size(),0.5,0.5,INTER_LINEAR);
@@ -867,7 +862,7 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                     int direction = get_obstacle_direction(best_angle,best_line,remaining_mask);
 
                     // Determine borders of split obstalces
-                    vector<Vec4i> borders = get_line_borders(direction,best_line,remaining_mask,5,0.75);
+                    vector<Vec4i> borders = get_line_borders(direction,best_line,remaining_mask,step_threshold,decline_threshold);
                     Vec4i first_line = borders.at(0);
                     Vec4i last_line = borders.at(1);
 
@@ -877,8 +872,8 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
 
                     // Draw edges of best lines
                     Mat best_shape = Mat::zeros(mask.size(),CV_8U);
-                    line(best_shape,Point(first_line[0],first_line[1]),Point(first_line[2],first_line[3]),255,3,LINE_AA);
-                    line(best_shape,Point(last_line[0],last_line[1]),Point(last_line[2],last_line[3]),255,3,LINE_AA);
+                    line(best_shape,Point(first_line[0],first_line[1]),Point(first_line[2],first_line[3]),WHITE,3,LINE_AA);
+                    line(best_shape,Point(last_line[0],last_line[1]),Point(last_line[2],last_line[3]),WHITE,3,LINE_AA);
 
 //                    Mat mask_test = mask.clone();
 //                    resize(mask_test,mask_test,Size(),0.5,0.5,INTER_LINEAR);
@@ -900,7 +895,7 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                     Mat first_bounding_mat = Mat::zeros(mask.size(),CV_8U);
                     vector<vector<Point>> polygons;
                     polygons.push_back(first_bounding);
-                    fillPoly(first_bounding_mat,polygons,255);
+                    fillPoly(first_bounding_mat,polygons,WHITE);
                     Mat first_mask = first_bounding_mat & mask;
 
                     // Cut masks into only including a single obstacle
@@ -916,7 +911,7 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                     cut_polygons.push_back(cut_bounding);
 
                     Mat cut_mask = Mat::zeros(mask.size(),CV_8U);
-                    fillPoly(cut_mask,cut_polygons,255);
+                    fillPoly(cut_mask,cut_polygons,WHITE);
                     cut_mask = cut_mask & mask;
 
                     remaining_mask = remaining_mask-cut_mask;
@@ -947,14 +942,14 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                         vector<vector<Point>> new_points;
                         new_points.push_back(new_rectangle_points_vector);
                         Mat new_bounding_box = Mat::zeros(mask.size(),CV_8U);
-                        drawContours(new_bounding_box,new_points,0,255,-1,LINE_8);
+                        drawContours(new_bounding_box,new_points,0,WHITE,-1,LINE_8);
 
                         Mat new_error_mask = new_bounding_box-first_mask;
 
                         int new_mask_count = countNonZero(first_mask);
                         int new_error_count = countNonZero(new_error_mask);
                         // If error low, keep obstacle
-                        if(new_error_count <= int(new_mask_count*0.25)){ // Maybe change threshold
+                        if(new_error_count <= int(new_mask_count*accept_rectangle_threshold)){ // Maybe change threshold
                             obstacle new_obstacle;
                             new_obstacle.mask = first_mask;
                             new_obstacle.contour = first_bounding;
@@ -964,7 +959,7 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                         }
                     }
                     // Break if remainder is less than 10% of original size
-                    if(countNonZero(remaining_mask) < original_contour_size*0.1){
+                    if(countNonZero(remaining_mask) < original_contour_size*obstacle_size_limit){
                         break;
                     }
                 }
@@ -1057,7 +1052,7 @@ bool detecting::check_border(obstacle obstacle_to_check){
         Mat mask = obstacle_to_check.mask;
         // Draw border
         Mat border = Mat::zeros(mask.size(),CV_8U);
-        rectangle(border,Point(0,0),Point(mask.cols,mask.rows),255,1);
+        rectangle(border,Point(0,0),Point(mask.cols,mask.rows),WHITE,1);
 
         // Detect intersections
         Mat intersections = border & mask;
@@ -1238,7 +1233,7 @@ vector<obstacle> detecting::patch_detection_gap(vector<obstacle> last_obstacles,
             for(int point_index = 0; point_index < points.size(); point_index++){
                 // Draw point on empty frame
                 Mat point_mask = Mat::zeros(current_obstacle.mask.size(),CV_8U);
-                circle(point_mask,points.at(point_index),1,255,1);
+                circle(point_mask,points.at(point_index),1,WHITE,1);
 
                 // find overlap
                 Mat overlap = point_mask & current_obstacle.mask;
@@ -1305,16 +1300,17 @@ void detecting::set_possible_obstacles_settings(int blur_size, double low_thresh
     }
 }
 
-void detecting::set_obstacle_filter_settings(int rectangle_threshold, int size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh){
+void detecting::set_obstacle_filter_settings(float rectangle_threshold, float size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh, float rectangle_ratio, int obstacle_cutoff){
     try{
-        accepth_rectangle_threshold = rectangle_threshold;
+        accept_rectangle_threshold = rectangle_threshold;
         obstacle_size_limit = size_limit;
         hough_threshold = hough_thresh;
         min_line_length = min_length;
         max_line_gap = max_gap;
         step_threshold = step_limit;
         decline_threshold = decline_thresh;
-
+        rectangle_size_ratio = rectangle_ratio;
+        obstacle_size_threshold = obstacle_cutoff;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

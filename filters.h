@@ -39,6 +39,8 @@ public:
 
     std::vector<float> filter_ipr(std::vector<float> data_points, float lower_percentile, float upper_percentile); // inter percentile range
 
+    std::vector<short> filter_ipr(std::vector<short> data_points, float lower_percentile, float upper_percentile); // inter percentile range
+
 
 
 private:

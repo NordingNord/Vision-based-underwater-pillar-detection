@@ -59,6 +59,8 @@ public:
     // -- Methods for cleaning maps after disparity mapping --
     cv::Mat remove_invalid_edge(cv::Mat frame); // Removes edge made by disparity mapping
 
+    cv::Mat add_invalid_edge(cv::Mat frame); // Used to revert back to correct frame size
+
     // -- Trackbars --
     void min_disparity_bar(int step){
         disparity_settings.min_disparity = step;

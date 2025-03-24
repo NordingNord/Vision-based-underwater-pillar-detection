@@ -135,7 +135,6 @@ void pipeline::set_feature_parameters(int gap, int size){
     }
 }
 
-
 void pipeline::set_match_parameters(int match_type, int n_best_matches, float flann_ratio){
     try{
         // Prepare settings
@@ -196,7 +195,6 @@ void pipeline::set_optical_flow_paramters(Size new_window_size, int new_max_pyra
     }
 }
 
-
 void pipeline::set_obstacle_candidate_settings(int blur_size, double low_thresh, double high_thresh, int sobel_size, bool l2_status, int size_thresh, cv::Mat line_kernel, cv::Mat contour_kernel, cv::Mat border_kernel, float border_threshold){
     try{
         detector.set_possible_obstacles_settings(blur_size, low_thresh, high_thresh, sobel_size, l2_status, size_thresh, line_kernel, contour_kernel, border_kernel, border_threshold);
@@ -206,7 +204,23 @@ void pipeline::set_obstacle_candidate_settings(int blur_size, double low_thresh,
     }
 }
 
+void pipeline::set_obstacle_filter_settings(float rectangle_acceptance_threshold, float size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh, float rectangle_ratio, int obstacle_cutoff){
+    try{
+        detector.set_obstacle_filter_settings(rectangle_acceptance_threshold, size_limit, hough_thresh, min_length, max_gap, step_limit, decline_thresh, rectangle_ratio, obstacle_cutoff);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
 
+void pipeline::set_slic_settings(int algorithm, int region_size, float ruler, int iterations){
+    try{
+        cluster_system.set_slic_paramters(algorithm,region_size,ruler,iterations);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
 
 // -- The pipelines --
 void pipeline::run_triangulation_pipeline(int disparity_filter){
@@ -441,10 +455,6 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
         cout << "Error: " << error.what() << endl;
     }
 }
-
-
-
-// TEST ZONE
 
 void pipeline::run_triangulation_pipeline_test(int disparity_filter){
     try{
@@ -712,7 +722,6 @@ void pipeline::run_triangulation_pipeline_test(int disparity_filter){
     }
 }
 
-
 void pipeline::run_disparity_pipeline(int disparity_filter){
     try{
         // Visualize camera data
@@ -798,13 +807,13 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             start = chrono::high_resolution_clock::now();
 
             Mat disparity_map = stereo_system.get_disparity(first_frame,second_frame);
+            //Mat disparity_map = stereo_system.track_disparity(first_frame,second_frame);
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Disparity map found in  " << duration.count() << " ms using." << endl;
 
-
-            // Visualize filtered disparity map
+            // Visualize  disparity map
             Mat disparity_map_color;
             disparity_map_color = stereo_system.process_disparity(disparity_map);
             applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
@@ -815,6 +824,33 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             imshow("Chosen disparity map",disparity_combined);
             waitKey(0);
 
+            // Find superpixels
+            Mat disparity_first_frame = stereo_system.remove_invalid_edge(first_frame);
+            super_pixel_frame superpixels =  cluster_system.perform_slic(disparity_first_frame);
+
+            // Visualize superpixels
+            Mat superpixel_border_frame = visualizer.show_super_pixel_borders(disparity_first_frame,superpixels);
+            resize(superpixel_border_frame,superpixel_border_frame,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("superpixels",superpixel_border_frame);
+            waitKey(0);
+
+            // Remove disparity noise using superpixels
+            Mat disparity_map_roi = stereo_system.remove_invalid_edge(disparity_map);
+            Mat noise_filtered_disparity = cluster_system.remove_inter_superpixel_noise(disparity_map_roi,superpixels);
+
+            // Visualize new disparity map
+            Mat cleaned_disparity_map_color;
+            cleaned_disparity_map_color = stereo_system.process_disparity(noise_filtered_disparity);
+            applyColorMap(cleaned_disparity_map_color,cleaned_disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+            Mat cleaned_disparity_combined;
+            hconcat(cleaned_disparity_map_color,disparity_first_frame, cleaned_disparity_combined);
+            resize(cleaned_disparity_combined,cleaned_disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("Noise reduced disparity map",cleaned_disparity_combined);
+            waitKey(0);
+
+            // Add borders back
+            disparity_map = stereo_system.add_invalid_edge(noise_filtered_disparity);
+
             // Filter disparity map
             start = chrono::high_resolution_clock::now();
 
@@ -822,7 +858,8 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
                 disparity_map = stereo_system.filter_disparity(disparity_map,first_frame,second_frame);
             }
             else if(disparity_filter == DISPARITY_FILTER_BILATERAL){
-                disparity_map = stereo_system.process_disparity(disparity_map); // should only be done when filtering is used, since it does not excpect disparity maps
+                //disparity_map = stereo_system.process_disparity(disparity_map); // should only be done when filtering is used, since it does not excpect disparity maps
+                disparity_map.convertTo(disparity_map,CV_32F,1.0/16);
                 disparity_map = filtering_sytem.filter_bilateral(disparity_map);
 
             }
@@ -831,12 +868,16 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             }
             if(disparity_filter != DISPARITY_FILTER_NONE){
                 // Visualize filtered disparity map
-                applyColorMap(disparity_map,disparity_map,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                disparity_map_color = stereo_system.process_disparity(disparity_map);
+                applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
                 Mat filtered_disparity_combined;
-                hconcat(disparity_map,first_frame, filtered_disparity_combined);
+                hconcat(disparity_map_color,first_frame, filtered_disparity_combined);
                 resize(filtered_disparity_combined,filtered_disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
                 imshow("Filtered disparity",filtered_disparity_combined);
                 waitKey(0);
+
+                // Ensure correct data type for further manipulation
+                disparity_map.convertTo(disparity_map,CV_32F,1.0/16);
             }
 
             stop = chrono::high_resolution_clock::now();

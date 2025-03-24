@@ -302,3 +302,25 @@ Mat visualization::show_obstacles(vector<obstacle> obstacles, Mat frame){
     }
     return warning_frame;
 }
+
+// -- Superpixel visualization methods --
+Mat visualization::show_super_pixel_borders(Mat frame, super_pixel_frame data, Vec3b color){
+    Mat visualized_frame = frame.clone();
+    try{
+        // Borders are indicated by the uchar of -1
+        uchar border = -1;
+        // Go through mask looking for border value
+        for(int row = 0; row < frame.rows; row++){
+            for(int col = 0; col < frame.cols; col++){
+                // If border -> mark on current visualization frame
+                if(data.border_mask.at<uchar>(row,col) == border){ // CV_8UC1 -> access with uchar
+                    visualized_frame.at<Vec3b>(row,col) = color; // CV_8UC3 -> access with Vec3b
+                }
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return visualized_frame;
+}

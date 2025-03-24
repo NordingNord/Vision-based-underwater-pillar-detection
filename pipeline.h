@@ -20,6 +20,7 @@
 #include "estimating_3d.h"
 #include "detecting.h"
 #include "optical_flow.h"
+#include "clustering.h"
 
 
 // -- Defines --
@@ -65,6 +66,10 @@ public:
 
     void set_obstacle_candidate_settings(int blur_size, double low_thresh, double high_thresh, int sobel_size, bool l2_status, int size_thresh, cv::Mat line_kernel, cv::Mat contour_kernel, cv::Mat border_kernel, float border_threshold);
 
+    void set_obstacle_filter_settings(float rectangle_acceptance_threshold, float size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh, float rectangle_ratio, int obstacle_cutoff);
+
+    void set_slic_settings(int algorithm, int region_size, float ruler, int iterations);
+
     // -- The pipelines --
     void run_triangulation_pipeline(int disparity_filter);
 
@@ -104,6 +109,9 @@ private:
 
     // Optical flow class
     optical_flow optical_flow_system;
+
+    // Clustering class
+    clustering cluster_system;
 
     // Settings
     bool callibration_transposed;

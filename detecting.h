@@ -20,6 +20,8 @@ static const int DIRECTION_RIGHT = 1;
 static const int DIRECTION_UP = 2;
 static const int DIRECTION_DOWN = 3;
 
+static const int WHITE = 255;
+
 
 // -- Class --
 class detecting
@@ -76,7 +78,7 @@ public:
     // -- Methods that sets settings --
     void set_possible_obstacles_settings(int blur_size, double low_thresh, double high_thresh, int sobel_size, bool l2_status, int size_thresh, cv::Mat line_kernel, cv::Mat contour_kernel, cv::Mat border_kernel, float border_threshold);
 
-    void set_obstacle_filter_settings(int rectangle_threshold, int size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh);
+    void set_obstacle_filter_settings(float rectangle_acceptance_threshold, float size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh, float rectangle_ratio, int obstacle_cutoff);
 
 
 
@@ -103,9 +105,9 @@ private:
     float deeper_threshold;
 
     // -- Settings used to filter obstacles --
-    int accepth_rectangle_threshold;
+    float accept_rectangle_threshold;
 
-    int obstacle_size_limit;
+    float obstacle_size_limit;
 
     // Maybe reuse canny?
 
@@ -116,6 +118,10 @@ private:
     int step_threshold;
 
     float decline_threshold;
+
+    float rectangle_size_ratio;
+
+    int obstacle_size_threshold;
 
 
 };

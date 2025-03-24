@@ -40,6 +40,9 @@ public:
     cv::Mat show_possible_obstacles(std::vector<cv::Mat> possible_obstacles, cv::Mat frame);
 
     cv::Mat show_obstacles(std::vector<obstacle> obstacles, cv::Mat frame);
+
+    // -- Superpixel visualization methods --
+    cv::Mat show_super_pixel_borders(cv::Mat frame, super_pixel_frame data, cv::Vec3b color  = {0,0,0});
 private:
 
 };

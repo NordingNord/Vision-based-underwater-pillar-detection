@@ -173,3 +173,40 @@ vector<float> filters::filter_ipr(vector<float> data_points, float lower_percent
     return filtered_data;
 }
 
+vector<short> filters::filter_ipr(vector<short> data_points, float lower_percentile, float upper_percentile){
+    vector<short> filtered_data;
+    try{
+        // sort vector
+        vector<short> sorted_data_points = data_points;
+        sort(sorted_data_points.begin(),sorted_data_points.end()); // This is where all time issues arise from
+
+        // Find quantiles
+        int lower_index = lower_percentile*sorted_data_points.size();
+        int upper_index = upper_percentile*sorted_data_points.size();
+
+        short lower_quantile = sorted_data_points.at(lower_index);
+        short upper_quantile = sorted_data_points.at(upper_index);
+
+        // Determine range
+        float inter_quantile_range = upper_quantile-lower_quantile;
+
+        // If range is 0 set it to one
+        if(inter_quantile_range == 0){
+            inter_quantile_range = 1;
+        }
+
+        // Determine bounds
+        short lower_bound_val = lower_quantile-1.5*inter_quantile_range;
+        short upper_bound_val = upper_quantile+1.5*inter_quantile_range;
+
+        // Filter points
+        auto bottom = lower_bound(sorted_data_points.begin(), sorted_data_points.end(),lower_bound_val);
+        auto top = lower_bound(sorted_data_points.begin(), sorted_data_points.end(),upper_bound_val);
+        filtered_data.assign(bottom,top);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_data;
+}
+
