@@ -131,8 +131,8 @@ int main(){
     int mode = StereoSGBM::MODE_SGBM;
 
     // -- WSL settings --
-    double lamda = 2000.0; // Usual value 8000
-    double sigma = 0.8; // Usually 0.8 -> 2.0 small values more sensitive to noise, while big values can result in disparity leakage
+    double lamda = 1000.0; // Usual value 8000
+    double sigma = 0.4; // Usually 0.8 -> 2.0 small values more sensitive to noise, while big values can result in disparity leakage
 
     // -- Bilateral settings --
     int diameter = 5;
@@ -190,7 +190,7 @@ int main(){
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
-    detection_triangulation.run_disparity_pipeline(DISPARITY_FILTER_WLS);
+    detection_triangulation.run_disparity_pipeline(DISPARITY_FILTER_NONE);
 
 
 }

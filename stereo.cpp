@@ -144,6 +144,46 @@ cv::Mat stereo::get_disparity(cv::Mat first_frame, cv::Mat second_frame){
     return disparity_map;
 }
 
+Mat stereo::get_reversed_disparity(Mat first_frame, Mat second_frame){
+    Mat reverse_disparity_map;
+    try{
+        // Calculate second disparity (right) Manual
+//        Mat second_disparity_map(second_frame.size(),CV_16S);
+//        Mat flipped_second_disparity(second_frame.size(),CV_16S);
+//        Mat flipped_first_frame(first_frame.size(),CV_8U);
+//        Mat flipped_second_frame(second_frame.size(),CV_8U);
+//        flip(first_frame,flipped_first_frame,1);
+//        flip(second_frame,flipped_second_frame,1);
+//        sgbm->compute(flipped_second_frame,flipped_first_frame,flipped_second_disparity);
+//        flip(flipped_second_disparity,second_disparity_map,1);
+//        second_disparity_map *= -1;
+
+        // Create stereo matcher (simple version)
+        Ptr<StereoMatcher> matcher = ximgproc::createRightMatcher(sgbm);
+
+        // Convert frames to grayscale
+        Mat first_gray_frame, second_gray_frame;
+        cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
+        cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
+
+        // Prepare second disparity map
+        Mat second_disparity_map;
+        matcher->compute(second_gray_frame,first_gray_frame,second_disparity_map);
+
+        // Convert to match original disparity range (Due to right matcher making everything negative)
+        Mat mask = second_disparity_map == -1792; // Value of 0 / no disparity for the second map
+        second_disparity_map = second_disparity_map*-1; // second map is set to negative due to this being needed in wls, i reverse this for visualization
+        second_disparity_map.setTo(-16,mask);
+
+        // Prepare output
+        reverse_disparity_map = second_disparity_map;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return reverse_disparity_map;
+}
+
 cv::Mat stereo::track_disparity(cv::Mat first_frame, cv::Mat second_frame){
     Mat disparity_map;
     try{
@@ -303,50 +343,60 @@ Mat stereo::process_disparity_stepwise(Mat disparity_map){
     return processed_disparity;
 }
 
-Mat stereo::filter_disparity(Mat disparity_map, Mat first_frame, Mat second_frame){
+Mat stereo::filter_disparity(Mat disparity_map, Mat first_frame, Mat second_disparity_map, Mat second_frame){
     Mat filtered_disparity;
     try{
-        // Calculate second disparity (right)
-//        Mat second_disparity_map(second_frame.size(),CV_16S);
-//        Mat flipped_second_disparity(second_frame.size(),CV_16S);
-
-//        Mat flipped_first_frame(first_frame.size(),CV_8U);
-//        Mat flipped_second_frame(second_frame.size(),CV_8U);
-
-//        flip(first_frame,flipped_first_frame,1);
-//        flip(second_frame,flipped_second_frame,1);
-
-//        sgbm->compute(flipped_second_frame,flipped_first_frame,flipped_second_disparity);
-
-//        flip(flipped_second_disparity,second_disparity_map,1);
-
-//        second_disparity_map *= -1;
-
-        // Create stereo matcher
-        Ptr<StereoMatcher> matcher = ximgproc::createRightMatcher(sgbm);
         // Create filter
         Ptr<ximgproc::DisparityWLSFilter> wls_filter = ximgproc::createDisparityWLSFilter(sgbm);
         //Ptr<ximgproc::DisparityWLSFilter> wls_filter = ximgproc::createDisparityWLSFilterGeneric(true);
         // Set parameters
         wls_filter->setLambda(lamda);
         wls_filter->setSigmaColor(sigma);
-        // Prepare second disparity map
-        Mat second_disparity_map;
-        matcher->compute(second_frame,first_frame,second_disparity_map);
+
         // Convert frame to grayscale
         Mat first_gray_frame, second_gray_frame;
         cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
         cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
+
+        // Prepare second disparity map
+        Mat mask = second_disparity_map > 0;
+        if(hasNonZero(mask) == true){
+            // Has been converted for viz so must be converted back
+            Mat invalid_mask = second_disparity_map == -16;
+            second_disparity_map *= -1;
+            second_disparity_map.setTo(-1792,invalid_mask);
+        }
+
         // Run filter
-        wls_filter->filter(disparity_map,first_gray_frame,filtered_disparity,second_disparity_map);//,Rect(),second_gray_frame);
-        // Process newly found disparity map
-        //filtered_disparity = process_disparity(filtered_disparity);
+        wls_filter->filter(disparity_map,first_gray_frame,filtered_disparity,second_disparity_map,Rect(),second_gray_frame);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
     return filtered_disparity;
 }
+
+Mat stereo::validate_disparity(Mat disparity_map, Mat second_disparity_map){
+    Mat validated_disparity = disparity_map.clone();
+    try{
+        // Prepare second disparity map
+        Mat mask = second_disparity_map > 0;
+        if(hasNonZero(mask) == true){
+            // Has been converted for viz so must be converted back
+            Mat invalid_mask = second_disparity_map == -16;
+            second_disparity_map *= -1;
+            second_disparity_map.setTo(-1792,invalid_mask);
+        }
+
+        // Validate
+        validateDisparity(validated_disparity,second_disparity_map,disparity_settings.min_disparity, disparity_settings.num_disparities, disparity_settings.disp_12_max_diff);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return validated_disparity;
+}
+
 
 // -- Methods that handle depth --
 Mat stereo::disparity_to_depth(Mat disparity_map){
@@ -485,10 +535,18 @@ vector<Mat> stereo::get_projections(){
 
 
 // -- Methods for cleaning maps after disparity mapping --
-Mat stereo::remove_invalid_edge(Mat frame){
+Mat stereo::remove_invalid_edge(Mat frame, int edge){
     Mat frame_without_edge;
     try{
-        frame_without_edge = frame(Range(0,frame.rows),Range(disparity_settings.num_disparities,frame.cols));
+        if(edge == LEFT){
+            frame_without_edge = frame(Range(0,frame.rows),Range(disparity_settings.num_disparities,frame.cols));
+        }
+        else if(edge == RIGHT){
+            frame_without_edge = frame(Range(0,frame.rows),Range(0,frame.cols-disparity_settings.num_disparities));
+        }
+        else{
+            throw runtime_error("Unknown edge choise. Use LEFT or RIGHT to remove coresponding edge.");
+        }
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -496,10 +554,15 @@ Mat stereo::remove_invalid_edge(Mat frame){
     return frame_without_edge;
 }
 
-Mat stereo::add_invalid_edge(Mat frame){
+Mat stereo::add_invalid_edge(Mat frame, int edge){
     Mat frame_with_edge = Mat::zeros(Size(frame.cols+disparity_settings.num_disparities,frame.rows),frame.type()); // correct dimension
     try{
-        copyMakeBorder(frame,frame_with_edge,0,0,disparity_settings.num_disparities,0,BORDER_CONSTANT,-16); // -16 currently due to me only using this with disparity maps 16S1, which has -16 as NaN. Future work is to make it universal
+        if(edge == LEFT){
+            copyMakeBorder(frame,frame_with_edge,0,0,disparity_settings.num_disparities,0,BORDER_CONSTANT,-16); // -16 currently due to me only using this with disparity maps 16S1, which has -16 as NaN. Future work is to make it universal
+        }
+        else if(edge == RIGHT){
+            copyMakeBorder(frame,frame_with_edge,0,0,0,disparity_settings.num_disparities,BORDER_CONSTANT,-16); // -16 currently due to me only using this with disparity maps 16S1, which has -16 as NaN. Future work is to make it universal
+        }
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

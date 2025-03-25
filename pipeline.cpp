@@ -76,7 +76,7 @@ void pipeline::set_stereo_parameters(double alpha, bool transposed_callibration)
         if(frame_size.height == 0 || frame_size.width == 0){
             throw runtime_error("No cameras loaded. Unable to set stereo paramters.");
         }
-        // Convert size if frames transposed
+        // Convert size if frames rotated
         if(transposed_callibration == true){
             frame_size = {frame_size.width, frame_size.height};
         }
@@ -372,8 +372,9 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
 
                 // Filter disparity map
                 if(disparity_filter == DISPARITY_FILTER_WLS){
-                    disparity_map = stereo_system.filter_disparity(disparity_map,second_frame,first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
-                    old_disparity_map = stereo_system.filter_disparity(old_disparity_map,old_second_frame,old_first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+                    cout << "temp out of order" << endl;
+                    //disparity_map = stereo_system.filter_disparity(disparity_map,second_frame,first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
+                    //old_disparity_map = stereo_system.filter_disparity(old_disparity_map,old_second_frame,old_first_frame); // I dont understand why the frame order should be reversed for me to get good disparity results
                 }
                 else if(disparity_filter == DISPARITY_FILTER_BILATERAL){
                     disparity_map = stereo_system.process_disparity(disparity_map); // should only be done when filtering is used, since it does not excpect disparity maps
@@ -607,8 +608,9 @@ void pipeline::run_triangulation_pipeline_test(int disparity_filter){
 
                 // Filter disparity map
                 if(disparity_filter == DISPARITY_FILTER_WLS){
-                    disparity_map = stereo_system.filter_disparity(disparity_map,first_frame,second_frame);
-                    old_disparity_map = stereo_system.filter_disparity(old_disparity_map,old_first_frame,old_second_frame);
+                    cout << "temp out of order" << endl;
+                    //disparity_map = stereo_system.filter_disparity(disparity_map,first_frame,second_frame);
+                    //old_disparity_map = stereo_system.filter_disparity(old_disparity_map,old_first_frame,old_second_frame);
                 }
                 else if(disparity_filter == DISPARITY_FILTER_BILATERAL){
                     disparity_map = stereo_system.process_disparity(disparity_map); // should only be done when filtering is used, since it does not excpect disparity maps
@@ -824,38 +826,102 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             imshow("Chosen disparity map",disparity_combined);
             waitKey(0);
 
-            // Find superpixels
-            Mat disparity_first_frame = stereo_system.remove_invalid_edge(first_frame);
-            super_pixel_frame superpixels =  cluster_system.perform_slic(disparity_first_frame);
+            // Compute reverse disparity map
+            start = chrono::high_resolution_clock::now();
 
-            // Visualize superpixels
-            Mat superpixel_border_frame = visualizer.show_super_pixel_borders(disparity_first_frame,superpixels);
-            resize(superpixel_border_frame,superpixel_border_frame,Size(),0.5,0.5,INTER_LINEAR);
-            imshow("superpixels",superpixel_border_frame);
+            Mat reverse_disparity_map = stereo_system.get_reversed_disparity(first_frame,second_frame);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Second disparity map found in  " << duration.count() << " ms using." << endl;
+
+            // Compare visually
+            Mat reversed_disparity_map_color;
+            reversed_disparity_map_color = stereo_system.process_disparity(reverse_disparity_map);
+            applyColorMap(reversed_disparity_map_color,reversed_disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+            Mat two_disparity_combined;
+            hconcat(disparity_map_color,reversed_disparity_map_color, two_disparity_combined);
+            resize(two_disparity_combined,two_disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("left right disparity",two_disparity_combined);
             waitKey(0);
 
-            // Remove disparity noise using superpixels
-            Mat disparity_map_roi = stereo_system.remove_invalid_edge(disparity_map);
-            Mat noise_filtered_disparity = cluster_system.remove_inter_superpixel_noise(disparity_map_roi,superpixels);
+            // Remove speckles with opencv method
+            start = chrono::high_resolution_clock::now();
 
-            // Visualize new disparity map
-            Mat cleaned_disparity_map_color;
-            cleaned_disparity_map_color = stereo_system.process_disparity(noise_filtered_disparity);
-            applyColorMap(cleaned_disparity_map_color,cleaned_disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
-            Mat cleaned_disparity_combined;
-            hconcat(cleaned_disparity_map_color,disparity_first_frame, cleaned_disparity_combined);
-            resize(cleaned_disparity_combined,cleaned_disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
-            imshow("Noise reduced disparity map",cleaned_disparity_combined);
+            filterSpeckles(disparity_map,-16,10000,160); // remove speckles smaller than 0.4% of image thus under 1%
+            filterSpeckles(reverse_disparity_map,-16,10000,160);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Filtered speckles in  " << duration.count() << " ms using." << endl;
+
+            // Visalize speckled filter
+            reversed_disparity_map_color = stereo_system.process_disparity(reverse_disparity_map);
+            disparity_map_color = stereo_system.process_disparity(disparity_map);
+            applyColorMap(reversed_disparity_map_color,reversed_disparity_map_color,COLORMAP_JET);
+            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET);
+
+            Mat filt_two_disparity_combined;
+            hconcat(disparity_map_color,reversed_disparity_map_color, filt_two_disparity_combined);
+            resize(filt_two_disparity_combined,filt_two_disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("left right disparity speckle free",filt_two_disparity_combined);
             waitKey(0);
+
+            // Validate disparity map (Has minor influence)
+//            Mat validated_disparity_map = stereo_system.validate_disparity(disparity_map,reverse_disparity_map);
+
+//            // Visualize validated disparity map
+//            Mat temp_validated = validated_disparity_map.clone();
+//            //bitwise_xor(stereo_system.process_disparity(temp_validated),stereo_system.process_disparity(disparity_map),temp_validated);
+//            applyColorMap(temp_validated,temp_validated,COLORMAP_JET);
+//            resize(temp_validated,temp_validated,Size(),0.5,0.5,INTER_LINEAR);
+//            imshow("validated",temp_validated);
+//            waitKey(0);
+
+
+//            // Find superpixels (Currently too slow and not ideal)
+//            Mat disparity_first_frame = stereo_system.remove_invalid_edge(first_frame);
+//            Mat disparity_second_frame = stereo_system.remove_invalid_edge(second_frame, RIGHT);
+//            super_pixel_frame superpixels =  cluster_system.perform_slic(disparity_first_frame);
+//            super_pixel_frame second_superpixels =  cluster_system.perform_slic(disparity_second_frame);
+
+//            // Remove disparity noise using superpixels
+//            start = chrono::high_resolution_clock::now();
+
+//            Mat disparity_map_roi = stereo_system.remove_invalid_edge(disparity_map);
+//            Mat noise_filtered_disparity = cluster_system.remove_inter_superpixel_noise(disparity_map_roi,superpixels);
+
+//            Mat reverse_disparity_map_roi = stereo_system.remove_invalid_edge(reverse_disparity_map,RIGHT);
+//            Mat reverse_noise_filtered_disparity = cluster_system.remove_inter_superpixel_noise(reverse_disparity_map_roi,second_superpixels);
+
+//            stop = chrono::high_resolution_clock::now();
+//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//            cout << "Superpixel filter finished in " << duration.count() << " ms using." << endl;
+
+
+//            // Visualize new disparity map with superpixels
+//            Mat cleaned_disparity_map_color, reverse_cleaned_disparity_map_color;
+//            cleaned_disparity_map_color = stereo_system.process_disparity(noise_filtered_disparity);
+//            reverse_cleaned_disparity_map_color = stereo_system.process_disparity(reverse_noise_filtered_disparity);
+//            applyColorMap(cleaned_disparity_map_color,cleaned_disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+//            applyColorMap(reverse_cleaned_disparity_map_color,reverse_cleaned_disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+//            cleaned_disparity_map_color = visualizer.show_super_pixel_borders(cleaned_disparity_map_color,superpixels);
+//            reverse_cleaned_disparity_map_color = visualizer.show_super_pixel_borders(reverse_cleaned_disparity_map_color,second_superpixels);
+//            Mat cleaned_disparity_combined;
+//            hconcat(cleaned_disparity_map_color,reverse_cleaned_disparity_map_color, cleaned_disparity_combined);
+//            resize(cleaned_disparity_combined,cleaned_disparity_combined,Size(),0.5,0.5,INTER_LINEAR);
+//            imshow("Noise reduced disparity map",cleaned_disparity_combined);
+//            waitKey(0);
 
             // Add borders back
-            disparity_map = stereo_system.add_invalid_edge(noise_filtered_disparity);
+//            disparity_map = stereo_system.add_invalid_edge(noise_filtered_disparity);
+//            reverse_disparity_map = stereo_system.add_invalid_edge(reverse_noise_filtered_disparity, RIGHT);
 
             // Filter disparity map
             start = chrono::high_resolution_clock::now();
 
             if(disparity_filter == DISPARITY_FILTER_WLS){
-                disparity_map = stereo_system.filter_disparity(disparity_map,first_frame,second_frame);
+                disparity_map = stereo_system.filter_disparity(disparity_map,first_frame,reverse_disparity_map,second_frame);
             }
             else if(disparity_filter == DISPARITY_FILTER_BILATERAL){
                 //disparity_map = stereo_system.process_disparity(disparity_map); // should only be done when filtering is used, since it does not excpect disparity maps
@@ -912,7 +978,6 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Normalized in  " << duration.count() << " ms using." << endl;
-
 
             // Find edges in depth
             start = chrono::high_resolution_clock::now();

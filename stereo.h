@@ -16,6 +16,9 @@
 static const double VALID = 0.0;
 static const double FULL = 1.0;
 
+static const int LEFT = 0;
+static const int RIGHT = 1;
+
 // -- Class --
 class stereo
 {
@@ -31,6 +34,8 @@ public:
     // -- Methods that handles disparity mapping --
     cv::Mat get_disparity(cv::Mat first_frame, cv::Mat second_frame); // Works with preset parameters
 
+    cv::Mat get_reversed_disparity(cv::Mat first_frame, cv::Mat second_frame); // Gets right -> left disparity
+
     cv::Mat track_disparity(cv::Mat first_frame, cv::Mat second_frame); // Allows for manipulation of paramters
 
     void set_disparity_settings(int min_disp, int num_disp, int block_size, int p1, int p2, int disp_12_max_diff, int prefilter_cap, int uniqueness_ratio, int speckle_window_size, int speckle_range, int mode);
@@ -43,7 +48,9 @@ public:
     cv::Mat process_disparity(cv::Mat disparity_map); // All in one line
     cv::Mat process_disparity_stepwise(cv::Mat disparity_map); // Each step shown
 
-    cv::Mat filter_disparity(cv::Mat disparity_map, cv::Mat first_frame, cv::Mat second_frame); // Uses wls filtering
+    cv::Mat filter_disparity(cv::Mat disparity_map, cv::Mat first_frame, cv::Mat second_disparity_map, cv::Mat second_frame); // Uses wls filtering
+
+    cv::Mat validate_disparity(cv::Mat disparity_map, cv::Mat second_disparity_map);
 
     // -- Methods that handle depth --
     cv::Mat disparity_to_depth(cv::Mat disparity_map);
@@ -57,9 +64,9 @@ public:
     std::vector<cv::Mat> get_projections();
 
     // -- Methods for cleaning maps after disparity mapping --
-    cv::Mat remove_invalid_edge(cv::Mat frame); // Removes edge made by disparity mapping
+    cv::Mat remove_invalid_edge(cv::Mat frame, int edge = LEFT); // Removes edge made by disparity mapping
 
-    cv::Mat add_invalid_edge(cv::Mat frame); // Used to revert back to correct frame size
+    cv::Mat add_invalid_edge(cv::Mat frame, int edge = LEFT); // Used to revert back to correct frame size
 
     // -- Trackbars --
     void min_disparity_bar(int step){

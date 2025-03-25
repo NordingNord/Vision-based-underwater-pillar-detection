@@ -136,7 +136,7 @@ Mat converting::normalize_depth(Mat depth_map, float range){
         // Determine min and max depth
         float min_depth = filtered_depths.front();
         float max_depth = filtered_depths.back();
-        //cout << min_depth << " -> " << max_depth << endl;
+        cout << min_depth << " -> " << max_depth << endl;
 
         // Prepare temp original depth map
         Mat org_depth = depth_channel.clone();

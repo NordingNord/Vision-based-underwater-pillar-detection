@@ -45,12 +45,15 @@ public:
 
     line_data get_best_line(cv::Mat edge_mask,int threshold, double min_length, double max_gap, bool col_banned = false, bool row_banned = false, int ban_threshold = 0, int col_1 = 0, int col_2 = 0, int row_1 = 0, int row_2 = 0);
 
+    std::vector<line_data> get_all_lines(cv::Mat edge_mask,int threshold, double min_length, double max_gap);
+
     cv::Mat ensure_single_obstacle(cv::Mat mask, cv::Vec4i first_line, cv::Vec4i last_line);
 
     cv::Mat ensure_single_obstacle(cv::Mat mask); // Faster version that just keeps the biggest contour
 
     // -- Methods that splits all obstacles into viable rectangles. --
     std::vector<obstacle> split_into_rectangles(std::vector<obstacle> obstacles);
+    std::vector<obstacle> split_into_rectangles_corner(std::vector<obstacle> obstacles);
 
     // -- Methods that filter obstacles based on shape
     std::vector<obstacle> filter_rectangle_shape(std::vector<obstacle> obstacles, float ratio);

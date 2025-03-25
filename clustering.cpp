@@ -87,73 +87,83 @@ Mat clustering::remove_inter_superpixel_noise(Mat frame, super_pixel_frame super
     try{
         // Get mask of invalid data points (-16)
         Mat invalid = frame == -16;
-        // Go through each superpixel
+        // Go through each superpixel looking for areas with mostly invalid pixels as well as areas with high standard deviation. While filling gaps in each superpixels
         for(int i = 0; i < superpixels.super_pixel_count; i++){
             // Create superpixel mask
             Mat mask = superpixels.pixel_labels == i;
+            // Get invalid pixels within superpixel
+            Mat invalid_mask = mask & invalid;
+            // Count number of invalid pixels and total amount of pixels
+            int invalid_count = countNonZero(invalid_mask);
+            int total_count = countNonZero(mask);
+            // Make all pixels invalid if invalid values account for more than 50% of pixels
+            if(invalid_count >= total_count*0.5){
+                cleaned_frame.setTo(-16,mask);
+            }
             // Remove invalid values (-16)
             Mat mask_valid = mask - invalid;
             // Calculate standard deviation and mean
             Scalar superpixel_mean_array, superpixel_std_array;
             meanStdDev(frame,superpixel_mean_array,superpixel_std_array,mask_valid);
-            // Find min and max values
-            double min_val, max_val;
-            Point min_location, max_location;
-            minMaxLoc(frame, &min_val, &max_val,&min_location, &max_location, mask_valid);
-            // Set all invalid areas to min
-            Mat fixer_invalid = mask & invalid;
-            cleaned_frame.setTo(min_val,fixer_invalid);
+//            // Find min and max values
+//            double min_val, max_val;
+//            Point min_location, max_location;
+//            minMaxLoc(frame, &min_val, &max_val,&min_location, &max_location, mask_valid);
+//            // Set all invalid areas to min
+//            Mat fixer_invalid = mask & invalid;
+//            cleaned_frame.setTo(min_val,fixer_invalid);
 
             // If standard deviation is high supress peaks
             if(superpixel_std_array[0] >= 100){
-                // Get values of each pixel
-                vector<Point> points;
-                findNonZero(mask,points);
-                vector<short> values;
-                for(int j = 0; j < points.size(); j++){
-                    values.push_back(cleaned_frame.at<short>(points.at(j))); // Using cleaned frames to have invalid data count as deep data
-                };
+                cleaned_frame.setTo(-16,mask);
+//                // Get values of each pixel
+//                vector<Point> points;
+//                findNonZero(mask,points);
+//                vector<short> values;
+//                for(int j = 0; j < points.size(); j++){
+//                    values.push_back(cleaned_frame.at<short>(points.at(j))); // Using cleaned frames to have invalid data count as deep data
+//                };
 
-                // Find median
-                sort(values.begin(), values.end());
-                short superpixel_median;
-                // If odd
-                if(values.size() % 2 != 0){
-                    superpixel_median = values.at(values.size()/2);
-                }
-                else{
-                    // if even
-                    superpixel_median = values.at((values.size()-1)/2) + values.at(values.size()/2);
-                    superpixel_median = superpixel_median/2;
-                }
+//                // Find median
+//                sort(values.begin(), values.end());
+//                short superpixel_median;
+//                // If odd
+//                if(values.size() % 2 != 0){
+//                    superpixel_median = values.at(values.size()/2);
+//                }
+//                else{
+//                    // if even
+//                    superpixel_median = values.at((values.size()-1)/2) + values.at(values.size()/2);
+//                    superpixel_median = superpixel_median/2;
+//                }
 
-//                // Filter using iqr
-//                filters filter;
-//                vector<short> filtered_values = filter.filter_ipr(values,0.25,0.50);
-//                cout << filtered_values.size() << endl;
-//                // Find min and max
-//                short min_val = filtered_values.front();
-//                short max_val = filtered_values.back();
+////                // Filter using iqr
+////                filters filter;
+////                vector<short> filtered_values = filter.filter_ipr(values,0.25,0.50);
+////                cout << filtered_values.size() << endl;
+////                // Find min and max
+////                short min_val = filtered_values.front();
+////                short max_val = filtered_values.back();
 
-//                // Find areas below and above these values
-//                Mat min_mask = frame < min_val;
-//                Mat max_mask = frame > max_val;
+////                // Find areas below and above these values
+////                Mat min_mask = frame < min_val;
+////                Mat max_mask = frame > max_val;
+
+////                // locate these values in mask
+////                Mat fixer_min_mask = min_mask & mask;
+////                Mat fixer_max_mask = max_mask & mask;
+////                cleaned_frame.setTo(min_val,fixer_min_mask);
+////                cleaned_frame.setTo(max_val,fixer_max_mask);
+
+//                // Find areas greatly above below and above median
+//                Mat min_mask = frame < superpixel_median-10;
+//                Mat max_mask = frame > superpixel_median+10; // 10 is currently just arbitrary
 
 //                // locate these values in mask
 //                Mat fixer_min_mask = min_mask & mask;
 //                Mat fixer_max_mask = max_mask & mask;
-//                cleaned_frame.setTo(min_val,fixer_min_mask);
-//                cleaned_frame.setTo(max_val,fixer_max_mask);
-
-                // Find areas greatly above below and above median
-                Mat min_mask = frame < superpixel_median-10;
-                Mat max_mask = frame > superpixel_median+10; // 10 is currently just arbitrary
-
-                // locate these values in mask
-                Mat fixer_min_mask = min_mask & mask;
-                Mat fixer_max_mask = max_mask & mask;
-                cleaned_frame.setTo(superpixel_median,fixer_min_mask);
-                cleaned_frame.setTo(superpixel_median,fixer_max_mask);
+//                cleaned_frame.setTo(superpixel_median,fixer_min_mask);
+//                cleaned_frame.setTo(superpixel_median,fixer_max_mask);
             }
         }
     }
