@@ -39,6 +39,8 @@ public:
     // -- Methods for assisting with obstacle detection --
     std::vector<cv::Vec4i> get_line_borders(int direction, cv::Vec4i initial_line, cv::Mat mask, int step_threshold, float decline_threshold);
 
+    std::vector<cv::Vec4i> get_best_fit_borders(int direction, cv::Vec4i initial_line, cv::Mat mask);
+
     int get_obstacle_direction(double angle, cv::Vec4i initial_line, cv::Mat mask);
 
     line_data get_best_line(cv::Mat edge_mask,int threshold, double min_length, double max_gap, bool compare = false, double compare_angle = 0.0, double angle_threshold = 45);
@@ -83,6 +85,14 @@ public:
 
     void set_obstacle_filter_settings(float rectangle_acceptance_threshold, float size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh, float rectangle_ratio, int obstacle_cutoff);
 
+    // -- Convinience methods --
+    bool check_valid_split(cv::Vec4i line, int direction, cv::Mat mask);
+
+    std::vector<cv::Mat> split_with_line(cv::Vec4i line, int direction, cv::Mat frame);
+
+    cv::Mat get_best_split(cv::Vec4i line, int direction, cv::Mat frame);
+
+    cv::Mat get_best_split_mask(cv::Vec4i line, int direction, cv::Mat frame);
 
 
 private:

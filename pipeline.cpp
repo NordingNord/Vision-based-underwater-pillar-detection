@@ -793,7 +793,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             auto stop = chrono::high_resolution_clock::now();
             auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Rectification done in  " << duration.count() << " ms using." << endl;
+            cout << "Rectification done in  " << duration.count() << " ms." << endl;
 
 
             // Show rectification
@@ -813,7 +813,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Disparity map found in  " << duration.count() << " ms using." << endl;
+            cout << "Disparity map found in  " << duration.count() << " ms." << endl;
 
             // Visualize  disparity map
             Mat disparity_map_color;
@@ -833,7 +833,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Second disparity map found in  " << duration.count() << " ms using." << endl;
+            cout << "Second disparity map found in  " << duration.count() << " ms." << endl;
 
             // Compare visually
             Mat reversed_disparity_map_color;
@@ -853,7 +853,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Filtered speckles in  " << duration.count() << " ms using." << endl;
+            cout << "Filtered speckles in  " << duration.count() << " ms." << endl;
 
             // Visalize speckled filter
             reversed_disparity_map_color = stereo_system.process_disparity(reverse_disparity_map);
@@ -948,7 +948,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Disparity map filtered in  " << duration.count() << " ms using." << endl;
+            cout << "Disparity map filtered in  " << duration.count() << " ms." << endl;
 
 
             // Get depth map
@@ -958,7 +958,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Depth map found in  " << duration.count() << " ms using." << endl;
+            cout << "Depth map found in  " << duration.count() << " ms." << endl;
 
             // Remove black border from depth
             start = chrono::high_resolution_clock::now();
@@ -967,7 +967,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "border removal done in  " << duration.count() << " ms using." << endl;
+            cout << "border removal done in  " << duration.count() << " ms." << endl;
 
 
             // Normalize depth
@@ -977,7 +977,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Normalized in  " << duration.count() << " ms using." << endl;
+            cout << "Normalized in  " << duration.count() << " ms." << endl;
 
             // Find edges in depth
             start = chrono::high_resolution_clock::now();
@@ -989,7 +989,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Found possible obstacles in  " << duration.count() << " ms using." << endl;
+            cout << "Found possible obstacles in  " << duration.count() << " ms." << endl;
 
 
             // Prepare vizualization of possible obstacles
@@ -1008,7 +1008,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Filtered obstacles in  " << duration.count() << " ms using." << endl;
+            cout << "Filtered obstacles in  " << duration.count() << " ms." << endl;
 
 
             // Find obstacle types
@@ -1018,7 +1018,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Identified obstacles in  " << duration.count() << " ms using." << endl;
+            cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
 
 
 
