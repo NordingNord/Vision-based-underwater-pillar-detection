@@ -155,8 +155,23 @@ vector<float> filters::filter_ipr(vector<float> data_points, float lower_percent
         float lower_quantile = sorted_data_points.at(lower_index);
         float upper_quantile = sorted_data_points.at(upper_index);
 
+        // New maybe faster solution
+//        auto lower_index = data_points.begin() + lower_percentile*data_points.size();
+//        auto upper_index = data_points.begin() + upper_percentile*data_points.size();
+
+//        nth_element(data_points.begin(),lower_index, data_points.end());
+//        nth_element(data_points.begin(),upper_index, data_points.end());
+
+//        float lower_quantile = data_points[lower_percentile*data_points.size()];
+//        float upper_quantile = data_points[upper_percentile*data_points.size()];
+
         // Determine range
         float inter_quantile_range = upper_quantile-lower_quantile;
+
+        // If range is 0 set it to one
+        if(inter_quantile_range == 0){
+            inter_quantile_range = 1;
+        }
 
         // Determine bounds
         float lower_bound_val = lower_quantile-1.5*inter_quantile_range;
@@ -166,6 +181,9 @@ vector<float> filters::filter_ipr(vector<float> data_points, float lower_percent
         auto bottom = lower_bound(sorted_data_points.begin(), sorted_data_points.end(),lower_bound_val);
         auto top = lower_bound(sorted_data_points.begin(), sorted_data_points.end(),upper_bound_val);
         filtered_data.assign(bottom,top);
+
+//        filtered_data = data_points;
+//        filtered_data.erase(remove_if(filtered_data.begin(), filtered_data.end(),[lower_bound_val, upper_bound_val](const float& x){return x < lower_bound_val || x > upper_bound_val;}),filtered_data.end());
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

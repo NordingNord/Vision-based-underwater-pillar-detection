@@ -61,6 +61,9 @@ public:
     // -- Methods for visualizing data --
     void visualize_camera_data(std::string title = "Camera data: ");
 
+    // -- Fixes intrensic parameters based on resizing --
+    void resize_intrensic(double scale_factor);
+
 
 private:
     // Scaling variables

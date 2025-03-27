@@ -22,6 +22,12 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         // Histogram equlization
         equalizeHist(temp_depth_map,temp_depth_map);
 
+
+        Mat temp_hist = temp_depth_map.clone();
+        resize(temp_hist,temp_hist,Size(),0.5,0.5,INTER_LINEAR);
+        imshow("equalized",temp_hist);
+        waitKey(0);
+
         // Visualized normalized depth
 //        Mat temp = temp_depth_map.clone();
 //        resize(temp,temp,Size(),0.5,0.5,INTER_LINEAR);
@@ -31,6 +37,11 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
         // Blur frame
         Mat pre_blur = temp_depth_map.clone();
         medianBlur(temp_depth_map,temp_depth_map,median_blur_size);
+
+        Mat temp_flemp = temp_depth_map.clone();
+        resize(temp_flemp,temp_flemp,Size(),0.5,0.5,INTER_LINEAR);
+        imshow("preprocessed",temp_flemp);
+        waitKey(0);
 
 //        Mat viz = temp_depth_map.clone();
 //        resize(viz,viz,Size(),0.5,0.5,INTER_LINEAR);
@@ -1351,12 +1362,12 @@ vector<obstacle> detecting::split_into_rectangles_corner(vector<obstacle> obstac
                         break;
                     }
 
-//                    Mat step_3 = contour_mask.clone();
-//                    line(step_3,Point(best_line[0],best_line[1]),Point(best_line[2],best_line[3]),150,3,LINE_AA);
-//                    line(step_3,Point(second_best_line[0],second_best_line[1]),Point(second_best_line[2],second_best_line[3]),150,3,LINE_AA);
-//                    resize(step_3,step_3,Size(),0.5,0.5,INTER_LINEAR);
-//                    imshow("Step 3: Find two best but different lines", step_3);
-//                    waitKey(0);
+                    Mat step_3 = contour_mask.clone();
+                    line(step_3,Point(best_line[0],best_line[1]),Point(best_line[2],best_line[3]),150,3,LINE_AA);
+                    line(step_3,Point(second_best_line[0],second_best_line[1]),Point(second_best_line[2],second_best_line[3]),150,3,LINE_AA);
+                    resize(step_3,step_3,Size(),0.5,0.5,INTER_LINEAR);
+                    imshow("Step 3: Find two best but different lines", step_3);
+                    waitKey(0);
 
                     // Step 4: Move lines until obstacle is lost
                     int first_direction = get_obstacle_direction(best_angle,best_line,contour_mask);

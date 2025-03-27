@@ -306,3 +306,27 @@ void camera::visualize_camera_data(string title){
         cout << "Error: " << error.what() << endl;
     }
 }
+
+// -- Fixes intrensic parameters based on resizing --
+void camera::resize_intrensic(double scale_factor){
+    try{
+        // Initialize new intrinsic parameters
+        intrinsic new_intrinsic;
+
+        // Update based on location of origin
+        // Update focal lengths
+        new_intrinsic.focal_length_u = scale_factor*camera_intrinsics.focal_length_u;
+        new_intrinsic.focal_length_v = scale_factor*camera_intrinsics.focal_length_v;
+
+        // Update pixel centers (All the 0.5 shenanigans are dure to orgin being in the center of the pixel and not the top left of the pixel)
+        new_intrinsic.projection_center_u = scale_factor*(camera_intrinsics.projection_center_u+0.5)-0.5;
+        new_intrinsic.projection_center_v = scale_factor*(camera_intrinsics.projection_center_v+0.5)-0.5;
+
+        // Update intrinsics
+        set_intrinsic(new_intrinsic.focal_length_u,new_intrinsic.focal_length_v,new_intrinsic.projection_center_u,new_intrinsic.projection_center_v);
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}

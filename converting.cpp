@@ -117,7 +117,7 @@ Mat converting::normalize_depth(Mat depth_map, float range){
         }
 
         // Convert NaN to inf
-        float inf = numeric_limits<double>::infinity();
+        float inf = numeric_limits<float>::infinity();
         patchNaNs(depth_channel,inf);
 
         // Get vector of elements
@@ -128,60 +128,116 @@ Mat converting::normalize_depth(Mat depth_map, float range){
 
         // Filter outliers
         filters filter;
-        vector<float> filtered_depths = filter.filter_ipr(depths,0.25,0.50);
-
+        vector<float> filtered_depths = filter.filter_ipr(depths,0.25,0.5);
+        if(filtered_depths.size() == 0){
+            throw runtime_error("IQR was unable to filter outliers from depth.");
+        }
         // Timing
         auto start = chrono::high_resolution_clock::now();
 
         // Determine min and max depth
         float min_depth = filtered_depths.front();
         float max_depth = filtered_depths.back();
-        cout << min_depth << " -> " << max_depth << endl;
 
         // Prepare temp original depth map
         Mat org_depth = depth_channel.clone();
 
         // Find problem areas
         Mat inf_mask = org_depth == inf;
-        vector<Point> locations;
-        findNonZero(inf_mask,locations);
+//        vector<Point> locations;
+//        findNonZero(inf_mask,locations);
 
-        // Go through problem areas and change to mean
-        int start_row, end_row, start_col, end_col;
-        Mat good_areas = Mat::ones(depth_channel.size(),CV_8U);
-        good_areas = good_areas - inf_mask;
+        // Test zone
 
-        for(int i = 0; i < locations.size(); i++){
-            // Do stuff if not already found
-            if(isinf(depth_channel.at<float>(locations.at(i))) == false){
-                int min_row = max(locations.at(i).y,depth_channel.rows-locations.at(i).y);
-                int min_col = max(locations.at(i).x, depth_channel.cols-locations.at(i).x);
+        // get max depth that is not inf
+        Mat not_inf;
+        bitwise_not(inf_mask,not_inf);
+        Mat data_map;
+        bitwise_and(depth_channel,depth_channel,data_map,not_inf);
+        Scalar the_mean = mean(data_map,not_inf);
+        data_map.setTo(the_mean[0],inf_mask);
+        double min_data_depth,max_data_depth;
+        minMaxLoc(data_map,&min_data_depth,&max_data_depth);
+        cout << float(min_data_depth) << " -> " << float(max_data_depth) << endl;
 
-                int max_ring = max(min_row,min_col);
+//        Mat viz_min_mask = depth_channel == min_data_depth;
+//        cout << countNonZero(viz_min_mask) << endl;
+//        resize(viz_min_mask,viz_min_mask,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("Areas of min depth",viz_min_mask);
+//        waitKey(0);
 
-                for(int ring = 1; ring < max_ring; ring++){
-                    // Get possible mask
-                    start_row = max(0,locations.at(i).y-ring);
-                    end_row = min(depth_channel.rows-1,locations.at(i).y+ring);
+//        Mat viz_max_mask = depth_channel == max_data_depth;
+//        resize(viz_max_mask,viz_max_mask,Size(),0.5,0.5,INTER_LINEAR);
+//        imshow("Areas of max depth",viz_max_mask);
+//        waitKey(0);
 
-                    start_col = max(0,locations.at(i).x-ring);
-                    end_col = min(depth_channel.cols-1,locations.at(i).x+ring);
+        // Set inf to max
+        depth_channel.setTo(max_data_depth,inf_mask);
 
-                    // Check if valid
-                    if(hasNonZero(good_areas(Range(start_row,end_row+1),Range(start_col,end_col+1))) == true){
-                        break;
-                    }
-                }
+//        //try inpaintin instead
+//        inpaint(depth_channel,inf_mask,depth_channel,3,INPAINT_TELEA);
 
-                // get mean
-                Scalar current_mean = mean(org_depth(Range(start_row,end_row+1),Range(start_col,end_col+1)),good_areas(Range(start_row,end_row+1),Range(start_col,end_col+1)));
-                // Set all bad areas within ring
-                depth_channel.setTo(current_mean[0],inf_mask(Range(start_row,end_row+1),Range(start_col,end_col+1)));
-                //depth_channel.at<float>(locations.at(i)) = current_mean[0];
-            }
-        }
+        // Apply median filter only at inf areas to smooth them into their soroundings
+        Mat kernel = getStructuringElement(MORPH_ELLIPSE,Size(3,3),Point(-1,-1));
+        Mat dilated_inf_mask;
+        dilate(inf_mask,dilated_inf_mask,kernel,Point(-1,-1),3);
+
+        Mat area_of_interest;//7 = dilated_inf_mask & depth_channel;
+        bitwise_and(depth_channel,depth_channel,area_of_interest,dilated_inf_mask);
+
+        medianBlur(area_of_interest,area_of_interest,5);
+
+        Mat blur_inf;
+        bitwise_and(area_of_interest,area_of_interest,blur_inf,dilated_inf_mask);
+
+        blur_inf.copyTo(depth_channel,inf_mask);
+
+//        // Go through problem areas and change to mean
+//        int start_row, end_row, start_col, end_col;
+//        Mat good_areas;// = Mat::ones(depth_channel.size(),CV_8U);
+//        bitwise_not(inf_mask,good_areas);
+//        //good_areas = good_areas - inf_mask;
+
+//        for(int i = 0; i < locations.size(); i++){
+//            // Do stuff if not already found
+//            if(isinf(depth_channel.at<float>(locations.at(i))) == true){
+//                int min_row = max(locations.at(i).y,depth_channel.rows-locations.at(i).y);
+//                int min_col = max(locations.at(i).x, depth_channel.cols-locations.at(i).x);
+
+//                int max_ring = max(min_row,min_col);
+
+//                for(int ring = 1; ring < max_ring; ring++){
+//                    // Get possible mask
+//                    start_row = max(0,locations.at(i).y-ring);
+//                    end_row = min(depth_channel.rows-1,locations.at(i).y+ring);
+
+//                    start_col = max(0,locations.at(i).x-ring);
+//                    end_col = min(depth_channel.cols-1,locations.at(i).x+ring);
+
+//                    // Check if valid
+//                    if(hasNonZero(good_areas(Range(start_row,end_row+1),Range(start_col,end_col+1))) == true){
+//                        break;
+//                    }
+//                }
+
+//                // get mean
+//                Scalar current_mean = mean(org_depth(Range(start_row,end_row+1),Range(start_col,end_col+1)),good_areas(Range(start_row,end_row+1),Range(start_col,end_col+1)));
+//                // Set all bad areas within ring
+//                Mat temp_mask =  Mat::zeros(depth_channel.size(),CV_8U);
+//                rectangle(temp_mask,Point(start_col,start_row),Point(end_col+1,end_row+1),255,-1);
+//                temp_mask = temp_mask & inf_mask;
+//                depth_channel.setTo(current_mean[0],temp_mask);//inf_mask(Range(start_row,end_row+1),Range(start_col,end_col+1)));
+//                //depth_channel.at<float>(locations.at(i)) = current_mean[0];
+//            }
+//        }
+
+//        // Find min and max element
+//        double min_depth, max_depth;
+//        minMaxLoc(depth_channel,&min_depth,&max_depth);
 
         // Create mask of min and max elements
+//        float min_depth = 0.5;
+//        float max_depth = 2.0;
         Mat min_mask = depth_channel < min_depth;
         Mat max_mask = depth_channel > max_depth;
 
@@ -190,7 +246,7 @@ Mat converting::normalize_depth(Mat depth_map, float range){
         depth_channel.setTo(max_depth,max_mask);
 
         // Normalize
-        normalized_depth = (depth_channel-min_depth)/(max_depth-min_depth)*range;
+        normalized_depth = (depth_channel-float(min_depth))/(max_depth-float(min_depth))*range;
 
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);

@@ -80,6 +80,10 @@ int main(){
     string top_parameter_path = "/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Top.yml";
     string bottom_paramter_path = "/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Bottom.yml";
 
+//    string top_parameter_path = "/home/benjamin/Master_Thesis_Workspace/Data/Parameters/November_Top.yml";
+//    string bottom_paramter_path = "/home/benjamin/Master_Thesis_Workspace/Data/Parameters/November_Bottom.yml";
+
+
     // -- Feature settings --
 
     // -- newest sift
@@ -119,15 +123,15 @@ int main(){
 
     // -- Disparity settings --
     int min_disparity = 0; // 0
-    int num_disparities = 112; // 160 / 112
+    int num_disparities = 80; // 160 / 112 / 144
     int block_size = 11; // 9 / 11
-    int p1 = 1352; // 648 / 1352
-    int p2 = 10816; // 7776 / 10816
-    int disp_12_max_diff = 14; // 0
-    int pre_filter_cap = 0; // 0
-    int uniqueness_ratio = 5; // 0
-    int speckle_window_size = 100; // 0
-    int speckle_range = 2; // 0
+    int p1 = 968; // 648 / 1352 / 1296
+    int p2 = 3872 ; // 7776 / 10816 / 9072
+    int disp_12_max_diff = -1; // 0 / 19
+    int pre_filter_cap = 0; // 0 / 10
+    int uniqueness_ratio = 5; // 0 / 16
+    int speckle_window_size = 200; // 0 / 250
+    int speckle_range = 2; // 0 / 3
     int mode = StereoSGBM::MODE_SGBM;
 
     // -- WSL settings --
@@ -190,7 +194,7 @@ int main(){
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
-    detection_triangulation.run_disparity_pipeline(DISPARITY_FILTER_NONE);
+    detection_triangulation.run_disparity_pipeline_test(DISPARITY_FILTER_NONE);
 
 
 }

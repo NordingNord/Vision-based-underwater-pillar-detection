@@ -71,11 +71,11 @@ void stereo::prepare_rectify(Mat first_intrinsics, Mat second_intrinsics, Mat fi
         Mat first_transform, second_transform, first_projection, second_projection, disparity_depth_map;
         Rect region_of_intrest[2]; // Region in each image where the algorithm beleives only correct matches are atained. (Used for cropping)
 
-        // Test
-        // Invert rotation and translation
-        stereoRectify(first_intrinsics, first_distortion, second_intrinsics, second_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
-        Q_test = disparity_depth_map;
-        // Test done
+//        // Test
+//        // Invert rotation and translation
+//        stereoRectify(first_intrinsics, first_distortion, second_intrinsics, second_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
+//        Q_test = disparity_depth_map;
+//        // Test done
 
         stereoRectify(first_intrinsics, first_distortion, second_intrinsics, second_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
 
@@ -119,6 +119,16 @@ vector<Mat> stereo::rectify(Mat first_frame, Mat second_frame){
         cout << "Error: " << error.what() << endl;
     }
     return rectified_frames;
+}
+
+void stereo::set_callibration_size(cv::Size new_size){
+    try{
+        callibration_size = new_size;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
 }
 
 // -- Methods that handles disparity mapping --

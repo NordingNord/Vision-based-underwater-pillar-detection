@@ -71,7 +71,7 @@ void pipeline::set_stereo_parameters(double alpha, bool transposed_callibration)
     try{
         // Ensure camera data have already been read
         vector<int> frame_dimension = first_camera.get_camera_dimensions();
-        Size frame_size = {frame_dimension.at(0),frame_dimension.at(1)};
+        Size frame_size = {frame_dimension.at(1),frame_dimension.at(0)};// {frame_dimension.at(0),frame_dimension.at(1)};
 
         if(frame_size.height == 0 || frame_size.width == 0){
             throw runtime_error("No cameras loaded. Unable to set stereo paramters.");
@@ -867,6 +867,16 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             imshow("left right disparity speckle free",filt_two_disparity_combined);
             waitKey(0);
 
+            // test processing stuff
+            Mat test_process_disparity = disparity_map.clone();
+            test_process_disparity = stereo_system.process_disparity(test_process_disparity);
+//            medianBlur(test_process_disparity,test_process_disparity,31);
+
+            Mat viz = test_process_disparity.clone();
+            resize(viz,viz,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("Play with disparity",viz);
+            waitKey(0);
+
             // Validate disparity map (Has minor influence)
 //            Mat validated_disparity_map = stereo_system.validate_disparity(disparity_map,reverse_disparity_map);
 
@@ -979,6 +989,12 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Normalized in  " << duration.count() << " ms." << endl;
 
+            Mat viz_normalized = normalized_depth_map.clone();
+            resize(viz_normalized,viz_normalized,Size(),0.5,0.5,INTER_LINEAR);
+            imshow("Normalized depth map",viz_normalized);
+            waitKey(0);
+
+
             // Find edges in depth
             start = chrono::high_resolution_clock::now();
 
@@ -1060,6 +1076,265 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             resize(final_warning_temp,final_warning_temp,Size(),0.5,0.5,INTER_LINEAR);
             imshow("final warning", final_warning_temp);
             waitKey(0);
+
+            // Destroy windows before new run
+            destroyAllWindows();
+
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+
+void pipeline::run_disparity_pipeline_test(int disparity_filter){
+    try{
+        // Visualize camera data
+        first_camera.visualize_camera_data("First/Left/Bottom camera data: ");
+        second_camera.visualize_camera_data("Second/Right/Top camera data: ");
+
+        // Resize intrinsics
+        first_camera.resize_intrensic(0.5);
+        second_camera.resize_intrensic(0.5);
+        stereo_system.set_callibration_size(Size(540,960));
+
+        // Videos galore
+        VideoWriter video("disparity.avi",CV_FOURCC('M','J','P','G'),10, Size(540,960));
+
+        // Prepare rectification
+        stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
+
+        // Initialize some loop paramters
+        int frame_index = 0;
+        Mat first_frame, second_frame;
+        Mat last_first_frame;
+        vector<obstacle> last_obstacles;
+
+        // Begin to go through video feed
+        while(true){
+
+            // Read frames
+            first_frame = first_camera.get_next_frame();
+            second_frame = second_camera.get_next_frame();
+
+            // Increment index
+            frame_index++;
+
+            // Break if no more frames any of the videos
+            if(first_frame.empty() || second_frame.empty()){
+                cout << "Reached end of a video stream" << endl;
+                // Error notification if one video ends prematurely
+                if(first_frame.empty() == false){
+                    throw runtime_error("Second video was limited by first video length.");
+                }
+                else if(second_frame.empty() == false){
+                    throw runtime_error("First video was limited by second video length.");
+                }
+                break;
+            }
+
+            // Transpose frames if transposed during callibration
+            if(callibration_transposed == true){
+                rotate(first_frame, first_frame, ROTATE_90_CLOCKWISE);
+                rotate(second_frame, second_frame, ROTATE_90_CLOCKWISE);
+            }
+
+            // Resize frames
+            resize(first_frame,first_frame,Size(),0.5,0.5,INTER_LINEAR);
+            resize(second_frame,second_frame,Size(),0.5,0.5,INTER_LINEAR);
+
+            // Show resized
+//            Mat resized;
+//            hconcat(first_frame,second_frame,resized);
+//            //resize(rectified,rectified,Size(),0.5,0.5,INTER_LINEAR);
+//            imshow("resized frames", resized);
+//            waitKey(0);
+
+            // Rectify frames
+            auto start = chrono::high_resolution_clock::now();
+
+            vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
+            first_frame = rectified_frames.at(0);
+            second_frame = rectified_frames.at(1);
+
+            auto stop = chrono::high_resolution_clock::now();
+            auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Rectification done in  " << duration.count() << " ms." << endl;
+
+
+            // Show rectification
+//            Mat rectified;
+//            hconcat(rectified_frames.at(0),rectified_frames.at(1),rectified);
+//            //resize(rectified,rectified,Size(),0.5,0.5,INTER_LINEAR);
+//            line(rectified,{0,295},{rectified.cols-1,295},{255,0,0},1);
+//            imwrite("2.png",rectified);
+//            imshow("rectified frames", rectified);
+//            waitKey(0);
+
+            // Compute disparity map
+            start = chrono::high_resolution_clock::now();
+
+            Mat disparity_map = stereo_system.get_disparity(first_frame,second_frame);
+            //Mat disparity_map = stereo_system.track_disparity(first_frame,second_frame);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Disparity map found in  " << duration.count() << " ms." << endl;
+
+//            // Visualize  disparity map
+//            Mat disparity_map_color;
+//            disparity_map_color = stereo_system.process_disparity(disparity_map);
+//            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+//            video.write(disparity_map_color);
+//            Mat disparity_combined;
+//            hconcat(disparity_map_color,first_frame, disparity_combined);
+//            imwrite("3.png",disparity_combined);
+//            imshow("Chosen disparity map",disparity_combined);
+//            waitKey(0);
+
+
+            // Remove speckles with opencv method
+            start = chrono::high_resolution_clock::now();
+
+            filterSpeckles(disparity_map,-16,10000,160); // remove speckles smaller than 0.4% of image thus under 1%
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Filtered speckles in  " << duration.count() << " ms." << endl;
+
+            // Visalize speckled filter
+//            disparity_map_color = stereo_system.process_disparity(disparity_map);
+//            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET);
+//            Mat filt_two_disparity_combined;
+//            hconcat(disparity_map_color,first_frame, filt_two_disparity_combined);
+//            imshow("left disparity speckle free",filt_two_disparity_combined);
+//            waitKey(0);
+
+            // Get depth map
+            start = chrono::high_resolution_clock::now();
+
+            Mat depth_map = stereo_system.disparity_to_depth(disparity_map);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Depth map found in  " << duration.count() << " ms." << endl;
+
+            // Remove black border from depth and working disparity
+            start = chrono::high_resolution_clock::now();
+
+            Mat cleaned_depth_map = stereo_system.remove_invalid_edge(depth_map);
+            Mat cleaned_disparity_map = stereo_system.remove_invalid_edge(disparity_map);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "border removal done in  " << duration.count() << " ms." << endl;
+
+            // Prepare disparity map for shape finding.
+            cleaned_disparity_map = stereo_system.process_disparity(cleaned_disparity_map);
+            medianBlur(cleaned_disparity_map,cleaned_disparity_map,11);
+
+            // Show prepared disparity map
+//            Mat viz = cleaned_disparity_map.clone();
+//            imshow("Play with disparity",viz);
+//            waitKey(0);
+
+
+//            // Normalize depth
+//            start = chrono::high_resolution_clock::now();
+
+//            Mat normalized_depth_map = converter.normalize_depth(cleaned_depth_map,255.0);
+
+//            stop = chrono::high_resolution_clock::now();
+//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//            cout << "Normalized in  " << duration.count() << " ms." << endl;
+
+//            Mat viz_normalized = normalized_depth_map.clone();
+//            resize(viz_normalized,viz_normalized,Size(),0.5,0.5,INTER_LINEAR);
+//            imshow("Normalized depth map",viz_normalized);
+//            waitKey(0);
+
+
+//            // Find edges in depth
+//            start = chrono::high_resolution_clock::now();
+
+//            vector<obstacle> obstacles = detector.get_depth_difference(normalized_depth_map);
+
+//            // Get danger zones
+//            vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
+
+//            stop = chrono::high_resolution_clock::now();
+////            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+////            cout << "Found possible obstacles in  " << duration.count() << " ms." << endl;
+
+
+//            // Prepare vizualization of possible obstacles
+//            Mat cut_first_frame = stereo_system.remove_invalid_edge(first_frame);
+//            Mat warning_frame = visualizer.show_possible_obstacles(danger_zones,cut_first_frame);
+
+//            Mat warning_temp = warning_frame.clone();
+//            resize(warning_temp,warning_temp,Size(),0.5,0.5,INTER_LINEAR);
+//            imshow("warning", warning_temp);
+//            waitKey(0);
+
+//            // Filter obstacles
+//            start = chrono::high_resolution_clock::now();
+
+//            vector<obstacle> filtered_obstacles = detector.filter_obstacles(obstacles,first_frame);
+
+//            stop = chrono::high_resolution_clock::now();
+//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//            cout << "Filtered obstacles in  " << duration.count() << " ms." << endl;
+
+
+//            // Find obstacle types
+//            start = chrono::high_resolution_clock::now();
+
+//            filtered_obstacles = detector.detect_type(filtered_obstacles,normalized_depth_map);
+
+//            stop = chrono::high_resolution_clock::now();
+//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//            cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
+
+
+//            // If no obstacles, use last obstacles
+//            vector<obstacle> temp_obstacles = filtered_obstacles;
+//            if(filtered_obstacles.size() == 0){
+//                // Find features in last and current frame
+//                vector<KeyPoint> keypoints = feature_handler.find_features(first_frame);
+//                vector<KeyPoint> last_keypoints = feature_handler.find_features(last_first_frame);
+
+//                Mat descriptors = feature_handler.get_descriptors(first_frame,keypoints);
+//                Mat last_descriptors = feature_handler.get_descriptors(last_first_frame,last_keypoints);
+
+//                // Match features
+//                vector<DMatch> matches = feature_handler.match_features(last_descriptors,descriptors);
+
+//                // Clean matches
+//                vector<DMatch> filtered_matches = filtering_sytem.filter_matches(matches,last_keypoints,keypoints);
+//                vector<vector<KeyPoint>> remaining_keypoints = converter.remove_unmatches_keypoints(filtered_matches,last_keypoints,keypoints);
+//                last_keypoints = remaining_keypoints.at(0);
+
+//                // Perform optical flow
+//                vector<vector<float>> movement = optical_flow_system.get_optical_flow_movement(converter.keypoints_to_points(last_keypoints),last_first_frame,first_frame);
+
+//                // Use optical flow results to move obstacles
+//                temp_obstacles = detector.patch_detection_gap(last_obstacles,movement,converter.keypoints_to_points(last_keypoints));
+
+
+//            }
+//            // Update last info
+//            last_first_frame = first_frame.clone();
+//            last_obstacles = filtered_obstacles;
+//            filtered_obstacles = temp_obstacles;
+
+//            // Visualize final obstacles
+//            Mat final_warning = visualizer.show_obstacles(filtered_obstacles,cut_first_frame);
+
+//            Mat final_warning_temp = final_warning.clone();
+//            resize(final_warning_temp,final_warning_temp,Size(),0.5,0.5,INTER_LINEAR);
+//            imshow("final warning", final_warning_temp);
+//            waitKey(0);
 
             // Destroy windows before new run
             destroyAllWindows();

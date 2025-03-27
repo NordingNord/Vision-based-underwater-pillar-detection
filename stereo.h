@@ -31,6 +31,8 @@ public:
 
     std::vector<cv::Mat> rectify(cv::Mat first_frame, cv::Mat second_frame);
 
+    void set_callibration_size(cv::Size new_size);
+
     // -- Methods that handles disparity mapping --
     cv::Mat get_disparity(cv::Mat first_frame, cv::Mat second_frame); // Works with preset parameters
 
