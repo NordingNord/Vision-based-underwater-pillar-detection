@@ -1992,3 +1992,11 @@
 //        }
 
 //        filtered_data.assign(sorted_data_points.begin()+low_index,sorted_data_points.end()-high_index);
+
+// Ensure that we only work in the area of interest
+//            if(frame_index < 6950){
+//                continue;
+//            }
+//            if(frame_index > 7470){
+//                break;
+//            }

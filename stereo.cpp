@@ -139,8 +139,10 @@ cv::Mat stereo::get_disparity(cv::Mat first_frame, cv::Mat second_frame){
         Mat disparity;
         // Convert frames to grayscale
         Mat first_gray_frame, second_gray_frame;
-        cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
-        cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
+        first_gray_frame = first_frame.clone();
+        second_gray_frame = second_frame.clone();
+        //cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
+        //cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
         // Set disparity settings
         set_disparity_settings(disparity_settings);
         // Determine disparity
@@ -173,17 +175,20 @@ Mat stereo::get_reversed_disparity(Mat first_frame, Mat second_frame){
 
         // Convert frames to grayscale
         Mat first_gray_frame, second_gray_frame;
-        cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
-        cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
+        first_gray_frame = first_frame.clone();
+        second_gray_frame = second_frame.clone();
+        //cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
+        //cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
 
         // Prepare second disparity map
         Mat second_disparity_map;
         matcher->compute(second_gray_frame,first_gray_frame,second_disparity_map);
 
-        // Convert to match original disparity range (Due to right matcher making everything negative)
-        Mat mask = second_disparity_map == -1792; // Value of 0 / no disparity for the second map
-        second_disparity_map = second_disparity_map*-1; // second map is set to negative due to this being needed in wls, i reverse this for visualization
-        second_disparity_map.setTo(-16,mask);
+        // Uncomment below if we want disparity map rather than cost map
+//        // Convert to match original disparity range (Due to right matcher making everything negative)
+//        Mat mask = second_disparity_map == -1792; // Value of 0 / no disparity for the second map
+//        second_disparity_map = second_disparity_map*-1; // second map is set to negative due to this being needed in wls, i reverse this for visualization
+//        second_disparity_map.setTo(-16,mask);
 
         // Prepare output
         reverse_disparity_map = second_disparity_map;
@@ -386,25 +391,159 @@ Mat stereo::filter_disparity(Mat disparity_map, Mat first_frame, Mat second_disp
     return filtered_disparity;
 }
 
-Mat stereo::validate_disparity(Mat disparity_map, Mat second_disparity_map){
+Mat stereo::validate_disparity(Mat disparity_map, Mat first_frame, Mat second_frame){
     Mat validated_disparity = disparity_map.clone();
     try{
-        // Prepare second disparity map
-        Mat mask = second_disparity_map > 0;
-        if(hasNonZero(mask) == true){
-            // Has been converted for viz so must be converted back
-            Mat invalid_mask = second_disparity_map == -16;
-            second_disparity_map *= -1;
-            second_disparity_map.setTo(-1792,invalid_mask);
-        }
-
-        // Validate
-        validateDisparity(validated_disparity,second_disparity_map,disparity_settings.min_disparity, disparity_settings.num_disparities, disparity_settings.disp_12_max_diff);
+        Mat cost_map = get_reversed_disparity(first_frame,second_frame);
+//        validated_disparity = validated_disparity/16.0;
+//        cost_map = cost_map/16.0;
+        validateDisparity(validated_disparity,cost_map,disparity_settings.min_disparity,disparity_settings.num_disparities);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
     return validated_disparity;
+}
+
+Mat stereo::fill_disparity_holes(Mat disparity_map){
+    Mat filled_disparity_map;
+    try{
+
+        // Shitty slow solution
+        Mat left_map = disparity_map.clone();
+        Mat right_map = disparity_map.clone();
+        short min_val = 16;
+
+        for(int row = 0; row < disparity_map.rows; row++){
+            short left_row_val = -16;
+            for(int col = 0; col < disparity_map.cols; col++){
+                if(disparity_map.at<short>(Point(col,row)) == -16){
+                    left_map.at<short>(Point(col,row)) = left_row_val;
+                }
+                else{
+                    left_row_val = disparity_map.at<short>(Point(col,row));
+                    if(left_row_val < min_val){
+                        min_val = left_row_val;
+                    }
+                }
+            }
+        }
+
+        for(int row = 0; row < disparity_map.rows; row++){
+            short right_row_val = -16;
+            for(int col = disparity_map.cols-1; col >= 0; col--){
+                if(disparity_map.at<short>(Point(col,row)) == -16){
+                    right_map.at<short>(Point(col,row)) = right_row_val;
+                }
+                else{
+                    right_row_val = disparity_map.at<short>(Point(col,row));
+                    if(right_row_val < min_val){
+                        min_val = right_row_val;
+                    }
+                }
+            }
+        }
+
+        // Find missing areas (due to border)
+        Mat bad_left = left_map == -16;
+        Mat bad_right = right_map == -16;
+        Mat bad = bad_left | bad_right;
+
+        Mat good;
+        bitwise_not(bad,good);
+
+        // Assing minimum of the two if not border
+        filled_disparity_map = min(left_map, right_map);
+        Mat temp_border_map = max(left_map,right_map);
+
+        filled_disparity_map.setTo(0,bad);
+
+        temp_border_map.setTo(0,good);
+
+        bitwise_xor(filled_disparity_map,temp_border_map,filled_disparity_map);
+
+        // Fill big disparity holes as background
+        Mat invalid = disparity_map == -16;
+        vector<vector<Point>> contours;
+        vector<Vec4i> hierarchy;
+        findContours(invalid,contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+        vector<vector<Point>> big_contours;
+        for(int i = 0; i < contours.size(); i++){
+            double current_area = contourArea(contours.at(i));
+            if(current_area > disparity_map.cols*disparity_map.rows*0.01){
+                big_contours.push_back(contours.at(i));
+            }
+        }
+
+//        for(vector<vector<Point>>::iterator it = contours.begin(); it!=contours.end();){
+//            int current_size = it->size();
+
+//            if(current_size > disparity_map.cols*disparity_map.rows*0.01){
+//                big_contours.push_back(*it);
+//            }
+//            else{
+//                ++it;
+//            }
+//        }
+
+        for(int i = 0; i < big_contours.size(); i++){
+            Mat mask =  Mat::zeros(disparity_map.size(),CV_8U);
+            drawContours(mask,big_contours,i,255,-1);
+
+            mask = invalid & mask;
+
+            filled_disparity_map.setTo(min_val,mask);
+        }
+
+
+
+
+//        // Create mask for invalid values
+//        Mat invalid = disparity_map == -16;
+
+//        // Dilate mask one pixel in rows alone to left and to right
+//        Mat_<int> temp_left_kernel(3,3);
+//        temp_left_kernel << 0,0,0,0,255,255,0,0,0;
+//        Mat left_kernel = temp_left_kernel;
+//        left_kernel.convertTo(left_kernel,CV_8U);
+//        Mat left_valid;
+//        dilate(invalid,left_valid,left_kernel);
+
+//        Mat_<int> temp_right_kernel(3,3);
+//        temp_right_kernel << 0,0,0,255,255,0,0,0,0;
+//        Mat right_kernel = temp_right_kernel;
+//        right_kernel.convertTo(right_kernel,CV_8U);
+//        Mat right_valid;
+//        dilate(invalid,right_valid,right_kernel);
+
+////        // Remove invalid mask from valid mask to get closest pixels
+//        left_valid = left_valid - invalid;
+//        right_valid = right_valid - invalid;
+
+//        // Get values of valid areas
+//        imshow("invalid", invalid);
+//        imshow("left",left_valid);
+//        imshow("right", right_valid);
+//        waitKey(0);
+
+        // Get coordinates of invalid points as well as closest valid points
+//        vector<Point> locations;
+//        findNonZero(invalid,locations);
+
+//        vector<Point> valid_locations;
+//        findNonZero(valid,valid_locations);
+
+//        // For each location find closest valid left and right location
+//        for(int i = 0; i < locations.size(); i++){
+
+//        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filled_disparity_map;
 }
 
 

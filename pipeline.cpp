@@ -1144,13 +1144,6 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             resize(first_frame,first_frame,Size(),0.5,0.5,INTER_LINEAR);
             resize(second_frame,second_frame,Size(),0.5,0.5,INTER_LINEAR);
 
-            // Show resized
-//            Mat resized;
-//            hconcat(first_frame,second_frame,resized);
-//            //resize(rectified,rectified,Size(),0.5,0.5,INTER_LINEAR);
-//            imshow("resized frames", resized);
-//            waitKey(0);
-
             // Rectify frames
             auto start = chrono::high_resolution_clock::now();
 
@@ -1162,16 +1155,6 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Rectification done in  " << duration.count() << " ms." << endl;
 
-
-            // Show rectification
-//            Mat rectified;
-//            hconcat(rectified_frames.at(0),rectified_frames.at(1),rectified);
-//            //resize(rectified,rectified,Size(),0.5,0.5,INTER_LINEAR);
-//            line(rectified,{0,295},{rectified.cols-1,295},{255,0,0},1);
-//            imwrite("2.png",rectified);
-//            imshow("rectified frames", rectified);
-//            waitKey(0);
-
             // Compute disparity map
             start = chrono::high_resolution_clock::now();
 
@@ -1182,17 +1165,15 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Disparity map found in  " << duration.count() << " ms." << endl;
 
-//            // Visualize  disparity map
-//            Mat disparity_map_color;
-//            disparity_map_color = stereo_system.process_disparity(disparity_map);
-//            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
-//            video.write(disparity_map_color);
-//            Mat disparity_combined;
-//            hconcat(disparity_map_color,first_frame, disparity_combined);
-//            imwrite("3.png",disparity_combined);
-//            imshow("Chosen disparity map",disparity_combined);
-//            waitKey(0);
+            // Compute left right consistensy check
+            start = chrono::high_resolution_clock::now();
 
+            Mat pre_validity_disparity_map = disparity_map.clone();
+            disparity_map = stereo_system.validate_disparity(disparity_map,first_frame,second_frame);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Disparity validation done in  " << duration.count() << " ms." << endl;
 
             // Remove speckles with opencv method
             start = chrono::high_resolution_clock::now();
@@ -1203,36 +1184,51 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Filtered speckles in  " << duration.count() << " ms." << endl;
 
-            // Visalize speckled filter
+            // Fill holes
+            start = chrono::high_resolution_clock::now();
+
+            disparity_map = stereo_system.fill_disparity_holes(disparity_map);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Filled holes in  " << duration.count() << " ms." << endl;
+
+            // Get not completely accurate depth map (Due to disparity map post filtering)
+
+
+            // Visualize post processed disparity
+//            Mat disparity_map_color;
 //            disparity_map_color = stereo_system.process_disparity(disparity_map);
-//            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET);
-//            Mat filt_two_disparity_combined;
-//            hconcat(disparity_map_color,first_frame, filt_two_disparity_combined);
-//            imshow("left disparity speckle free",filt_two_disparity_combined);
+//            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+//            video.write(disparity_map_color);
+//            imshow("post processed",disparity_map_color);
 //            waitKey(0);
 
-            // Get depth map
-            start = chrono::high_resolution_clock::now();
 
-            Mat depth_map = stereo_system.disparity_to_depth(disparity_map);
+//            // Get depth map
+//            start = chrono::high_resolution_clock::now();
 
-            stop = chrono::high_resolution_clock::now();
-            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Depth map found in  " << duration.count() << " ms." << endl;
+//            Mat depth_map = stereo_system.disparity_to_depth(disparity_map);
 
-            // Remove black border from depth and working disparity
-            start = chrono::high_resolution_clock::now();
+//            stop = chrono::high_resolution_clock::now();
+//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//            cout << "Depth map found in  " << duration.count() << " ms." << endl;
 
-            Mat cleaned_depth_map = stereo_system.remove_invalid_edge(depth_map);
-            Mat cleaned_disparity_map = stereo_system.remove_invalid_edge(disparity_map);
+//            // Remove black border from depth and working disparity
+//            start = chrono::high_resolution_clock::now();
 
-            stop = chrono::high_resolution_clock::now();
-            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "border removal done in  " << duration.count() << " ms." << endl;
+//            Mat cleaned_depth_map = stereo_system.remove_invalid_edge(depth_map);
+//            Mat cleaned_disparity_map = stereo_system.remove_invalid_edge(disparity_map);
 
-            // Prepare disparity map for shape finding.
-            cleaned_disparity_map = stereo_system.process_disparity(cleaned_disparity_map);
-            medianBlur(cleaned_disparity_map,cleaned_disparity_map,11);
+//            stop = chrono::high_resolution_clock::now();
+//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//            cout << "border removal done in  " << duration.count() << " ms." << endl;
+
+//            // Prepare disparity map for shape finding.
+//            cleaned_disparity_map = stereo_system.process_disparity(cleaned_disparity_map);
+//            medianBlur(cleaned_disparity_map,cleaned_disparity_map,11);
+
+
 
             // Show prepared disparity map
 //            Mat viz = cleaned_disparity_map.clone();
@@ -1337,7 +1333,7 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
 //            waitKey(0);
 
             // Destroy windows before new run
-            destroyAllWindows();
+//            destroyAllWindows();
 
         }
     }

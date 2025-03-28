@@ -123,7 +123,7 @@ int main(){
 
     // -- Disparity settings --
     int min_disparity = 0; // 0
-    int num_disparities = 80; // 160 / 112 / 144
+    int num_disparities = 64; // 160 / 112 / 144
     int block_size = 11; // 9 / 11
     int p1 = 968; // 648 / 1352 / 1296
     int p2 = 3872 ; // 7776 / 10816 / 9072

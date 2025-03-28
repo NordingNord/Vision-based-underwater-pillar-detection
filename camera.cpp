@@ -288,6 +288,14 @@ void camera::visualize_camera_data(string title){
     try{
         // Initialize visualizer
         visualization visualizer;
+//        std::stringstream stream;
+//        stream << "0x" << std::setfill ('0') << std::setw(sizeof(int)*2) << std::hex << int(camera_capturer.get(CAP_PROP_FOURCC));
+//        std::string result( stream.str() );
+//        cout << result << endl;
+
+        int fourcc = camera_capturer.get(CAP_PROP_FOURCC);
+        string fourcc_str = format("%c%c%c%c", fourcc & 255, (fourcc >> 8) & 255, (fourcc >> 16) & 255, (fourcc >> 24) & 255);
+        cout << "CAP_PROP_FOURCC: " << fourcc_str << endl;
 
         // Show title:
         cout << title << endl;

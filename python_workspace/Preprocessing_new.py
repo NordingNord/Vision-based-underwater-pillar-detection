@@ -871,35 +871,42 @@ class preprocessing:
         capturer_top = cv.VideoCapture(path_top)
         capturer_bottom = cv.VideoCapture(path_bottom)
 
-        # Resizing variable
+        # # Resizing variable
         rows = int(capturer_top.get(4))
         cols = int(capturer_top.get(3))
-        diff_percentage = 1.0
-        if(rows < cols):
-            diff_percentage = min_size/rows
-        else:
-            diff_percentage = min_size/cols
+        # diff_percentage = 1.0
+        # if(rows < cols):
+        #     diff_percentage = min_size/rows
+        # else:
+        #     diff_percentage = min_size/cols
 
 
-        frame_size = (int(capturer_top.get(3)*diff_percentage-(kernel_size-1)),int(capturer_top.get(4)*diff_percentage-(kernel_size-1)))
+        frame_size = (rows,cols)
+        # frame_size = (int(capturer_top.get(3)*diff_percentage-(kernel_size-1)),int(capturer_top.get(4)*diff_percentage-(kernel_size-1)))
 
-        top_resized_path = save_path_top+str("resized_top.mkv")
-        bottom_resized_path = save_path_bottom+str("resized_bottom.mkv")
+        # top_resized_path = save_path_top+str("resized_top.mkv")
+        # bottom_resized_path = save_path_bottom+str("resized_bottom.mkv")
 
-        top_snow_path = save_path_top+str("snow_top.mkv")
-        bottom_snow_path = save_path_bottom+str("snow_bottom.mkv")
+        top_snow_path = save_path_top+str("snow_top.avi")
+        bottom_snow_path = save_path_bottom+str("snow_bottom.avi")
 
-        top_light_path = save_path_top+str("light_top.mkv")
-        bottom_light_path = save_path_bottom+str("light_bottom.mkv")
+        top_homomorphic_path = save_path_top+str("homomorphic_top.avi")
+        bottom_homomorphic_path = save_path_bottom+str("homomorhic_bottom.avi")
 
-        writer_top_resize = cv.VideoWriter(top_resized_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
-        writer_bottom_resize = cv.VideoWriter(bottom_resized_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        top_light_path = save_path_top+str("light_top.avi")
+        bottom_light_path = save_path_bottom+str("light_bottom.avi")
+
+        # writer_top_resize = cv.VideoWriter(top_resized_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        # writer_bottom_resize = cv.VideoWriter(bottom_resized_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
 
         writer_top_snow = cv.VideoWriter(top_snow_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
         writer_bottom_snow = cv.VideoWriter(bottom_snow_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
 
-        writer_top_ligth = cv.VideoWriter(top_light_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
-        writer_bottom_light = cv.VideoWriter(bottom_light_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        # writer_top_homomorphic = cv.VideoWriter(top_homomorphic_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        # writer_bottom_homomorphic = cv.VideoWriter(bottom_homomorphic_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+
+        # writer_top_ligth = cv.VideoWriter(top_light_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+        # writer_bottom_light = cv.VideoWriter(bottom_light_path, cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
 
         frames = 0
 
@@ -915,11 +922,11 @@ class preprocessing:
             # Time taking
             start = time.time()
             # Step 0: Resize
-            frame_top = cv.resize(frame_top,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
-            frame_bottom = cv.resize(frame_bottom,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
+            # frame_top = cv.resize(frame_top,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
+            # frame_bottom = cv.resize(frame_bottom,(0,0),fx=diff_percentage, fy=diff_percentage,interpolation=cv.INTER_AREA)
 
-            writer_top_resize.write(frame_top)
-            writer_bottom_resize.write(frame_bottom)
+            # writer_top_resize.write(frame_top)
+            # writer_bottom_resize.write(frame_bottom)
 
             # Step 1: Remove snow
             cleaned_frame_top =  preprocessor.snow_blur(frame_top,prob_limit,kernel_size,False)
@@ -928,59 +935,64 @@ class preprocessing:
             writer_top_snow.write(cleaned_frame_top)
             writer_bottom_snow.write(cleaned_frame_bottom)
 
-            # Step 2: combine
-            combined_frame = preprocessor.combine_frames(cleaned_frame_top,cleaned_frame_bottom)
+            # # Step 2: combine
+            # # combined_frame = preprocessor.combine_frames(cleaned_frame_top,cleaned_frame_bottom)
 
-            # Step 3: homomorphic filter
-            # Extend in order to use the filter
-            extended_frame = preprocessor.get_squared_image(combined_frame)
-            # Apply filter
-            homomorphic_frame = preprocessor.homomorphic_filter(extended_frame,min_coef,max_coef,cutoff)
-            # Revert frame
-            homomorphic_frame = preprocessor.revert_frame(homomorphic_frame, combined_frame)
+            # # Step 3: homomorphic filter
+            # # Extend in order to use the filter
+            # extended_frame = preprocessor.get_squared_image(combined_frame)
+            # # Apply filter
+            # homomorphic_frame = preprocessor.homomorphic_filter(extended_frame,min_coef,max_coef,cutoff)
+            # # Revert frame
+            # homomorphic_frame = preprocessor.revert_frame(homomorphic_frame, combined_frame)
 
-            # Step 4: Apply brightness and contrast
-            frame_luminance = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
-            # add brightness based on the upper 75 perncentiles distance to 75.
-            light_addition = np.abs(75-np.percentile(frame_luminance[:,:,0],75))
-            frame_luminance[:,:,0] = preprocessor.brighten_frame(frame_luminance[:,:,0],light_addition,6.0)
-            homomorphic_frame = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
-            #cv.imshow("lum_old",frame_luminance[:,:,0])
-
-            # Test specific brightening
-            #frame_luminance_temp = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
-            #brightness_limit = np.percentile(frame_luminance_temp[:,:,0],25)
-            #frame_luminance_temp[:,:,0] = np.where(frame_luminance_temp[:,:,0] > brightness_limit, frame_luminance_temp[:,:,0]*(frame_luminance_temp[:,:,0]/2),frame_luminance_temp[:,:,0])
-            #homomorphic_frame_temp = cv.cvtColor(frame_luminance_temp,cv.COLOR_YCrCb2BGR)
-            #cv.imshow("lum",frame_luminance_temp[:,:,0])
+            # frame_top,frame_bottom = preprocessor.split_frames(homomorphic_frame,cleaned_frame_top)
+            # writer_top_homomorphic.write(frame_top)
+            # writer_bottom_homomorphic.write(frame_bottom)
 
 
-            #cv.imshow("old", homomorphic_frame)
-            #cv.imshow("targeted",homomorphic_frame_temp)
-            #cv.waitKey(0)
+            # # Step 4: Apply brightness and contrast
+            # frame_luminance = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
+            # # add brightness based on the upper 75 perncentiles distance to 75.
+            # light_addition = np.abs(75-np.percentile(frame_luminance[:,:,0],75))
+            # frame_luminance[:,:,0] = preprocessor.brighten_frame(frame_luminance[:,:,0],light_addition,6.0)
+            # homomorphic_frame = cv.cvtColor(frame_luminance,cv.COLOR_YCrCb2BGR)
+            # #cv.imshow("lum_old",frame_luminance[:,:,0])
 
-            # Step 5: split frame
-            frame_top,frame_bottom = preprocessor.split_frames(homomorphic_frame,cleaned_frame_top)
+            # # Test specific brightening
+            # #frame_luminance_temp = cv.cvtColor(homomorphic_frame,cv.COLOR_BGR2YCrCb)
+            # #brightness_limit = np.percentile(frame_luminance_temp[:,:,0],25)
+            # #frame_luminance_temp[:,:,0] = np.where(frame_luminance_temp[:,:,0] > brightness_limit, frame_luminance_temp[:,:,0]*(frame_luminance_temp[:,:,0]/2),frame_luminance_temp[:,:,0])
+            # #homomorphic_frame_temp = cv.cvtColor(frame_luminance_temp,cv.COLOR_YCrCb2BGR)
+            # #cv.imshow("lum",frame_luminance_temp[:,:,0])
 
-            writer_top_ligth.write(frame_top)
-            writer_bottom_light.write(frame_bottom)
+
+            # #cv.imshow("old", homomorphic_frame)
+            # #cv.imshow("targeted",homomorphic_frame_temp)
+            # #cv.waitKey(0)
+
+            # # Step 5: split frame
+            # frame_top,frame_bottom = preprocessor.split_frames(homomorphic_frame,cleaned_frame_top)
+
+            # writer_top_ligth.write(frame_top)
+            # writer_bottom_light.write(frame_bottom)
 
             # Step 6: Align lum if desired
-            if(align_lum == True):
-                frame_bottom = preprocessor.align_lum(frame_top,frame_bottom,vertical_offset, horizontal_offset)
-                # frame_luminance_top = cv.cvtColor(frame_top,cv.COLOR_BGR2YCrCb)
-                # frame_luminance_bottom = cv.cvtColor(frame_bottom,cv.COLOR_BGR2YCrCb)
-                # rows,cols,channels = frame_luminance_bottom.shape
-                # frame_luminance_bottom[0:rows-vertical_offset,0:cols-horizontal_offset,0] = frame_luminance_top[vertical_offset:rows,horizontal_offset:cols,0]
-                # frame_bottom = cv.cvtColor(frame_luminance_bottom,cv.COLOR_YCrCb2BGR)
-                # show cut made
-                # frame_bottom[rows-vertical_offset,:] = (0,0,255)
-                # frame_bottom[:,cols-horizontal_offset] = (0,0,255)
-                # frame_top[vertical_offset,:] = (0,0,255)
-                # frame_top[:,horizontal_offset] = (0,0,255)
-                # cv.imshow("top",frame_top)
-                # cv.imshow("bottom",frame_bottom)
-                # cv.waitKey(0)
+            # if(align_lum == True):
+            #     frame_bottom = preprocessor.align_lum(frame_top,frame_bottom,vertical_offset, horizontal_offset)
+            #     # frame_luminance_top = cv.cvtColor(frame_top,cv.COLOR_BGR2YCrCb)
+            #     # frame_luminance_bottom = cv.cvtColor(frame_bottom,cv.COLOR_BGR2YCrCb)
+            #     # rows,cols,channels = frame_luminance_bottom.shape
+            #     # frame_luminance_bottom[0:rows-vertical_offset,0:cols-horizontal_offset,0] = frame_luminance_top[vertical_offset:rows,horizontal_offset:cols,0]
+            #     # frame_bottom = cv.cvtColor(frame_luminance_bottom,cv.COLOR_YCrCb2BGR)
+            #     # show cut made
+            #     # frame_bottom[rows-vertical_offset,:] = (0,0,255)
+            #     # frame_bottom[:,cols-horizontal_offset] = (0,0,255)
+            #     # frame_top[vertical_offset,:] = (0,0,255)
+            #     # frame_top[:,horizontal_offset] = (0,0,255)
+            #     # cv.imshow("top",frame_top)
+            #     # cv.imshow("bottom",frame_bottom)
+            #     # cv.waitKey(0)
 
 
             # Record frame
@@ -1253,10 +1265,11 @@ preprocessor = preprocessing()
 # save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_bottom_video.mkv'
 # preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7,True,50,20)
 
-path_top = '../../Data/Video_Data/Varied_rectified_right.mkv'
-path_bottom = '../../Data/Video_Data/Varied_rectified_left.mkv'
-save_top = '../../Data/Video_Data/Varied_Videos/Order_5_full/'
-save_bottom = '../../Data/Video_Data/Varied_Videos/Order_5_full/'
+path_top = '/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv'
+path_bottom = '/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv'
+
+save_top = '../../Data/Video_Data/Preprocess_videos/'
+save_bottom = '../../Data/Video_Data/Preprocess_videos/'
 preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,360,0.6,7,False,50,20)
 
 

@@ -52,7 +52,9 @@ public:
 
     cv::Mat filter_disparity(cv::Mat disparity_map, cv::Mat first_frame, cv::Mat second_disparity_map, cv::Mat second_frame); // Uses wls filtering
 
-    cv::Mat validate_disparity(cv::Mat disparity_map, cv::Mat second_disparity_map);
+    cv::Mat validate_disparity(cv::Mat disparity_map, cv::Mat first_frame, cv::Mat second_frame);
+
+    cv::Mat fill_disparity_holes(cv::Mat disparity_map);
 
     // -- Methods that handle depth --
     cv::Mat disparity_to_depth(cv::Mat disparity_map);
