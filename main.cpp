@@ -32,6 +32,9 @@ int main(){
     string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv";
     string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv";
 
+//    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Preprocess_videos/homomorphic_top.avi";
+//    string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Preprocess_videos/homomorhic_bottom.avi";
+
     // -- varied top dataset --
 //    string top_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Varied_Top.mkv";
 //    string bottom_video = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Varied_Bottom.mkv";

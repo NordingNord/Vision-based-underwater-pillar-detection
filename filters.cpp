@@ -72,7 +72,7 @@ vector<DMatch> filters::filter_matches_ransac(vector<DMatch> matches, vector<Key
         // Keep only inliers
         vector<DMatch> temp_matches;
         for(size_t i = 0; i < matches.size(); i++){
-            if(ransac_mask.at<uchar>(i) > 0){ // CV_8UC1 -> access with uchar
+            if(ransac_mask.at<uchar>(i) > 0){ // CV_8UC1 -> access with uchar might be an issue since 0 is not uchar
                 temp_matches.push_back(matches.at(i));
             }
         }

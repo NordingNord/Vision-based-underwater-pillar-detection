@@ -21,6 +21,7 @@
 #include "detecting.h"
 #include "optical_flow.h"
 #include "clustering.h"
+#include "preprocessing_algorithms.h"
 
 
 // -- Defines --
@@ -115,6 +116,9 @@ private:
 
     // Clustering class
     clustering cluster_system;
+
+    // Preprocessing class
+    preprocessing_algorithms preprocessing;
 
     // Settings
     bool callibration_transposed;

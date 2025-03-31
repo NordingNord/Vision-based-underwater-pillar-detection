@@ -1100,7 +1100,7 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
         stereo_system.set_callibration_size(Size(540,960));
 
         // Videos galore
-        VideoWriter video("disparity.avi",CV_FOURCC('M','J','P','G'),10, Size(540,960));
+        VideoWriter video("disparity_org.avi",CV_FOURCC('M','J','P','G'),10, Size(540,960));
 
         // Prepare rectification
         stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
@@ -1144,15 +1144,26 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             resize(first_frame,first_frame,Size(),0.5,0.5,INTER_LINEAR);
             resize(second_frame,second_frame,Size(),0.5,0.5,INTER_LINEAR);
 
-            // Rectify frames
+            imwrite("first.png",first_frame);
+            imwrite("second.png",second_frame);
+
+            // Histogram match to make colors more equal
             auto start = chrono::high_resolution_clock::now();
+            second_frame = preprocessing.correct_colour_difference(first_frame,second_frame);
+
+            auto stop = chrono::high_resolution_clock::now();
+            auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Image preprocessing done in " << duration.count() << " ms." << endl;
+
+            // Rectify frames
+            start = chrono::high_resolution_clock::now();
 
             vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
             first_frame = rectified_frames.at(0);
             second_frame = rectified_frames.at(1);
 
-            auto stop = chrono::high_resolution_clock::now();
-            auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Rectification done in  " << duration.count() << " ms." << endl;
 
             // Compute disparity map
@@ -1197,10 +1208,10 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
 
 
             // Visualize post processed disparity
-//            Mat disparity_map_color;
-//            disparity_map_color = stereo_system.process_disparity(disparity_map);
-//            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
-//            video.write(disparity_map_color);
+            Mat disparity_map_color;
+            disparity_map_color = stereo_system.process_disparity(disparity_map);
+            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+            video.write(disparity_map_color);
 //            imshow("post processed",disparity_map_color);
 //            waitKey(0);
 
