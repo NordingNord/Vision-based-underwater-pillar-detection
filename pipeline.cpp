@@ -1111,6 +1111,9 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
         Mat last_first_frame;
         vector<obstacle> last_obstacles;
 
+        int good_count = 0;
+        int bad_count = 0;
+
         // Begin to go through video feed
         while(true){
 
@@ -1144,16 +1147,93 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             resize(first_frame,first_frame,Size(),0.5,0.5,INTER_LINEAR);
             resize(second_frame,second_frame,Size(),0.5,0.5,INTER_LINEAR);
 
-            imwrite("first.png",first_frame);
-            imwrite("second.png",second_frame);
+//            imwrite("first.png",first_frame);
+//            imwrite("second.png",second_frame);
+
+            // Apply homomorphic filter
+            auto start = chrono::high_resolution_clock::now();
+            Mat ycrcb_first, ycrcb_second;
+            cvtColor(first_frame,ycrcb_first,COLOR_BGR2YCrCb);
+            cvtColor(second_frame,ycrcb_second,COLOR_BGR2YCrCb);
+
+            Mat first_channels[ycrcb_first.channels()];
+            Mat second_channels[ycrcb_second.channels()];
+            split(ycrcb_first,first_channels);
+            split(ycrcb_second,second_channels);
+            Mat luminance_first = first_channels[0];
+            Mat luminance_second = second_channels[0];
+
+            luminance_first = preprocessing.homomorphic_filter(luminance_first,HIGHPASS_GAUSSIAN);
+            luminance_second = preprocessing.homomorphic_filter(luminance_second,HIGHPASS_GAUSSIAN);
+
+            vector<Mat> temp_first = {luminance_first,first_channels[1],first_channels[2]};
+            vector<Mat> temp_second = {luminance_second,second_channels[1],second_channels[2]};
+
+            merge(temp_first,ycrcb_first);
+            merge(temp_second,ycrcb_second);
+
+            cvtColor(ycrcb_first,first_frame,COLOR_YCrCb2BGR);
+            cvtColor(ycrcb_second,second_frame,COLOR_YCrCb2BGR);
 
             // Histogram match to make colors more equal
-            auto start = chrono::high_resolution_clock::now();
             second_frame = preprocessing.correct_colour_difference(first_frame,second_frame);
+
+            // Histogram match luminosity
+//            Mat ycrcb_first, ycrcb_second;
+//            cvtColor(first_frame,ycrcb_first,COLOR_BGR2YCrCb);
+//            cvtColor(second_frame,ycrcb_second,COLOR_BGR2YCrCb);
+
+//            Mat first_channels[ycrcb_first.channels()];
+//            Mat second_channels[ycrcb_second.channels()];
+//            split(ycrcb_first,first_channels);
+//            split(ycrcb_second,second_channels);
+//            Mat luminance_first = first_channels[0];
+//            Mat luminance_second = second_channels[0];
+
+            luminance_second = preprocessing.correct_colour_difference(luminance_first,luminance_second);
+            cvtColor(second_frame,ycrcb_second,COLOR_BGR2YCrCb);
+            split(ycrcb_second,second_channels);
+
+            temp_first = {luminance_first,first_channels[1],first_channels[2]};
+            temp_second = {luminance_second,second_channels[1],second_channels[2]};
+
+            merge(temp_first,ycrcb_first);
+            merge(temp_second,ycrcb_second);
+
+            cvtColor(ycrcb_first,first_frame,COLOR_YCrCb2BGR);
+            cvtColor(ycrcb_second,second_frame,COLOR_YCrCb2BGR);
+
+//            // Apply homomorphic filter
+//            luminance_first = preprocessing.homomorphic_filter(luminance_first,HIGHPASS_GAUSSIAN);
+//            luminance_second = preprocessing.homomorphic_filter(luminance_second,HIGHPASS_GAUSSIAN);
+
+//            vector<Mat> temp_first = {luminance_first,first_channels[1],first_channels[2]};
+//            vector<Mat> temp_second = {luminance_second,second_channels[1],second_channels[2]};
+
+//            merge(temp_first,ycrcb_first);
+//            merge(temp_second,ycrcb_second);
+
+//            cvtColor(ycrcb_first,first_frame,COLOR_YCrCb2BGR);
+//            cvtColor(ycrcb_second,second_frame,COLOR_YCrCb2BGR);
+
+//            Mat first_gray, second_gray;
+//            cvtColor(first_frame,first_gray,COLOR_BGR2GRAY);
+//            cvtColor(second_frame,second_gray,COLOR_BGR2GRAY);
+
+//            first_gray = preprocessing.homomorphic_filter(first_gray,HIGHPASS_ORG_ARTICLE);
+//            second_gray = preprocessing.homomorphic_filter(second_gray,HIGHPASS_ORG_ARTICLE);
+
+//            cvtColor(first_gray,first_frame,COLOR_GRAY2BGR);
+//            cvtColor(second_gray,second_frame,COLOR_GRAY2BGR);
 
             auto stop = chrono::high_resolution_clock::now();
             auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Image preprocessing done in " << duration.count() << " ms." << endl;
+
+//            Mat temp_boy;
+//            hconcat(first_frame,second_frame,temp_boy);
+//            imshow("the boys", temp_boy);
+//            waitKey(0);
 
             // Rectify frames
             start = chrono::high_resolution_clock::now();
@@ -1214,6 +1294,26 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             video.write(disparity_map_color);
 //            imshow("post processed",disparity_map_color);
 //            waitKey(0);
+
+//            cout << "Was the disparity bad (0) or good (1): ";
+//            char answer;
+//            cin >> answer;
+//            //char answer = getchar();
+//            cout << endl;
+            if(frame_index == 41 || frame_index == 43 || frame_index == 49 || frame_index == 50 || frame_index == 56 || frame_index == 61){
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/bad/luminosity_"+to_string(frame_index) + ".png";
+                Mat write_img;
+                hconcat(luminance_first,luminance_second,write_img);
+                imwrite(title,write_img);
+//                bad_count++;
+            }
+            else if(frame_index == 8 || frame_index == 42 || frame_index == 44 || frame_index == 51 || frame_index == 52 || frame_index == 57){
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good/luminosity_"+to_string(frame_index) + ".png";
+                Mat write_img;
+                hconcat(luminance_first,luminance_second,write_img);
+                imwrite(title,write_img);
+//                good_count++;
+            }
 
 
 //            // Get depth map
