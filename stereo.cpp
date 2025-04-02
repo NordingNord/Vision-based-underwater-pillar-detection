@@ -76,7 +76,6 @@ void stereo::prepare_rectify(Mat first_intrinsics, Mat second_intrinsics, Mat fi
 //        stereoRectify(first_intrinsics, first_distortion, second_intrinsics, second_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
 //        Q_test = disparity_depth_map;
 //        // Test done
-
         stereoRectify(first_intrinsics, first_distortion, second_intrinsics, second_distortion, callibration_size, rotation, translation, first_transform, second_transform, first_projection, second_projection, disparity_depth_map,CALIB_ZERO_DISPARITY,alpha,callibration_size, &region_of_intrest[0], &region_of_intrest[1]);
 
         // Initialize undistortion
@@ -207,7 +206,7 @@ cv::Mat stereo::track_disparity(cv::Mat first_frame, cv::Mat second_frame){
         resizeWindow("Disparity map",600,600);
 
         // Create trackbars
-        createTrackbar("Min Disparity", "Disparity map", nullptr, 3, min_disparity_bar_static,this);
+        createTrackbar("Min Disparity", "Disparity map", nullptr, 100, min_disparity_bar_static,this);
         createTrackbar("Num disparities", "Disparity map", nullptr, 23, num_disparity_bar_static,this);
         createTrackbar("Block size", "Disparity map", nullptr, 100, block_size_bar_static,this);
         createTrackbar("P1", "Disparity map", nullptr, 50, p1_bar_static,this);

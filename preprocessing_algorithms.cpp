@@ -378,3 +378,38 @@ cv::Mat preprocessing_algorithms::butterworth_highpass_filter(cv:: Mat frame, fl
     return result_filter;
 }
 
+// -- Methods that handle histogram equalization --
+Mat preprocessing_algorithms::equalize_clahe(Mat frame){
+    Mat equalized_frame;
+    try{
+        Mat work_frame = frame.clone();
+        // If not grayscale or single channel image, grayscale first
+        bool revert = false;
+        if(work_frame.channels() == 3){
+            //cvtColor(work_frame,work_frame,COLOR_BGR2GRAY); // If not BGR image -_o_- ups
+            cvtColor(work_frame,work_frame,COLOR_BGR2YCrCb);
+            Mat channels[work_frame.channels()];
+            split(work_frame,channels);
+            work_frame = channels[0]; // Lum channel
+            revert = true;
+        }
+
+        Ptr<CLAHE> clahe = createCLAHE(contrast_threshold,grid_size);
+        clahe->apply(work_frame,equalized_frame);
+
+        if(revert == true){
+            //cvtColor(equalized_frame,equalized_frame,COLOR_GRAY2BGR);
+            Mat temp_frame;
+            cvtColor(frame,temp_frame,COLOR_BGR2YCrCb);
+            Mat channels[temp_frame.channels()];
+            split(temp_frame,channels);
+            vector<Mat> combiner = {equalized_frame,channels[1],channels[2]};
+            merge(combiner,equalized_frame);
+            cvtColor(equalized_frame,equalized_frame,COLOR_YCrCb2BGR);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return equalized_frame;
+}

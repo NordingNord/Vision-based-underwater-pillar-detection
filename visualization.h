@@ -43,6 +43,7 @@ public:
 
     // -- Superpixel visualization methods --
     cv::Mat show_super_pixel_borders(cv::Mat frame, super_pixel_frame data, cv::Vec3b color  = {0,0,0});
+
 private:
 
 };

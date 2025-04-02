@@ -22,23 +22,30 @@ class preprocessing_algorithms{
 public:
     preprocessing_algorithms();
 
-    // Methods to handle colour differences between frames
+    // -- Methods to handle colour differences between frames --
     cv::Mat correct_colour_difference(cv::Mat reference_frame, cv::Mat source_frame);
 
-    // Methods to handle non-uniform lighting
+    // -- Methods to handle non-uniform lighting --
     cv::Mat homomorphic_filter(cv::Mat frame, int highpass_filter);
 
-    // Highpass filters
+    // -- Highpass filters --
     cv::Mat article_highpass_filter(cv::Mat frame, float cutoff_freq, float steepness, float offset); // Based on: Performance analysis of pre-processing filters for underwater images
     cv::Mat org_article_highpass_filter(cv::Mat frame, float maximum, float minimum, float cutoff_coef);// Based on: Automatic Underwater Image Pre-Processing (Revelation: is just the gaussian highpass filter)
     cv::Mat gaussian_highpass_filter(cv:: Mat frame, float maximum, float minimum, float cutoff_coef); // Based on: https://github.com/fredyshox/HomomorphicFilter/blob/master/HomomorphicFilter.cpp (Implemented with reverse col row for some reason)
     cv::Mat butterworth_highpass_filter(cv:: Mat frame, float maximum, float minimum, float cutoff_coeff, int n);
+
+    // -- Methods that handle histogram equalization --
+    cv::Mat equalize_clahe(cv::Mat frame);
 
 private:
     float highpass_maximum = 2.5;
     float highpass_minimum = 0.5;
     float highpass_cutoff_coef = 1.0;
     float highpass_poles = 2;
+
+    // -- CLAHE settings --
+    double contrast_threshold = 40.0; // Also called clipLimit
+    cv::Size grid_size = cv::Size(8,8);
 };
 
 #endif // PREPROCESSING_ALGORITHMS_H

@@ -96,6 +96,9 @@ private:
     // Feature handling class
     feature_handling feature_handler;
 
+    // calculator class
+    calculator calculations;
+
     // Filter class
     filters filtering_sytem;
 

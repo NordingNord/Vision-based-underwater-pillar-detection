@@ -71,7 +71,7 @@ void pipeline::set_stereo_parameters(double alpha, bool transposed_callibration)
     try{
         // Ensure camera data have already been read
         vector<int> frame_dimension = first_camera.get_camera_dimensions();
-        Size frame_size = {frame_dimension.at(1),frame_dimension.at(0)};// {frame_dimension.at(0),frame_dimension.at(1)};
+        Size frame_size = {frame_dimension.at(0),frame_dimension.at(1)};// {frame_dimension.at(0),frame_dimension.at(1)};
 
         if(frame_size.height == 0 || frame_size.width == 0){
             throw runtime_error("No cameras loaded. Unable to set stereo paramters.");
@@ -1098,9 +1098,10 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
         first_camera.resize_intrensic(0.5);
         second_camera.resize_intrensic(0.5);
         stereo_system.set_callibration_size(Size(540,960));
+//        stereo_system.set_callibration_size(Size(1080,1920));
 
         // Videos galore
-        VideoWriter video("disparity_org.avi",CV_FOURCC('M','J','P','G'),10, Size(540,960));
+        VideoWriter video("disparity_org.avi",CV_FOURCC('M','J','P','G'),5, Size(540,960));
 
         // Prepare rectification
         stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
@@ -1150,8 +1151,24 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
 //            imwrite("first.png",first_frame);
 //            imwrite("second.png",second_frame);
 
-            // Apply homomorphic filter
+//            Mat temp_boy;
+//            hconcat(first_frame,second_frame,temp_boy);
+//            imshow("the boys", temp_boy);
+//            waitKey(0);
+
+            // Rectify frames
             auto start = chrono::high_resolution_clock::now();
+
+            vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
+            first_frame = rectified_frames.at(0);
+            second_frame = rectified_frames.at(1);
+
+            auto stop = chrono::high_resolution_clock::now();
+            auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Rectification done in  " << duration.count() << " ms." << endl;
+
+            // Apply homomorphic filter
+            start = chrono::high_resolution_clock::now();
             Mat ycrcb_first, ycrcb_second;
             cvtColor(first_frame,ycrcb_first,COLOR_BGR2YCrCb);
             cvtColor(second_frame,ycrcb_second,COLOR_BGR2YCrCb);
@@ -1163,8 +1180,8 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             Mat luminance_first = first_channels[0];
             Mat luminance_second = second_channels[0];
 
-            luminance_first = preprocessing.homomorphic_filter(luminance_first,HIGHPASS_GAUSSIAN);
-            luminance_second = preprocessing.homomorphic_filter(luminance_second,HIGHPASS_GAUSSIAN);
+//            luminance_first = preprocessing.homomorphic_filter(luminance_first,HIGHPASS_GAUSSIAN);
+//            luminance_second = preprocessing.homomorphic_filter(luminance_second,HIGHPASS_GAUSSIAN);
 
             vector<Mat> temp_first = {luminance_first,first_channels[1],first_channels[2]};
             vector<Mat> temp_second = {luminance_second,second_channels[1],second_channels[2]};
@@ -1176,21 +1193,10 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             cvtColor(ycrcb_second,second_frame,COLOR_YCrCb2BGR);
 
             // Histogram match to make colors more equal
-            second_frame = preprocessing.correct_colour_difference(first_frame,second_frame);
+//            second_frame = preprocessing.correct_colour_difference(first_frame,second_frame);
 
             // Histogram match luminosity
-//            Mat ycrcb_first, ycrcb_second;
-//            cvtColor(first_frame,ycrcb_first,COLOR_BGR2YCrCb);
-//            cvtColor(second_frame,ycrcb_second,COLOR_BGR2YCrCb);
-
-//            Mat first_channels[ycrcb_first.channels()];
-//            Mat second_channels[ycrcb_second.channels()];
-//            split(ycrcb_first,first_channels);
-//            split(ycrcb_second,second_channels);
-//            Mat luminance_first = first_channels[0];
-//            Mat luminance_second = second_channels[0];
-
-            luminance_second = preprocessing.correct_colour_difference(luminance_first,luminance_second);
+//            luminance_second = preprocessing.correct_colour_difference(luminance_first,luminance_second);
             cvtColor(second_frame,ycrcb_second,COLOR_BGR2YCrCb);
             split(ycrcb_second,second_channels);
 
@@ -1203,58 +1209,100 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             cvtColor(ycrcb_first,first_frame,COLOR_YCrCb2BGR);
             cvtColor(ycrcb_second,second_frame,COLOR_YCrCb2BGR);
 
-//            // Apply homomorphic filter
-//            luminance_first = preprocessing.homomorphic_filter(luminance_first,HIGHPASS_GAUSSIAN);
-//            luminance_second = preprocessing.homomorphic_filter(luminance_second,HIGHPASS_GAUSSIAN);
+            // Histogram equalize frames
+//            first_frame = preprocessing.equalize_clahe(first_frame);
+//            second_frame = preprocessing.equalize_clahe(second_frame);
 
-//            vector<Mat> temp_first = {luminance_first,first_channels[1],first_channels[2]};
-//            vector<Mat> temp_second = {luminance_second,second_channels[1],second_channels[2]};
-
-//            merge(temp_first,ycrcb_first);
-//            merge(temp_second,ycrcb_second);
-
-//            cvtColor(ycrcb_first,first_frame,COLOR_YCrCb2BGR);
-//            cvtColor(ycrcb_second,second_frame,COLOR_YCrCb2BGR);
-
-//            Mat first_gray, second_gray;
-//            cvtColor(first_frame,first_gray,COLOR_BGR2GRAY);
-//            cvtColor(second_frame,second_gray,COLOR_BGR2GRAY);
-
-//            first_gray = preprocessing.homomorphic_filter(first_gray,HIGHPASS_ORG_ARTICLE);
-//            second_gray = preprocessing.homomorphic_filter(second_gray,HIGHPASS_ORG_ARTICLE);
-
-//            cvtColor(first_gray,first_frame,COLOR_GRAY2BGR);
-//            cvtColor(second_gray,second_frame,COLOR_GRAY2BGR);
-
-            auto stop = chrono::high_resolution_clock::now();
-            auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Image preprocessing done in " << duration.count() << " ms." << endl;
-
-//            Mat temp_boy;
-//            hconcat(first_frame,second_frame,temp_boy);
-//            imshow("the boys", temp_boy);
-//            waitKey(0);
-
-            // Rectify frames
-            start = chrono::high_resolution_clock::now();
-
-            vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
-            first_frame = rectified_frames.at(0);
-            second_frame = rectified_frames.at(1);
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Rectification done in  " << duration.count() << " ms." << endl;
+            cout << "Image preprocessing done in " << duration.count() << " ms." << endl;
+
+            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/" + to_string(frame_index) + ".jpg";
+                Mat write_img;
+                hconcat(first_frame,second_frame,write_img);
+                imwrite(title,write_img);
+            }
+
+            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/luminosity_"+to_string(frame_index) + ".jpg";
+                Mat write_img;
+                hconcat(luminance_first,luminance_second,write_img);
+                imwrite(title,write_img);
+            }
+
+
+            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/rectified_"+to_string(frame_index) + ".jpg";
+                Mat write_img;
+                // Get features of rectified image
+//                vector<KeyPoint> keypoints = feature_handler.find_features(first_frame);
+//                vector<KeyPoint> second_keypoints = feature_handler.find_features(second_frame);
+
+//                Mat descriptors = feature_handler.get_descriptors(first_frame,keypoints);
+//                Mat second_descriptors = feature_handler.get_descriptors(second_frame,second_keypoints);
+
+//                // Match features
+//                vector<DMatch> matches = feature_handler.match_features(descriptors,second_descriptors);
+
+//                // Clean matches
+//                vector<DMatch> filtered_matches = filtering_sytem.filter_matches(matches,keypoints,second_keypoints);
+//                drawMatches(first_frame, keypoints, second_frame, second_keypoints, filtered_matches, write_img, Scalar::all(-1),Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+
+//                vector<vector<KeyPoint>> remaining_keypoints = converter.remove_unmatches_keypoints(filtered_matches,keypoints,second_keypoints);
+//                keypoints = remaining_keypoints.at(0);
+//                second_keypoints = remaining_keypoints.at(1);
+
+//                double angle_sum = 0.0;
+//                for(int i = 0; i < keypoints.size(); i++){
+//                    double angle = calculations.calculate_angle(keypoints.at(i).pt, second_keypoints.at(i).pt);
+//                    // change sign due to direction
+//                    angle = fabs(angle);
+//                    // Take smallest
+//                    if(fabs(180.0*M_PI/180-angle) < fabs(angle)){
+//                        angle = fabs(180.0*M_PI/180-angle);
+//                    }
+//                    //angle = angle + (90*M_PI/180);
+//                    if(i == 0){
+//                        cout << keypoints.at(i).pt << " -> " << second_keypoints.at(i).pt << " | " << angle*180/M_PI << " | " << fabs(180.0*M_PI/180-angle)*180/M_PI << endl;
+//                    }
+//                    angle_sum += angle;
+//                }
+//                double mean_angle = angle_sum/keypoints.size();
+//                cout << "the mean angle: " << mean_angle*180/M_PI << endl;
+
+
+                hconcat(first_frame,second_frame,write_img);
+                for(int i = 10; i < write_img.rows; i+=20){
+                    line(write_img,Point(0,i),Point(write_img.cols-1,i),{0,0,255},1);
+                }
+                imwrite(title,write_img);
+            }
 
             // Compute disparity map
             start = chrono::high_resolution_clock::now();
 
             Mat disparity_map = stereo_system.get_disparity(first_frame,second_frame);
+//            if(frame_index == 6 || frame_index == 41 || frame_index == 43 || frame_index == 49 || frame_index == 50 || frame_index == 56 || frame_index == 61){
+//                disparity_map = stereo_system.track_disparity(first_frame,second_frame);
+//            }
+//            else{
+//                disparity_map = stereo_system.get_disparity(first_frame,second_frame);
+//            }
             //Mat disparity_map = stereo_system.track_disparity(first_frame,second_frame);
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Disparity map found in  " << duration.count() << " ms." << endl;
+
+            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
+                Mat temp;
+                temp = stereo_system.process_disparity(disparity_map);
+                applyColorMap(temp,temp,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/disparity_"+to_string(frame_index) + ".png";
+                imwrite(title,temp);
+            }
 
             // Compute left right consistensy check
             start = chrono::high_resolution_clock::now();
@@ -1266,6 +1314,14 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Disparity validation done in  " << duration.count() << " ms." << endl;
 
+            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
+                Mat temp;
+                temp = stereo_system.process_disparity(disparity_map);
+                applyColorMap(temp,temp,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/consistensy_disparity_"+to_string(frame_index) + ".png";
+                imwrite(title,temp);
+            }
+
             // Remove speckles with opencv method
             start = chrono::high_resolution_clock::now();
 
@@ -1275,6 +1331,14 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Filtered speckles in  " << duration.count() << " ms." << endl;
 
+            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
+                Mat temp;
+                temp = stereo_system.process_disparity(disparity_map);
+                applyColorMap(temp,temp,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/filtered_disparity_"+to_string(frame_index) + ".png";
+                imwrite(title,temp);
+            }
+
             // Fill holes
             start = chrono::high_resolution_clock::now();
 
@@ -1283,6 +1347,14 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Filled holes in  " << duration.count() << " ms." << endl;
+
+            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
+                Mat temp;
+                temp = stereo_system.process_disparity(disparity_map);
+                applyColorMap(temp,temp,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/filled_disparity_"+to_string(frame_index) + ".png";
+                imwrite(title,temp);
+            }
 
             // Get not completely accurate depth map (Due to disparity map post filtering)
 
@@ -1300,20 +1372,20 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
 //            cin >> answer;
 //            //char answer = getchar();
 //            cout << endl;
-            if(frame_index == 41 || frame_index == 43 || frame_index == 49 || frame_index == 50 || frame_index == 56 || frame_index == 61){
-                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/bad/luminosity_"+to_string(frame_index) + ".png";
-                Mat write_img;
-                hconcat(luminance_first,luminance_second,write_img);
-                imwrite(title,write_img);
-//                bad_count++;
-            }
-            else if(frame_index == 8 || frame_index == 42 || frame_index == 44 || frame_index == 51 || frame_index == 52 || frame_index == 57){
-                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good/luminosity_"+to_string(frame_index) + ".png";
-                Mat write_img;
-                hconcat(luminance_first,luminance_second,write_img);
-                imwrite(title,write_img);
-//                good_count++;
-            }
+//            if(frame_index == 41 || frame_index == 43 || frame_index == 49 || frame_index == 50 || frame_index == 56 || frame_index == 61){
+//                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/bad/luminosity_"+to_string(frame_index) + ".png";
+//                Mat write_img;
+//                hconcat(luminance_first,luminance_second,write_img);
+//                imwrite(title,write_img);
+////                bad_count++;
+//            }
+//            else if(frame_index == 8 || frame_index == 42 || frame_index == 44 || frame_index == 51 || frame_index == 52 || frame_index == 57){
+//                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good/luminosity_"+to_string(frame_index) + ".png";
+//                Mat write_img;
+//                hconcat(luminance_first,luminance_second,write_img);
+//                imwrite(title,write_img);
+////                good_count++;
+//            }
 
 
 //            // Get depth map
@@ -1444,7 +1516,7 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
 //            waitKey(0);
 
             // Destroy windows before new run
-//            destroyAllWindows();
+            destroyAllWindows();
 
         }
     }

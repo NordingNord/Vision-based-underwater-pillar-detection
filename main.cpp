@@ -135,7 +135,7 @@ int main(){
     int uniqueness_ratio = 5; // 0 / 16
     int speckle_window_size = 200; // 0 / 250
     int speckle_range = 2; // 0 / 3
-    int mode = StereoSGBM::MODE_SGBM;
+    int mode = StereoSGBM::MODE_SGBM; // StereoSGBM::MODE_HH;
 
     // -- WSL settings --
     double lamda = 1000.0; // Usual value 8000
@@ -183,7 +183,7 @@ int main(){
     // -- RUN PIPELINE --
     pipeline detection_triangulation(bottom_video,top_video); // Setup mode and video feeds
     detection_triangulation.set_parameter_paths(bottom_paramter_path, top_parameter_path); // Setup camera data
-    detection_triangulation.set_stereo_parameters(VALID,true); // Setup stereo parameters
+    detection_triangulation.set_stereo_parameters(VALID,true); // Setup stereo parameters // VALID usually
     detection_triangulation.set_feature_parameters(settings); // Setup feature settings
     detection_triangulation.set_match_parameters(match_type,n_best,flann_ratio);
     detection_triangulation.set_match_filter_parameters(match_filter_type,ransac_min,ransac_threshold);
