@@ -341,3 +341,13 @@ void camera::resize_intrensic(double scale_factor){
         cout << "Error: " << error.what() << endl;
     }
 }
+
+// -- Methods for printing data --
+void camera::print_timestamp(){
+    try{
+        cout << "Timestamp: " << camera_capturer.get(CAP_PROP_POS_MSEC) << " ms" << endl;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}

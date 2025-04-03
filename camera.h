@@ -64,6 +64,8 @@ public:
     // -- Fixes intrensic parameters based on resizing --
     void resize_intrensic(double scale_factor);
 
+    // -- Methods for printing data --
+    void print_timestamp();
 
 private:
     // Scaling variables

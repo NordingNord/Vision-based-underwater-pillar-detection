@@ -717,3 +717,92 @@ Mat stereo::add_invalid_edge(Mat frame, int edge){
     }
     return frame_with_edge;
 }
+
+
+// -- Methods for aligning rectified frames in the case of time issues --
+vector<Mat> stereo::phase_correlation(Mat reference, Mat source){
+    Mat projected_frame;
+    Mat border_fixed_frame;
+    vector<Mat> result_frames;
+    try{
+        // Grayscale frame
+        Mat reference_gray, source_gray;
+        cvtColor(reference,reference_gray,COLOR_BGR2GRAY);
+        cvtColor(source,source_gray,COLOR_BGR2GRAY);
+
+        // Convert frames to float32 (requirement for opencv discrete fourier transform)
+        Mat reference_32,source_32;
+        reference_gray.convertTo(reference_32,CV_32FC1);
+        source_gray.convertTo(source_32,CV_32FC1);
+
+        // Normalize to ensure correct values
+        reference_32 /= 255.0;
+        source_32 /= 255.0;
+
+        // Pad frames to match dft's desired scale
+        int optimal_rows = getOptimalDFTSize(reference_32.rows);
+        int optimal_cols = getOptimalDFTSize(reference_32.cols);
+
+        // Pad evenly around border
+        int row_padding = optimal_rows-reference_32.rows;
+        int col_padding = optimal_cols-reference_32.cols;
+
+        int pad_top = row_padding/2;
+        int pad_bottom = row_padding/2;
+        int pad_left = col_padding/2;
+        int pad_right = col_padding/2;
+
+        // bottom and right gets extra if odd
+        int vertical_odd_gain = 0;
+        int horizontal_odd_gain = 0;
+
+        if(reference_32.rows % 2 == 1){
+            pad_bottom += 1;
+            vertical_odd_gain = 1;
+        }
+        if(reference_32.cols % 2 == 1){
+            pad_right += 1;
+            horizontal_odd_gain = 1;
+        }
+
+        Mat padded_reference, padded_source;
+        copyMakeBorder(reference_32, padded_reference, pad_top, pad_bottom, pad_left, pad_right,BORDER_REFLECT);
+        copyMakeBorder(source_32, padded_source, pad_top, pad_bottom, pad_left, pad_right,BORDER_REFLECT);
+
+        // Apply phase correlation with hanning window
+        Mat hanning_window;
+        createHanningWindow(hanning_window,padded_reference.size(),CV_32F);
+
+        Point2d translation = phaseCorrelate(padded_source,padded_reference,hanning_window);
+
+        // Prepare affine transform (only 2,3 since opencv knows that the last row is allways 0,0,1)
+        Mat transform = (Mat_<float>(2,3) << 1.0, 0.0, 0.0, 0.0, 1.0, translation.y); // no x since we only want to align rows
+
+        // Warp frame
+        warpAffine(source,projected_frame,transform,reference.size());
+
+        // Remove invalid rows
+        int start_row = 0;
+        int height = source.rows-1;
+
+        if(signbit(translation.y) == false){
+            start_row = start_row+translation.y;
+        }
+        else{
+            height = height + translation.y;
+        }
+
+        cout << "boo" << endl;
+        cout << 0 << ", " << start_row << " -> " << padded_source.cols-1 << ", " << height << endl;
+        projected_frame = projected_frame(Rect(0,start_row,source.cols-1,height));
+        cout << "toot" << endl;
+        border_fixed_frame = source(Rect(0,start_row,source.cols-1,height));
+        result_frames = {border_fixed_frame,projected_frame};
+        cout << "done " << endl;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return result_frames;
+}

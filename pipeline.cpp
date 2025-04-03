@@ -1233,8 +1233,8 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             }
 
 
-            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
-                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/rectified_"+to_string(frame_index) + ".jpg";
+            if(frame_index == 41 || frame_index == 42 || frame_index == 49 || frame_index == 50 || frame_index == 56 || frame_index == 61){
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/bad_no_preprocess/rectified_phase_corr_"+to_string(frame_index) + ".jpg";
                 Mat write_img;
                 // Get features of rectified image
 //                vector<KeyPoint> keypoints = feature_handler.find_features(first_frame);
@@ -1272,6 +1272,9 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
 //                double mean_angle = angle_sum/keypoints.size();
 //                cout << "the mean angle: " << mean_angle*180/M_PI << endl;
 
+                vector<Mat> frames = stereo_system.phase_correlation(first_frame,second_frame);
+                first_frame = frames.at(0);
+                second_frame = frames.at(1);
 
                 hconcat(first_frame,second_frame,write_img);
                 for(int i = 10; i < write_img.rows; i+=20){
