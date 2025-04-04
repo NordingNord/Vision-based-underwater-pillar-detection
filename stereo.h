@@ -75,6 +75,7 @@ public:
     // -- Methods for aligning rectified frames in the case of time issues --
     std::vector<cv::Mat> phase_correlation(cv::Mat reference, cv::Mat source);
 
+
     // -- Trackbars --
     void min_disparity_bar(int step){
         disparity_settings.min_disparity = step;

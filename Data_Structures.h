@@ -156,4 +156,10 @@ struct line_data{
     double angle;
 };
 
+// Information about features
+struct feature_data{
+    std::vector<cv::KeyPoint> keypoints;
+    cv::Mat descriptors;
+};
+
 #endif

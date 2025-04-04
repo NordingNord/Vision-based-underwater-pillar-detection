@@ -758,11 +758,9 @@ vector<Mat> stereo::phase_correlation(Mat reference, Mat source){
 
         if(reference_32.rows % 2 == 1){
             pad_bottom += 1;
-            vertical_odd_gain = 1;
         }
         if(reference_32.cols % 2 == 1){
             pad_right += 1;
-            horizontal_odd_gain = 1;
         }
 
         Mat padded_reference, padded_source;
@@ -773,33 +771,43 @@ vector<Mat> stereo::phase_correlation(Mat reference, Mat source){
         Mat hanning_window;
         createHanningWindow(hanning_window,padded_reference.size(),CV_32F);
 
+        auto start = chrono::high_resolution_clock::now();
         Point2d translation = phaseCorrelate(padded_source,padded_reference,hanning_window);
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "phase correlation done in  " << duration.count() << " ms." << endl;
+        cout << endl;
+        cout << endl;
+        cout << endl;
+
 
         // Prepare affine transform (only 2,3 since opencv knows that the last row is allways 0,0,1)
-        Mat transform = (Mat_<float>(2,3) << 1.0, 0.0, 0.0, 0.0, 1.0, translation.y); // no x since we only want to align rows
+        Mat transform = (Mat_<float>(2,3) << 1.0, 0.0, 0.0, 0.0, 1.0, translation.y); // round(translation.y) // no x since we only want to align rows // maybe dont round here and instead round up below for more accuracy?
 
         // Warp frame
         warpAffine(source,projected_frame,transform,reference.size());
 
-        // Remove invalid rows
+        // Remove invalid rows (Cut top of one frame and bottom of other)
         int start_row = 0;
-        int height = source.rows-1;
+        int start_row_ref = 0;
+
+        int end_row = source.rows;
+        int end_row_ref = source.rows;
 
         if(signbit(translation.y) == false){
-            start_row = start_row+translation.y;
+            start_row = start_row+ceil(translation.y); // round(translation.y)
+            start_row_ref += ceil(translation.y);
+            //end_row_ref -= round(translation.y);
         }
         else{
-            height = height + translation.y;
+            end_row = end_row + ceil(translation.y);
+            end_row_ref += ceil(translation.y);
+            //start_row_ref -= round(translation.y);
         }
 
-        cout << "boo" << endl;
-        cout << 0 << ", " << start_row << " -> " << padded_source.cols-1 << ", " << height << endl;
-        projected_frame = projected_frame(Rect(0,start_row,source.cols-1,height));
-        cout << "toot" << endl;
-        border_fixed_frame = source(Rect(0,start_row,source.cols-1,height));
+        projected_frame = projected_frame(Range(start_row,end_row),Range(0,source.cols));
+        border_fixed_frame = reference(Range(start_row_ref,end_row_ref),Range(0,reference.cols));
         result_frames = {border_fixed_frame,projected_frame};
-        cout << "done " << endl;
-
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

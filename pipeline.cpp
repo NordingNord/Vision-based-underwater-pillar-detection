@@ -1218,6 +1218,25 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Image preprocessing done in " << duration.count() << " ms." << endl;
 
+            // Check for rectification error due to untimed frames
+            start = chrono::high_resolution_clock::now();
+            bool inconsistent = check_rectification_inconsistensy(first_frame,second_frame); // currently unable to identify rotation or horizontal errors
+
+            if(inconsistent == true){
+                cout << "Bad index: " << frame_index << endl;
+                vector<Mat> frames = stereo_system.phase_correlation(first_frame,second_frame);
+                first_frame = frames.at(0);
+                second_frame = frames.at(1);
+            }
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Rectification check done in " << duration.count() << " ms." << endl;
+
+
+
+
+
             if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
                 string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/" + to_string(frame_index) + ".jpg";
                 Mat write_img;
@@ -1233,7 +1252,7 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             }
 
 
-            if(frame_index == 41 || frame_index == 42 || frame_index == 49 || frame_index == 50 || frame_index == 56 || frame_index == 61){
+            if(frame_index == 41 || frame_index == 43 || frame_index == 49 || frame_index == 50 || frame_index == 56 || frame_index == 61){
                 string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/bad_no_preprocess/rectified_phase_corr_"+to_string(frame_index) + ".jpg";
                 Mat write_img;
                 // Get features of rectified image
@@ -1271,10 +1290,10 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
 //                }
 //                double mean_angle = angle_sum/keypoints.size();
 //                cout << "the mean angle: " << mean_angle*180/M_PI << endl;
-
-                vector<Mat> frames = stereo_system.phase_correlation(first_frame,second_frame);
-                first_frame = frames.at(0);
-                second_frame = frames.at(1);
+//                cout << "frame: " << frame_index << endl;
+//                vector<Mat> frames = stereo_system.phase_correlation(first_frame,second_frame);
+//                first_frame = frames.at(0);
+//                second_frame = frames.at(1);
 
                 hconcat(first_frame,second_frame,write_img);
                 for(int i = 10; i < write_img.rows; i+=20){
@@ -1282,6 +1301,7 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
                 }
                 imwrite(title,write_img);
             }
+
 
             // Compute disparity map
             start = chrono::high_resolution_clock::now();
@@ -1299,11 +1319,11 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Disparity map found in  " << duration.count() << " ms." << endl;
 
-            if(frame_index == 5 || frame_index == 40 || frame_index == 42 || frame_index == 48 || frame_index == 51 || frame_index == 55 || frame_index == 60){
+            if(frame_index == 6 || frame_index == 41 || frame_index == 43 || frame_index == 49 || frame_index == 50 || frame_index == 56 || frame_index == 61){
                 Mat temp;
                 temp = stereo_system.process_disparity(disparity_map);
                 applyColorMap(temp,temp,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
-                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/good_no_preprocess/disparity_"+to_string(frame_index) + ".png";
+                string title = "/home/benjamin/Master_Thesis_Workspace/Data/Image_review/bad_no_preprocess/corr_disparity_"+to_string(frame_index) + ".png";
                 imwrite(title,temp);
             }
 
@@ -1526,4 +1546,122 @@ void pipeline::run_disparity_pipeline_test(int disparity_filter){
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
+}
+
+
+// -- Assist methods --
+bool pipeline::check_rectification_inconsistensy(Mat first_frame, Mat second_frame){
+    bool inconsistensy = false;
+    try{
+        // Get features
+        vector<KeyPoint> keypoints = feature_handler.find_features(first_frame);
+        vector<KeyPoint> second_keypoints = feature_handler.find_features(second_frame);
+
+        Mat descriptors = feature_handler.get_descriptors(first_frame,keypoints);
+        Mat second_descriptors = feature_handler.get_descriptors(second_frame,second_keypoints);
+
+        // Match features
+        vector<DMatch> matches = feature_handler.match_features(descriptors,second_descriptors);
+
+        // Clean matches
+        vector<DMatch> filtered_matches = filtering_sytem.filter_matches(matches,keypoints,second_keypoints);
+
+        vector<vector<KeyPoint>> remaining_keypoints = converter.remove_unmatches_keypoints(filtered_matches,keypoints,second_keypoints);
+        keypoints = remaining_keypoints.at(0);
+        second_keypoints = remaining_keypoints.at(1);
+
+        // Find median using streaming median approach
+        priority_queue<double> small_heap; // max heap so biggest of smaller values are on top
+        priority_queue<double, vector<double>, greater<double>> big_heap; // min heap so smallest of bigger values are on top
+        double median = 0.0;
+
+        for(int i = 0; i < keypoints.size(); i++){
+            // Calculate angle
+            double angle = calculations.calculate_angle(keypoints.at(i).pt, second_keypoints.at(i).pt);
+            // change sign due to direction
+            angle = fabs(angle);
+            // Take smallest
+            if(fabs(180.0*M_PI/180-angle) < fabs(angle)){
+                angle = fabs(180.0*M_PI/180-angle);
+            }
+            angle = angle*180/M_PI; // Convert to degrees
+            // Assign to heaps (max priority queues)
+            if(i == 0){
+                small_heap.push(angle);
+                median = angle;
+            }
+            else if(i == 1){
+                if(small_heap.top() > angle){
+                    big_heap.push(small_heap.top());
+                    small_heap = priority_queue<double>();
+                    small_heap.push(angle);
+                }
+                else{
+                    big_heap.push(angle);
+                }
+                median = small_heap.top() + (big_heap.top()-small_heap.top())/2.0;
+            }
+            else{
+                if(angle < median){
+                    small_heap.push(angle);
+                }
+                else if(angle > median){
+                    big_heap.push(angle);
+                }
+                else{
+                    if(small_heap.size() < big_heap.size()){
+                        small_heap.push(angle);
+                    }
+                    else{
+                        big_heap.push(angle);
+                    }
+                }
+                if(abs(small_heap.size() - big_heap.size()) > 1){
+                    if(small_heap.size() > big_heap.size()){
+                        big_heap.push(small_heap.top());
+                        small_heap.pop();
+                    }
+                    else{
+                        small_heap.push(big_heap.top());
+                        big_heap.pop();
+                    }
+                }
+                if(small_heap.size() == big_heap.size()){
+                    median = small_heap.top() + (big_heap.top()-small_heap.top())/2.0;
+                }
+                else{
+                    if(small_heap.size() > big_heap.size()){
+                        median = small_heap.top();
+                    }
+                    else{
+                        median = big_heap.top();
+                    }
+                }
+            }
+        }
+
+//        // Find mean angle between matches
+//        double angle_sum = 0.0;
+//        for(int i = 0; i < keypoints.size(); i++){
+//            double angle = calculations.calculate_angle(keypoints.at(i).pt, second_keypoints.at(i).pt);
+//            // change sign due to direction
+//            angle = fabs(angle);
+//            // Take smallest
+//            if(fabs(180.0*M_PI/180-angle) < fabs(angle)){
+//                angle = fabs(180.0*M_PI/180-angle);
+//            }
+//            angle_sum += angle;
+//        }
+//        double mean_angle = angle_sum/keypoints.size();
+
+//        cout << "Angles: " <<  median << " | " << mean_angle*180/M_PI << endl;
+
+        if(median >= angle_limit){
+            inconsistensy = true;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return inconsistensy;
 }

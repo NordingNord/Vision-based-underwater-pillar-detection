@@ -339,6 +339,75 @@ Mat feature_handling::get_brief_descriptors(Mat frame,vector<KeyPoint> keypoints
 }
 
 
+// -- Methods for computing features (both keypoints and descriptors) --
+//feature_data feature_handling::compute_features(Mat frame){
+//    feature_data computed_features;
+//    try{
+//        // Run feature detector based on base method
+//        if(detector_type == DETECTOR_ORB){
+//            computed_features = compute_features(frame,settings_orb);
+//        }
+//        else if(detector_type == DETECTOR_SIFT){
+//            computed_features = compute_features(frame,settings_sift);
+//        }
+//        else if(detector_type == DETECTOR_AKAZE){
+//            computed_features = compute_features(frame,settings_akaze);
+//        }
+//        else{
+//            string error_message = "Invalid detector type " + to_string(detector_type) + ".";
+//            throw runtime_error(error_message);
+//        }
+//    }
+//    catch(const exception& error){
+//        cout << "Error: " << error.what() << endl;
+//    }
+//    return computed_features;
+//}
+
+//feature_data feature_handling::compute_features(Mat frame, orb_settings settings){
+//    feature_data computed_features;
+//    try{
+//        // Initialize detector
+//        Ptr<ORB> orb_detector = ORB::create(settings.max_features, settings.scale_factor, settings.levels, settings.edge_threshold, settings.first_level, settings.wta_k, ORB::HARRIS_SCORE, settings.patch_size, settings.fast_threshold);
+//        // Grayscale frame
+//        Mat grayscale_frame;
+//        cvtColor(frame,grayscale_frame,COLOR_BGR2GRAY);
+//        // Find features
+//        orb_detector->detectAndCompute(grayscale_frame,keypoints);
+//        if(keypoints.size() == 0){
+//            throw runtime_error("No features was found using ORB.");
+//        }
+
+//    }
+//    catch(const exception& error){
+//        cout << "Error: " << error.what() << endl;
+//    }
+//    return computed_features;
+//}
+
+//feature_data feature_handling::compute_features(Mat frame, sift_settings settings){
+//    feature_data computed_features;
+//    try{
+
+//    }
+//    catch(const exception& error){
+//        cout << "Error: " << error.what() << endl;
+//    }
+//    return computed_features;
+//}
+
+//feature_data feature_handling::compute_features(Mat frame, akaze_settings settings){
+//    feature_data computed_features;
+//    try{
+
+//    }
+//    catch(const exception& error){
+//        cout << "Error: " << error.what() << endl;
+//    }
+//    return computed_features;
+//}
+
+
 // -- Methods for setting paramters --
 void feature_handling::set_settings(orb_settings settings){
     try{

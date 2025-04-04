@@ -58,6 +58,15 @@ public:
 
     cv::Mat get_brief_descriptors(cv::Mat frame,std::vector<cv::KeyPoint> keypoints);
 
+    // -- Methods for computing features (both keypoints and descriptors) --
+//    feature_data compute_features(cv::Mat frame);
+
+//    feature_data compute_features(cv::Mat frame, orb_settings settings);
+
+//    feature_data compute_features(cv::Mat frame, sift_settings settings);
+
+//    feature_data compute_features(cv::Mat frame, akaze_settings settings);
+
     // -- Methods for setting paramters --
     void set_settings(orb_settings settings);
 

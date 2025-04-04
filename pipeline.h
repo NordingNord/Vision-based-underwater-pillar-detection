@@ -80,6 +80,9 @@ public:
 
     void run_disparity_pipeline_test(int disparity_filter);
 
+    // -- Assist methods --
+    bool check_rectification_inconsistensy(cv::Mat first_frame, cv::Mat second_frame);
+
 
 
 private:
@@ -125,6 +128,10 @@ private:
 
     // Settings
     bool callibration_transposed;
+
+    // Values to detect inconsistensies
+    int median_horizontal_diff;
+    double angle_limit = 2.0;
 
 
 };
