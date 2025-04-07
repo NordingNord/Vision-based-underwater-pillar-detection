@@ -32,6 +32,9 @@ static const int DISPARITY_FILTER_NONE = 0;
 static const int DISPARITY_FILTER_WLS = 1;
 static const int DISPARITY_FILTER_BILATERAL = 2;
 
+static const double INVALID = -16;
+static const int DISPARITY_STEP = 16;
+
 // -- Class --
 class pipeline
 {
@@ -46,7 +49,7 @@ public:
 
     void set_parameter_paths(std::string first_parameter_path, std::string second_parameter_path); // Stereo
 
-    void set_stereo_parameters(double alpha, bool transposed_callibration);
+    void set_stereo_parameters(double alpha, bool rotated_callibration);
 
     void set_feature_parameters(orb_settings settings);
     void set_feature_parameters(sift_settings settings);
@@ -71,6 +74,10 @@ public:
 
     void set_slic_settings(int algorithm, int region_size, float ruler, int iterations);
 
+    void set_preprocessing_steps(bool color_match = false, bool luminosity_match = false, bool homomorphic_filter = false, bool clahe = false, bool pre_rectify = false);
+
+    void set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track = false, bool fill = false, bool speckle_filter = false, bool use_processed = false, bool consistensy_check = false);
+
     // -- The pipelines --
     void run_triangulation_pipeline(int disparity_filter);
 
@@ -78,10 +85,19 @@ public:
 
     void run_disparity_pipeline(int disparity_filter);
 
-    void run_disparity_pipeline_test(int disparity_filter);
+    void run_disparity_pipeline_test(float resize_ratio);
 
     // -- Assist methods --
     bool check_rectification_inconsistensy(cv::Mat first_frame, cv::Mat second_frame);
+
+    void apply_resizing(float resize_ratio);
+
+    std::vector<cv::Mat> preprocess_frames(cv::Mat first_i_frame, cv::Mat second_i_frame);
+
+    std::vector<cv::Mat> preprocess_steps(cv::Mat first_i_frame, cv::Mat second_i_frame);
+
+    std::vector<cv::Mat> get_disparity_and_depth(cv::Mat first_i_frame, cv::Mat second_i_frame);
+
 
 
 
@@ -127,11 +143,38 @@ private:
     preprocessing_algorithms preprocessing;
 
     // Settings
-    bool callibration_transposed;
+    bool callibration_rotated;
 
     // Values to detect inconsistensies
     int median_horizontal_diff;
     double angle_limit = 2.0;
+
+    // Parameter files
+    std::string first_param;
+    std::string second_param;
+
+    // Resize ratio
+    float resizing = 1.0;
+
+    // preprocessing settings
+    bool preprocess_before_rectify_fix = false;
+    bool apply_color_match = false;
+    bool apply_luminosity_match = false;
+    bool apply_homomorphic_filter = false;
+    bool apply_clahe = false;
+
+    // keep track of current validity
+    bool valid = true;
+
+    // disparity and depth settings
+    bool track_disparity = false;
+    bool apply_consistensy_check = false;
+    bool fill_gaps = false;
+    bool apply_speckle_filter = false;
+    float speckle_area_percentage = 0.0; // percentage of image size that a speckle is defined as
+    double speckle_diff = 0.0;
+    bool use_processed_disparity = false;
+
 
 
 };

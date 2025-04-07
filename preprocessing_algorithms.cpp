@@ -166,16 +166,16 @@ cv::Mat preprocessing_algorithms::homomorphic_filter(cv::Mat frame, int highpass
         int pad_right = col_padding/2;
 
         // bottom and right gets extra if odd
-        int vertical_odd_gain = 0;
-        int horizontal_odd_gain = 0;
+        //int vertical_odd_gain = 0;
+        //int horizontal_odd_gain = 0;
 
         if(logarithmic_frame.rows % 2 == 1){
             pad_bottom += 1;
-            vertical_odd_gain = 1;
+            //vertical_odd_gain = 1;
         }
         if(logarithmic_frame.cols % 2 == 1){
             pad_right += 1;
-            horizontal_odd_gain = 1;
+            //horizontal_odd_gain = 1;
         }
         Mat padded_log_frame;
         copyMakeBorder(logarithmic_frame, padded_log_frame, pad_top, pad_bottom, pad_left, pad_right,BORDER_REFLECT);
@@ -206,14 +206,30 @@ cv::Mat preprocessing_algorithms::homomorphic_filter(cv::Mat frame, int highpass
             filter = butterworth_highpass_filter(padded_log_frame,highpass_maximum,highpass_minimum,highpass_cutoff_coef,highpass_poles);
         }
 
+        // Check for optimal odd (should not occur)
+        int vertical_odd_gain = 0;
+        int horizontal_odd_gain = 0;
+
+        if(padded_log_frame.rows % 2 == 1){
+            vertical_odd_gain = 1;
+        }
+        if(padded_log_frame.cols % 2 == 1){
+            horizontal_odd_gain = 1;
+        }
+
         // Shift highpassfilter (https://stackoverflow.com/questions/29226465/fftshift-c-implemetation-for-opencv and https://github.com/fredyshox/HomomorphicFilter/blob/master/HomomorphicFilter.cpp)
-        int center_col = optimal_cols/2;
+        int center_col = optimal_cols/2; // Faster way: optimal_cols >> 1
         int center_row = optimal_rows/2;
 
         Mat top_left_quadrant(filter, Rect(0,0,center_col + horizontal_odd_gain, center_row + vertical_odd_gain)); // Rect takes start x, start y, width, height. this thus starts at left top corner and have width and height that moves it to center
         Mat top_right_quadrant(filter, Rect(center_col + horizontal_odd_gain, 0, center_col, center_row + vertical_odd_gain));
         Mat bottom_left_quadrant(filter, Rect(0,center_row + vertical_odd_gain,center_col + horizontal_odd_gain,center_row));
         Mat bottom_right_quadrant(filter,Rect(center_col + horizontal_odd_gain, center_row+vertical_odd_gain,center_col,center_row));
+
+//        Mat top_left_quadrant(filter, Rect(0,0,center_col + horizontal_odd_gain, center_row + vertical_odd_gain)); // Rect takes start x, start y, width, height. this thus starts at left top corner and have width and height that moves it to center
+//        Mat top_right_quadrant(filter, Rect(center_col + horizontal_odd_gain, 0, center_col, center_row + vertical_odd_gain));
+//        Mat bottom_left_quadrant(filter, Rect(0,center_row + vertical_odd_gain,center_col + horizontal_odd_gain,center_row));
+//        Mat bottom_right_quadrant(filter,Rect(center_col + horizontal_odd_gain, center_row+vertical_odd_gain,center_col,center_row));
 
         // if even
         if(horizontal_odd_gain != 1 && vertical_odd_gain != 1){
@@ -269,20 +285,20 @@ cv::Mat preprocessing_algorithms::homomorphic_filter(cv::Mat frame, int highpass
         exp(result,result);
         result = result - 1.0;
 
-        // convert to CV_8U
-        normalize(result,result,0,255,NORM_MINMAX); // test
-        result.convertTo(filtered_frame,CV_8U);
-
-        // Remove border (have not been tested)
+        // Remove border
         if(result.rows > frame.rows){
-            result = result(Range(0,result.cols-1),Range(pad_top,result.rows-1-pad_bottom));
+            result = result(Range(pad_top,result.rows-pad_bottom),Range(0,result.cols));
         }
         if(result.cols > frame.cols){
-            result = result(Range(pad_left,result.cols-1-pad_right),Range(0,result.rows-1));
+            result = result(Range(0,result.rows),Range(pad_left,result.cols-pad_right));
         }
         if(result.size() != frame.size()){
             throw runtime_error("Filtered frame does not match original size. Error occured during resizing.");
         }
+
+        // convert to CV_8U
+        normalize(result,result,0,255,NORM_MINMAX); // test
+        result.convertTo(filtered_frame,CV_8U);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

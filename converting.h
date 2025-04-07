@@ -38,6 +38,9 @@ public:
     // -- Methods for reding specific obstacle data vectors --
     std::vector<cv::Mat> get_obstacle_masks(std::vector<obstacle> obstacles);
 
+    // -- Methods for reshaping --
+    cv::Mat expand_to_original_size(cv::Mat frame, cv::Size original_size);
+
 
 private:
 };

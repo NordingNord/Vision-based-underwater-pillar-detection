@@ -101,6 +101,136 @@ void stereo::prepare_rectify(Mat first_intrinsics, Mat second_intrinsics, Mat fi
     }
 }
 
+void stereo::prepare_rectify(string first_path, string second_path){
+    try{
+        // Create readers
+        FileStorage first_file_reader(first_path,FileStorage::READ);
+        FileStorage second_file_reader(second_path,FileStorage::READ);
+
+        // Read intrinsic dapta
+        Mat first_intrinsics, second_intrinsics, first_distortion, second_distortion;
+
+        first_file_reader["K"] >> first_intrinsics;
+        second_file_reader["K"] >> second_intrinsics;
+
+        first_file_reader["dist"] >> first_distortion;
+        second_file_reader["dist"] >> second_distortion;
+
+        // Read rectify Data
+        Mat disparity_depth_map,first_projection,second_projection,first_transform,second_transform;
+        first_file_reader["RR"] >> first_transform;
+        second_file_reader["RR"] >> second_transform;
+
+        first_file_reader["P"] >> first_projection;
+        second_file_reader["P"] >> second_projection;
+
+        first_file_reader["Q"] >> disparity_depth_map;
+
+        // Check for resising
+        int width, height;
+        first_file_reader["width"] >> width;
+        first_file_reader["height"] >> height;
+
+        // Resize intrinsics if nesesarry
+        if(width > callibration_size.width){
+            float scale = float(callibration_size.width)/float(width);
+            first_intrinsics.at<double>(Point(0,0)) = first_intrinsics.at<double>(Point(0,0))*scale;
+            first_intrinsics.at<double>(Point(2,0)) = first_intrinsics.at<double>(Point(2,0))*scale;
+            first_intrinsics.at<double>(Point(1,1)) = first_intrinsics.at<double>(Point(1,1))*scale;
+            first_intrinsics.at<double>(Point(2,1)) = first_intrinsics.at<double>(Point(2,1))*scale;
+
+            second_intrinsics.at<double>(Point(0,0)) = second_intrinsics.at<double>(Point(0,0))*scale;
+            second_intrinsics.at<double>(Point(2,0)) = second_intrinsics.at<double>(Point(2,0))*scale;
+            second_intrinsics.at<double>(Point(1,1)) = second_intrinsics.at<double>(Point(1,1))*scale;
+            second_intrinsics.at<double>(Point(2,1)) = second_intrinsics.at<double>(Point(2,1))*scale;
+
+            // Run normal function because unable to resize after rectification transforms have been made
+            Mat rotation,translation;
+            second_file_reader["R"] >> rotation;
+            second_file_reader["T"] >> translation;
+            prepare_rectify(first_intrinsics,second_intrinsics,first_distortion, second_distortion,rotation,translation);
+        }
+        else{
+            // Get maps
+            Mat first_x_map, first_y_map, second_x_map, second_y_map;
+            // For first camera
+            initUndistortRectifyMap(first_intrinsics,first_distortion,first_transform,first_projection,callibration_size,CV_16SC2,first_x_map, first_y_map); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+            // For second camera
+            initUndistortRectifyMap(second_intrinsics,second_distortion,second_transform,second_projection,callibration_size,CV_16SC2,second_x_map, second_y_map); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+
+            // Save data
+            rectification_data.disparity_depth_map = disparity_depth_map;
+            rectification_data.first_projection = first_projection;
+            rectification_data.second_projection = second_projection;
+            rectification_data.first_transform = first_transform;
+            rectification_data.second_transform = second_transform;
+            rectification_data.first_x_map = first_x_map;
+            rectification_data.first_y_map = first_y_map;
+            rectification_data.second_x_map = second_x_map;
+            rectification_data.second_y_map = second_y_map;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+
+void stereo::prepare_rectify(cv::Mat first_intrinsics, cv::Mat second_intrinsics, cv::Mat first_distortion, cv::Mat second_distortion, std::string first_path, std::string second_path){
+    try{
+        // Create readers
+        FileStorage first_file_reader(first_path,FileStorage::READ);
+        FileStorage second_file_reader(second_path,FileStorage::READ);
+
+        // Read rectify Data
+        Mat disparity_depth_map,first_projection,second_projection,first_transform,second_transform;
+        first_file_reader["RR"] >> first_transform;
+        second_file_reader["RR"] >> second_transform;
+
+        first_file_reader["P"] >> first_projection;
+        second_file_reader["P"] >> second_projection;
+
+        first_file_reader["Q"] >> disparity_depth_map;
+
+        // Check for resising
+        int width, height;
+        first_file_reader["width"] >> width;
+        first_file_reader["height"] >> height;
+
+        // Resize intrinsics if nesesarry
+        if(width > callibration_size.width){
+            // Run normal function because unable to resize after rectification transforms have been made
+            Mat rotation,translation;
+            second_file_reader["R"] >> rotation;
+            second_file_reader["T"] >> translation;
+            prepare_rectify(first_intrinsics,second_intrinsics,first_distortion, second_distortion,rotation,translation);
+        }
+        else{
+            // Get maps
+            Mat first_x_map, first_y_map, second_x_map, second_y_map;
+            // For first camera
+            initUndistortRectifyMap(first_intrinsics,first_distortion,first_transform,first_projection,callibration_size,CV_16SC2,first_x_map, first_y_map); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+            // For second camera
+            initUndistortRectifyMap(second_intrinsics,second_distortion,second_transform,second_projection,callibration_size,CV_16SC2,second_x_map, second_y_map); // CV_16SC2 -> 16 bit signed integer with two channels -> access with Vec2s
+
+            // Save data
+            rectification_data.disparity_depth_map = disparity_depth_map;
+            rectification_data.first_projection = first_projection;
+            rectification_data.second_projection = second_projection;
+            rectification_data.first_transform = first_transform;
+            rectification_data.second_transform = second_transform;
+            rectification_data.first_x_map = first_x_map;
+            rectification_data.first_y_map = first_y_map;
+            rectification_data.second_x_map = second_x_map;
+            rectification_data.second_y_map = second_y_map;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+
 vector<Mat> stereo::rectify(Mat first_frame, Mat second_frame){
     vector<Mat> rectified_frames;
     try{
@@ -545,13 +675,27 @@ Mat stereo::fill_disparity_holes(Mat disparity_map){
     return filled_disparity_map;
 }
 
+// Possible implementation that i can do myself: https://ieeexplore-ieee-org.proxy1-bib.sdu.dk/document/4287006
+Mat stereo::apply_weighted_median_filter(Mat frame, Mat disparity_map){
+    Mat filled_disparity_map;
+    try{
+        int kernel_radius = 9; // temp
+        // Convert disparity map to CV_8
+        disparity_map = process_disparity(disparity_map);
+        ximgproc::weightedMedianFilter(frame,disparity_map,filled_disparity_map,kernel_radius);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filled_disparity_map;
+}
 
 // -- Methods that handle depth --
 Mat stereo::disparity_to_depth(Mat disparity_map){
     Mat depth_map;
     try{
         Mat temp_disp;
-        disparity_map.convertTo(temp_disp,CV_8U);
+        disparity_map.convertTo(temp_disp,CV_8U); // This seem very wrong, since it does not account for
         //temp_disp = disparity_map.clone();
         reprojectImageTo3D(temp_disp,depth_map,rectification_data.disparity_depth_map);
 
@@ -681,6 +825,16 @@ vector<Mat> stereo::get_projections(){
     return projections;
 }
 
+Size stereo::get_callibration_size(){
+    Size dimensions;
+    try{
+        dimensions = callibration_size;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return dimensions;
+}
 
 // -- Methods for cleaning maps after disparity mapping --
 Mat stereo::remove_invalid_edge(Mat frame, int edge){

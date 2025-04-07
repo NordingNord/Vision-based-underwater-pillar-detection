@@ -274,3 +274,28 @@ vector<Mat> converting::get_obstacle_masks(vector<obstacle> obstacles){
     }
     return masks;
 }
+
+// -- Methods for reshaping --
+cv::Mat converting::expand_to_original_size(cv::Mat frame, cv::Size original_size){
+    Mat expanded_frame = frame.clone();
+    try{
+        int pad_top, pad_left;
+        if(frame.rows <= original_size.height){
+            pad_top = original_size.height-frame.rows;
+        }
+        else{
+            throw runtime_error("New map height is somehow bigger than original.");
+        }
+        if(frame.cols <= original_size.width){
+            pad_left = original_size.width-frame.cols;
+        }
+        else{
+            throw runtime_error("New map width is somehow bigger than original.");
+        }
+        copyMakeBorder(frame, expanded_frame, pad_top, 0, pad_left, 0, BORDER_CONSTANT,-1);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return expanded_frame;
+}

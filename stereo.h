@@ -28,6 +28,8 @@ public:
 
     // -- Methods that handles rectification --
     void prepare_rectify(cv::Mat first_intrinsics, cv::Mat second_intrinsics, cv::Mat first_distortion, cv::Mat second_distortion, cv::Mat rotation, cv::Mat translation);
+    void prepare_rectify(std::string first_path, std::string second_path); // Rectify only with path data
+    void prepare_rectify(cv::Mat first_intrinsics, cv::Mat second_intrinsics, cv::Mat first_distortion, cv::Mat second_distortion, std::string first_path, std::string second_path); // combination og set data and file data
 
     std::vector<cv::Mat> rectify(cv::Mat first_frame, cv::Mat second_frame);
 
@@ -56,6 +58,8 @@ public:
 
     cv::Mat fill_disparity_holes(cv::Mat disparity_map);
 
+    cv::Mat apply_weighted_median_filter(cv::Mat frame, cv::Mat disparity_map);
+
     // -- Methods that handle depth --
     cv::Mat disparity_to_depth(cv::Mat disparity_map);
 
@@ -66,6 +70,8 @@ public:
 
     // -- Methods for getting private parameters --
     std::vector<cv::Mat> get_projections();
+
+    cv::Size get_callibration_size();
 
     // -- Methods for cleaning maps after disparity mapping --
     cv::Mat remove_invalid_edge(cv::Mat frame, int edge = LEFT); // Removes edge made by disparity mapping

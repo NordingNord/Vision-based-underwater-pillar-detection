@@ -180,6 +180,25 @@ int main(){
     float ruler = 20.0f;
     int slic_iterations = 2;
 
+    // -- Run settings --
+    float ratio = 0.5;
+
+    // -- preprocessing pipeline --
+    bool color_match = true;
+    bool luminosity_match = false;
+    bool homomorphic_filter = true;
+    bool clahe = false;
+    bool pre_rectify = false;
+
+    // -- Disparity and depth pipeline --
+    float speckle_percentage = 0.04;
+    double max_speckle_diff = 10.0;
+    bool track = false;
+    bool fill = true;
+    bool speckle_filter = false;
+    bool use_processed = false;
+    bool consistensy_check = false;
+
     // -- RUN PIPELINE --
     pipeline detection_triangulation(bottom_video,top_video); // Setup mode and video feeds
     detection_triangulation.set_parameter_paths(bottom_paramter_path, top_parameter_path); // Setup camera data
@@ -194,10 +213,12 @@ int main(){
     detection_triangulation.set_obstacle_candidate_settings(blur_size,low_thresh,high_thresh,sobel_size,l2_status,size_thresh,line_kernel,contour_kernel,border_kernel,border_threshold);
     detection_triangulation.set_obstacle_filter_settings(rectangle_acceptance_threshold, size_limit, hough_thresh, min_length, max_gap, step_limit, decline_thresh, rectangle_ratio, obstacle_cutoff);
     detection_triangulation.set_slic_settings(slic_method,region_size,ruler,slic_iterations);
+    detection_triangulation.set_preprocessing_steps(color_match,luminosity_match,homomorphic_filter,clahe,pre_rectify);
+    detection_triangulation.set_disparity_and_depth_steps(speckle_percentage,max_speckle_diff,track,fill,speckle_filter,use_processed,consistensy_check);
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
-    detection_triangulation.run_disparity_pipeline_test(DISPARITY_FILTER_NONE);
+    detection_triangulation.run_disparity_pipeline_test(ratio);
 
 
 }
