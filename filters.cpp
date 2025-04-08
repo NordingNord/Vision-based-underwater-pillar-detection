@@ -21,7 +21,7 @@ filters::filters(int match_filter_type){
 // -- Filtering methods focused on matches --
 vector<DMatch> filters::filter_matches(vector<DMatch> matches, vector<KeyPoint> first_keypoints, vector<KeyPoint> second_keypoints){
     // Timing
-    auto start = chrono::high_resolution_clock::now();
+    //auto start = chrono::high_resolution_clock::now();
 
     vector<DMatch> filtered_matches;
     try{
@@ -38,9 +38,9 @@ vector<DMatch> filters::filter_matches(vector<DMatch> matches, vector<KeyPoint> 
             throw runtime_error("Unknown match filter.");
         }
         // Timing and post execution rundown
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "Match filtering was successfully conducted in " << duration.count() << " ms using " << filter_type << "." << endl;
+        //auto stop = chrono::high_resolution_clock::now();
+        //auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        //cout << "Match filtering was successfully conducted in " << duration.count() << " ms using " << filter_type << "." << endl;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

@@ -30,6 +30,36 @@ public:
     // -- Constructors --
     detecting();
 
+    // -- Methods for detecting possible obstacles --
+    std::vector<obstacle> get_possible_obstacles(cv::Mat disparity_map, cv::Mat deph_map);
+
+    // -- Methods for extracting a line map --
+    cv::Mat get_line_frame(cv::Mat frame);
+
+    // -- Methods for working with contours --
+    contours get_big_contours(cv::Mat line_frame);
+
+    std::vector<cv::Mat> create_contour_masks(contours input_contours, cv::Size frame_size, bool morph);
+
+    cv::Mat combine_masks(std::vector<cv::Mat> masks);
+
+    contours locate_missing_contours(cv::Mat combined_mask);
+
+    std::vector<int> test_for_overlap(cv::Mat combined_mask, std::vector<cv::Mat> masks, contours input_contours);
+
+    std::vector<cv::Mat> extract_masks(std::vector<cv::Mat> masks, std::vector<int> indexes);
+
+    contours extract_contours(contours input_contours, std::vector<int> indexes);
+
+    // -- Methods that analyse disparity --
+    std::vector<cv::Scalar> get_average_mask_value(std::vector<cv::Mat> masks, cv::Mat frame);
+
+    // -- Valdidation methods of initial masks --
+    std::vector<int> depth_validate_contours(std::vector<cv::Mat> masks, cv::Mat depth_map, std::vector<cv::Scalar> average_depths);
+
+    // -- Methods for creating obstacles --
+    std::vector<obstacle> create_obstacles(std::vector<cv::Mat> masks, contours input_contours, std::vector<int> valid_indexes);
+
     // -- Methods for analysing depth differences --
     std::vector<obstacle> get_depth_difference(cv::Mat depth_map);
 

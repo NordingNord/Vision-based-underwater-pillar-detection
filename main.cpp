@@ -195,9 +195,10 @@ int main(){
     double max_speckle_diff = 10.0;
     bool track = false;
     bool fill = true;
-    bool speckle_filter = false;
-    bool use_processed = false;
+    bool speckle_filter = true;
+    bool use_processed = true;
     bool consistensy_check = false;
+    bool horizontal_fill = false;
 
     // -- RUN PIPELINE --
     pipeline detection_triangulation(bottom_video,top_video); // Setup mode and video feeds
@@ -214,7 +215,7 @@ int main(){
     detection_triangulation.set_obstacle_filter_settings(rectangle_acceptance_threshold, size_limit, hough_thresh, min_length, max_gap, step_limit, decline_thresh, rectangle_ratio, obstacle_cutoff);
     detection_triangulation.set_slic_settings(slic_method,region_size,ruler,slic_iterations);
     detection_triangulation.set_preprocessing_steps(color_match,luminosity_match,homomorphic_filter,clahe,pre_rectify);
-    detection_triangulation.set_disparity_and_depth_steps(speckle_percentage,max_speckle_diff,track,fill,speckle_filter,use_processed,consistensy_check);
+    detection_triangulation.set_disparity_and_depth_steps(speckle_percentage,max_speckle_diff,track,fill,speckle_filter,use_processed,consistensy_check,horizontal_fill);
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);

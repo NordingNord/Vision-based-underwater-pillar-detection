@@ -270,8 +270,8 @@ cv::Mat stereo::get_disparity(cv::Mat first_frame, cv::Mat second_frame){
         Mat first_gray_frame, second_gray_frame;
         first_gray_frame = first_frame.clone();
         second_gray_frame = second_frame.clone();
-        //cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
-        //cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
+//        cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
+//        cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
         // Set disparity settings
         set_disparity_settings(disparity_settings);
         // Determine disparity
@@ -538,6 +538,67 @@ Mat stereo::fill_disparity_holes(Mat disparity_map){
     Mat filled_disparity_map;
     try{
 
+        // Idea for speedup: Make map of areas that need new values. Then translate the map right and left. If a non bad value is at a missing value. correspondent map is updated with the value.
+        // The area is then changed to non missing for the corresponding direction. After this we just do the classic min max. was somehow slower
+//        float left_move = 0.0;
+//        float right_move = 0.0;
+
+//        Mat total_bad_map = disparity_map == -16;
+//        Mat left_bad_map = total_bad_map.clone();
+//        Mat right_bad_map = total_bad_map.clone();
+
+//        Mat left_map = disparity_map.clone();
+//        Mat right_map = disparity_map.clone();
+
+//        while(countNonZero(total_bad_map) > 0){
+//            left_move--;
+//            right_move++;
+
+//            float translate_left[] = { 1.0, 0.0, left_move, 0.0, 1.0, 0.0 };
+//            float translate_right[] = { 1.0, 0.0, right_move, 0.0, 1.0, 0.0 };
+
+//            Mat left_movement = Mat(2, 3, CV_32F, translate_left);
+//            Mat right_movement = Mat(2, 3, CV_32F, translate_right);
+
+//            Mat translation_left;
+//            Mat translation_right;
+//            warpAffine(disparity_map, translation_left, left_movement, disparity_map.size());
+//            warpAffine(disparity_map, translation_right, right_movement, disparity_map.size());
+
+//            Mat left_good = translation_left > 0.0;
+//            Mat right_good = translation_right > 0.0;
+
+//            Mat left_overlap = left_good & left_bad_map;
+//            Mat right_overlap = right_good & right_bad_map;
+
+//            Mat temp_left;
+//            bitwise_and(translation_left,translation_left,temp_left,left_overlap);
+//            Mat temp_right;
+//            bitwise_and(translation_right,translation_right,temp_right,right_overlap);;
+
+//            Mat left_no_overlap;
+//            bitwise_not(left_overlap,left_no_overlap);
+//            Mat right_no_overlap;
+//            bitwise_not(right_overlap, right_no_overlap);
+
+//            Mat temp_left_2;
+//            bitwise_and(left_map,left_map,temp_left_2,left_no_overlap);
+//            Mat temp_right_2;
+//            bitwise_and(right_map,right_map,temp_right_2,right_no_overlap);
+
+//            left_map = temp_left | temp_left_2;
+//            right_map = temp_right | temp_right_2;
+
+//            bitwise_xor(left_overlap,left_bad_map,left_bad_map);
+//            bitwise_xor(right_overlap,right_bad_map,right_bad_map);
+
+//            total_bad_map = left_bad_map | right_bad_map;
+
+//            if(right_move >= disparity_map.cols){
+//                break;
+//            }
+//        }
+
         // Shitty slow solution
         Mat left_map = disparity_map.clone();
         Mat right_map = disparity_map.clone();
@@ -573,99 +634,73 @@ Mat stereo::fill_disparity_holes(Mat disparity_map){
             }
         }
 
-        // Find missing areas (due to border)
-        Mat bad_left = left_map == -16;
-        Mat bad_right = right_map == -16;
-        Mat bad = bad_left | bad_right;
-
-        Mat good;
-        bitwise_not(bad,good);
-
-        // Assing minimum of the two if not border
+        // New version
+        // get min of two maps
         filled_disparity_map = min(left_map, right_map);
-        Mat temp_border_map = max(left_map,right_map);
+        // for each bad value inspect top and bottom most valid
+        //Mat bad_map = filled_disparity_map =
 
-        filled_disparity_map.setTo(0,bad);
 
-        temp_border_map.setTo(0,good);
 
-        bitwise_xor(filled_disparity_map,temp_border_map,filled_disparity_map);
+//        // Find missing areas (due to border)
+//        Mat bad_left = left_map == -16;
+//        Mat bad_right = right_map == -16;
+//        Mat bad = bad_left | bad_right;
 
-        // Fill big disparity holes as background
-        Mat invalid = disparity_map == -16;
-        vector<vector<Point>> contours;
-        vector<Vec4i> hierarchy;
-        findContours(invalid,contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+//        Mat good;
+//        bitwise_not(bad,good);
 
-        vector<vector<Point>> big_contours;
-        for(int i = 0; i < contours.size(); i++){
-            double current_area = contourArea(contours.at(i));
-            if(current_area > disparity_map.cols*disparity_map.rows*0.01){
-                big_contours.push_back(contours.at(i));
-            }
-        }
+//        // Assing minimum of the two if not border
+//        filled_disparity_map = min(left_map, right_map);
 
-//        for(vector<vector<Point>>::iterator it = contours.begin(); it!=contours.end();){
-//            int current_size = it->size();
+//        // If border find min of above and bellow row
+//        float translate_up[] = { 1.0, 0.0, 0.0, 0.0, 1.0, -1.0 };
+//        float translate_down[] = { 1.0, 0.0, 0.0, 0.0, 1.0, 1.0 };
+//        Mat translation_up_matrix = Mat(2, 3, CV_32F, translate_up);
+//        Mat translation_down_matrix = Mat(2, 3, CV_32F, translate_down);
 
-//            if(current_size > disparity_map.cols*disparity_map.rows*0.01){
-//                big_contours.push_back(*it);
-//            }
-//            else{
-//                ++it;
+        // Remove bad values (IE: -16)
+//        left_map.setTo(max(left_map,right_map),bad_left);
+//        right_map.setTo(max(left_map,right_map),bad_right);
+
+//        Mat top_left,top_right,bottom_left,bottom_right;
+//        warpAffine(left_map, top_left, translation_up_matrix, left_map.size());
+//        warpAffine(right_map, top_right, translation_up_matrix, right_map.size());
+//        warpAffine(left_map, bottom_left, translation_down_matrix, left_map.size());
+//        warpAffine(right_map, bottom_right, translation_down_matrix, right_map.size());
+
+        // Take min of these values
+        //Mat temp_border_map = min(min(top_left,top_right),min(bottom_left,bottom_right));
+
+//        Mat temp_border_map = max(left_map,right_map);
+
+//        filled_disparity_map.setTo(0,bad);
+
+//        temp_border_map.setTo(0,good);
+
+//        bitwise_xor(filled_disparity_map,temp_border_map,filled_disparity_map);
+
+//        // Fill big disparity holes as background
+//        Mat invalid = disparity_map == -16;
+//        vector<vector<Point>> contours;
+//        vector<Vec4i> hierarchy;
+//        findContours(invalid,contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+//        vector<vector<Point>> big_contours;
+//        for(int i = 0; i < contours.size(); i++){
+//            double current_area = contourArea(contours.at(i));
+//            if(current_area > disparity_map.cols*disparity_map.rows*0.01){
+//                big_contours.push_back(contours.at(i));
 //            }
 //        }
 
-        for(int i = 0; i < big_contours.size(); i++){
-            Mat mask =  Mat::zeros(disparity_map.size(),CV_8U);
-            drawContours(mask,big_contours,i,255,-1);
+//        for(int i = 0; i < big_contours.size(); i++){
+//            Mat mask =  Mat::zeros(disparity_map.size(),CV_8U);
+//            drawContours(mask,big_contours,i,255,-1);
 
-            mask = invalid & mask;
+//            mask = invalid & mask;
 
-            filled_disparity_map.setTo(min_val,mask);
-        }
-
-
-
-
-//        // Create mask for invalid values
-//        Mat invalid = disparity_map == -16;
-
-//        // Dilate mask one pixel in rows alone to left and to right
-//        Mat_<int> temp_left_kernel(3,3);
-//        temp_left_kernel << 0,0,0,0,255,255,0,0,0;
-//        Mat left_kernel = temp_left_kernel;
-//        left_kernel.convertTo(left_kernel,CV_8U);
-//        Mat left_valid;
-//        dilate(invalid,left_valid,left_kernel);
-
-//        Mat_<int> temp_right_kernel(3,3);
-//        temp_right_kernel << 0,0,0,255,255,0,0,0,0;
-//        Mat right_kernel = temp_right_kernel;
-//        right_kernel.convertTo(right_kernel,CV_8U);
-//        Mat right_valid;
-//        dilate(invalid,right_valid,right_kernel);
-
-////        // Remove invalid mask from valid mask to get closest pixels
-//        left_valid = left_valid - invalid;
-//        right_valid = right_valid - invalid;
-
-//        // Get values of valid areas
-//        imshow("invalid", invalid);
-//        imshow("left",left_valid);
-//        imshow("right", right_valid);
-//        waitKey(0);
-
-        // Get coordinates of invalid points as well as closest valid points
-//        vector<Point> locations;
-//        findNonZero(invalid,locations);
-
-//        vector<Point> valid_locations;
-//        findNonZero(valid,valid_locations);
-
-//        // For each location find closest valid left and right location
-//        for(int i = 0; i < locations.size(); i++){
-
+//            filled_disparity_map.setTo(min_val,mask);
 //        }
 
     }
@@ -677,12 +712,33 @@ Mat stereo::fill_disparity_holes(Mat disparity_map){
 
 // Possible implementation that i can do myself: https://ieeexplore-ieee-org.proxy1-bib.sdu.dk/document/4287006
 Mat stereo::apply_weighted_median_filter(Mat frame, Mat disparity_map){
-    Mat filled_disparity_map;
+    Mat filled_disparity_map = disparity_map.clone();
     try{
-        int kernel_radius = 9; // temp
+        int kernel_radius = 11; // temp
+
+        // Convert to float
+        Mat temp_disp;
+        if(disparity_map.type() == CV_16SC1){
+            disparity_map.convertTo(temp_disp,CV_32F,1.0/16.0); // This is the official notation.
+        }
+        else if(disparity_map.type() == CV_32FC1){
+            temp_disp = disparity_map.clone();
+        }
+        else{
+            throw runtime_error("Invalid disparity map type. Please use 32F or 16S.");
+        }
+
         // Convert disparity map to CV_8
-        disparity_map = process_disparity(disparity_map);
-        ximgproc::weightedMedianFilter(frame,disparity_map,filled_disparity_map,kernel_radius);
+        //temp_disp = process_disparity(disparity_map);
+
+        ximgproc::weightedMedianFilter(frame,temp_disp,filled_disparity_map,kernel_radius);
+
+        // Convert back to signed
+        if(disparity_map.type() == CV_16SC1){
+            filled_disparity_map.convertTo(filled_disparity_map,CV_16SC1,1.0/(1.0/16.0));
+        }
+
+        //filled_disparity_map.convertTo(filled_disparity_map,CV_8U,255/disparity_settings.num_disparities);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -694,8 +750,15 @@ Mat stereo::apply_weighted_median_filter(Mat frame, Mat disparity_map){
 Mat stereo::disparity_to_depth(Mat disparity_map){
     Mat depth_map;
     try{
-        Mat temp_disp;
-        disparity_map.convertTo(temp_disp,CV_8U); // This seem very wrong, since it does not account for
+        Mat temp_disp = disparity_map.clone();
+        // Ensure correct type
+//        if(temp_disp.type() != CV_8UC1){
+//            temp_disp = process_disparity(temp_disp);
+//        }
+        if(disparity_map.type() != CV_32FC1){
+            disparity_map.convertTo(temp_disp,CV_32F,1.0/16.0); // This is the official notation.
+        }
+        //disparity_map.convertTo(temp_disp,CV_8U); // This seem very wrong, since it does not account for
         //temp_disp = disparity_map.clone();
         reprojectImageTo3D(temp_disp,depth_map,rectification_data.disparity_depth_map);
 
@@ -925,14 +988,14 @@ vector<Mat> stereo::phase_correlation(Mat reference, Mat source){
         Mat hanning_window;
         createHanningWindow(hanning_window,padded_reference.size(),CV_32F);
 
-        auto start = chrono::high_resolution_clock::now();
+        //auto start = chrono::high_resolution_clock::now();
         Point2d translation = phaseCorrelate(padded_source,padded_reference,hanning_window);
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "phase correlation done in  " << duration.count() << " ms." << endl;
-        cout << endl;
-        cout << endl;
-        cout << endl;
+        //auto stop = chrono::high_resolution_clock::now();
+        //auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        //cout << "phase correlation done in  " << duration.count() << " ms." << endl;
+        //cout << endl;
+        //cout << endl;
+        //cout << endl;
 
 
         // Prepare affine transform (only 2,3 since opencv knows that the last row is allways 0,0,1)

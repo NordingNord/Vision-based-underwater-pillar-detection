@@ -76,7 +76,7 @@ public:
 
     void set_preprocessing_steps(bool color_match = false, bool luminosity_match = false, bool homomorphic_filter = false, bool clahe = false, bool pre_rectify = false);
 
-    void set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track = false, bool fill = false, bool speckle_filter = false, bool use_processed = false, bool consistensy_check = false);
+    void set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track = false, bool fill = false, bool speckle_filter = false, bool use_processed = false, bool consistensy_check = false, bool horizontal_fill = false);
 
     // -- The pipelines --
     void run_triangulation_pipeline(int disparity_filter);
@@ -97,7 +97,6 @@ public:
     std::vector<cv::Mat> preprocess_steps(cv::Mat first_i_frame, cv::Mat second_i_frame);
 
     std::vector<cv::Mat> get_disparity_and_depth(cv::Mat first_i_frame, cv::Mat second_i_frame);
-
 
 
 
@@ -174,6 +173,7 @@ private:
     float speckle_area_percentage = 0.0; // percentage of image size that a speckle is defined as
     double speckle_diff = 0.0;
     bool use_processed_disparity = false;
+    bool apply_horizontal_fill = false;
 
 
 

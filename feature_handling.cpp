@@ -64,7 +64,7 @@ feature_handling::feature_handling(int gap, int size){
 // -- Methods for finding features --
 vector<KeyPoint> feature_handling::find_features(Mat frame){
     // Timing
-    auto start = chrono::high_resolution_clock::now();
+    //auto start = chrono::high_resolution_clock::now();
 
     // Initialize result vector
     vector<KeyPoint> keypoints;
@@ -93,9 +93,9 @@ vector<KeyPoint> feature_handling::find_features(Mat frame){
         }
 
         // Timing and post execution rundown
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "Features was successfully found in " << duration.count() << " ms using " << detector << "." << endl;
+        //auto stop = chrono::high_resolution_clock::now();
+        //auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        //cout << "Features was successfully found in " << duration.count() << " ms using " << detector << "." << endl;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -216,7 +216,7 @@ vector<KeyPoint> feature_handling::find_features(Mat frame, int gap, int size){
 // -- Methods for finding descriptors --
 Mat feature_handling::get_descriptors(Mat frame, vector<KeyPoint> keypoints){
     // Timing
-    auto start = chrono::high_resolution_clock::now();
+    //auto start = chrono::high_resolution_clock::now();
 
     // Initialize result Mat
     Mat descriptors;
@@ -244,9 +244,9 @@ Mat feature_handling::get_descriptors(Mat frame, vector<KeyPoint> keypoints){
             throw runtime_error(error_message);
         }
         // Timing and post execution rundown
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "Descriptors was successfully found in " << duration.count() << " ms using " << detector << "." << endl;
+        //auto stop = chrono::high_resolution_clock::now();
+        //auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        //cout << "Descriptors was successfully found in " << duration.count() << " ms using " << detector << "." << endl;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -478,7 +478,7 @@ void feature_handling::set_match_settings(int match_type, int n_best_matches, fl
 // -- Methods for feature matching --
 vector<DMatch> feature_handling::match_features(Mat first_descriptors, Mat second_descriptors){
     // Timing
-    auto start = chrono::high_resolution_clock::now();
+    //auto start = chrono::high_resolution_clock::now();
 
     vector<DMatch> kept_matches;
     try{
@@ -501,9 +501,9 @@ vector<DMatch> feature_handling::match_features(Mat first_descriptors, Mat secon
             throw runtime_error("Unknown matching method.");
         }
         // Timing and post execution rundown
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "Matching was successfully conducted in " << duration.count() << " ms using " << matching_type << "." << endl;
+        //auto stop = chrono::high_resolution_clock::now();
+        //auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        //cout << "Matching was successfully conducted in " << duration.count() << " ms using " << matching_type << "." << endl;
 
     }
     catch(const exception& error){

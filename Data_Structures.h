@@ -162,4 +162,10 @@ struct feature_data{
     cv::Mat descriptors;
 };
 
+// Contour information
+struct contours{
+    std::vector<std::vector<cv::Point>> contour_vector;
+    std::vector<cv::Vec4i> hierarchy;
+};
+
 #endif

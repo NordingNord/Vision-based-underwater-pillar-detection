@@ -237,7 +237,7 @@ void pipeline::set_preprocessing_steps(bool color_match, bool luminosity_match, 
     }
 }
 
-void pipeline::set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track, bool fill, bool speckle_filter, bool use_processed, bool consistensy_check){
+void pipeline::set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track, bool fill, bool speckle_filter, bool use_processed, bool consistensy_check,bool horizontal_fill ){
     try{
         track_disparity = track;
         apply_consistensy_check = consistensy_check;
@@ -246,6 +246,7 @@ void pipeline::set_disparity_and_depth_steps(float speckle_percentage, double ma
         speckle_area_percentage = speckle_percentage;
         speckle_diff = max_speckle_diff;
         use_processed_disparity = use_processed;
+        apply_horizontal_fill = horizontal_fill;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -1121,6 +1122,8 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
 
 void pipeline::run_disparity_pipeline_test(float resize_ratio){
     try{
+        // timing
+        auto start =  chrono::high_resolution_clock::now();
         // Visualize camera data
         first_camera.visualize_camera_data("First/Left/Bottom camera data: ");
         second_camera.visualize_camera_data("Second/Right/Top camera data: ");
@@ -1130,7 +1133,9 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
 
         // Videos for evaluation
         Size dimensions = stereo_system.get_callibration_size();
-        VideoWriter video("disparity_org.avi",CV_FOURCC('M','J','P','G'),5, dimensions);
+        Size temp_dimensions = dimensions;
+        temp_dimensions.width = temp_dimensions.width * 2;
+        VideoWriter video("disparity_full_post_process.avi",CV_FOURCC('M','J','P','G'),5, temp_dimensions);
 
         // Prepare rectification
         stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
@@ -1143,6 +1148,11 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
 
         int good_count = 0;
         int bad_count = 0;
+
+        // Timing
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        cout << "Setup completed in " << duration.count() << " ms." << endl;
 
         // Begin to go through video feed
         while(true){
@@ -1168,76 +1178,61 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             }
 
             // Preprocess frames
+            start = chrono::high_resolution_clock::now();
             vector<Mat> frames = preprocess_frames(first_frame,second_frame);
             first_frame = frames.at(0);
             second_frame = frames.at(1);
 
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Preprocessing completed in " << duration.count() << " ms." << endl;
+
             // Get disparity and depth maps
+            start = chrono::high_resolution_clock::now();
             vector<Mat> disparity_and_depth = get_disparity_and_depth(first_frame,second_frame);
             Mat disparity_map = disparity_and_depth.at(0);
             Mat depth = disparity_and_depth.at(1);
 
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Disparity and depth found in " << duration.count() << " ms." << endl;
+
+            // Detect possible obstacles
+            vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
+
+
+
+
+
+            // Visualize possible obstacles
+            vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
+            Mat cut_first_frame = stereo_system.remove_invalid_edge(first_frame);
+            Mat warning_frame = visualizer.show_possible_obstacles(danger_zones,cut_first_frame);
+
+            imshow("warning", warning_frame);
+            waitKey(0);
+
             // Write disparity map
-            Mat disparity_map_color;
-            disparity_map_color = stereo_system.process_disparity(disparity_map);
+            Mat disparity_map_color = disparity_map.clone();
             if(disparity_map_color.size() != dimensions){
                 disparity_map_color = converter.expand_to_original_size(disparity_map_color,dimensions);
-                cout << "fixed dimensions = " << disparity_map_color.size() << endl;
             }
             applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+            Mat temp_first = converter.expand_to_original_size(first_frame,dimensions);
+            hconcat(disparity_map_color,temp_first,disparity_map_color);
+//            imshow("doneski", disparity_map_color);
+//            waitKey(0);
             video.write(disparity_map_color);
 
-
-
-//            // Remove black border from depth and working disparity
-//            start = chrono::high_resolution_clock::now();
-
-//            Mat cleaned_depth_map = stereo_system.remove_invalid_edge(depth_map);
-//            Mat cleaned_disparity_map = stereo_system.remove_invalid_edge(disparity_map);
-
-//            stop = chrono::high_resolution_clock::now();
-//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-//            cout << "border removal done in  " << duration.count() << " ms." << endl;
-
-//            // Prepare disparity map for shape finding.
-//            cleaned_disparity_map = stereo_system.process_disparity(cleaned_disparity_map);
-//            medianBlur(cleaned_disparity_map,cleaned_disparity_map,11);
+            // Write depth map
+            //converter.write_3d_points("new_points_3d_F_post.csv",depth,second_frame);
 
 
 
-            // Show prepared disparity map
-//            Mat viz = cleaned_disparity_map.clone();
-//            imshow("Play with disparity",viz);
-//            waitKey(0);
 
-
-//            // Normalize depth
-//            start = chrono::high_resolution_clock::now();
-
-//            Mat normalized_depth_map = converter.normalize_depth(cleaned_depth_map,255.0);
-
-//            stop = chrono::high_resolution_clock::now();
-//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-//            cout << "Normalized in  " << duration.count() << " ms." << endl;
-
-//            Mat viz_normalized = normalized_depth_map.clone();
-//            resize(viz_normalized,viz_normalized,Size(),0.5,0.5,INTER_LINEAR);
-//            imshow("Normalized depth map",viz_normalized);
-//            waitKey(0);
-
-
-//            // Find edges in depth
-//            start = chrono::high_resolution_clock::now();
-
-//            vector<obstacle> obstacles = detector.get_depth_difference(normalized_depth_map);
 
 //            // Get danger zones
 //            vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
-
-//            stop = chrono::high_resolution_clock::now();
-////            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-////            cout << "Found possible obstacles in  " << duration.count() << " ms." << endl;
-
 
 //            // Prepare vizualization of possible obstacles
 //            Mat cut_first_frame = stereo_system.remove_invalid_edge(first_frame);
@@ -1650,9 +1645,6 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
             disparity_map = stereo_system.get_disparity(first_i_frame,second_i_frame);
         }
 
-        // Save original
-        Mat disparity_map_org = disparity_map.clone();
-
         // Compute left right consistensy check
         if(apply_consistensy_check == true){
             disparity_map = stereo_system.validate_disparity(disparity_map,first_i_frame,second_i_frame);
@@ -1661,27 +1653,24 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
         // Remove invalid border
         disparity_map = stereo_system.remove_invalid_edge(disparity_map);
 
+        // Save original
+        Mat disparity_map_org = disparity_map.clone();
+
         // Apply gap filling
         if(fill_gaps == true){
-            Mat disparity_map_color;
-            disparity_map_color = stereo_system.process_disparity(disparity_map);
-            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET);
-            imshow("org", disparity_map_color);
-
-            disparity_map = stereo_system.apply_weighted_median_filter(first_i_frame,disparity_map);
-
-            disparity_map_color = disparity_map;
-            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET);
-            imshow("filled", disparity_map_color);
-            waitKey(0);
-            //disparity_map = stereo_system.fill_disparity_holes(disparity_map);
+            disparity_map = stereo_system.apply_weighted_median_filter(first_i_frame,disparity_map); // Here i change the format of disparity map
         }
 
         // Apply speckle filter
         if(apply_speckle_filter == true){
             int frame_area = first_i_frame.cols * first_i_frame.rows;
             double max_diff = speckle_diff*DISPARITY_STEP;
+            // Method requires orginal signed
             filterSpeckles(disparity_map,INVALID,frame_area*speckle_area_percentage,max_diff);
+        }
+
+        if(apply_horizontal_fill == true){
+            disparity_map = stereo_system.fill_disparity_holes(disparity_map);
         }
 
         // Get depth map based
@@ -1706,3 +1695,5 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
     }
     return disparity_and_depth;
 }
+
+

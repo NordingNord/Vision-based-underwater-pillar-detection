@@ -10,6 +10,347 @@ using namespace cv;
 detecting::detecting(){}
 
 
+// -- Methods for detecting possible obstacles --
+vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_map){
+    vector<obstacle> possible_obstacles;
+    try{
+        // Get lines in disparity map
+        Mat disparity_lines = get_line_frame(disparity_map);
+
+        // Get initial contours
+        contours big_contours = get_big_contours(disparity_lines);
+
+        // Get masks for all surviving contours
+        vector<Mat> contour_masks = create_contour_masks(big_contours,disparity_map.size(),true);
+
+        // Combine masks
+        Mat combined_mask = combine_masks(contour_masks);
+
+        // Find missing contours
+        contours missing_contours = locate_missing_contours(combined_mask);
+
+        // Get missing masks
+        vector<Mat> missing_contour_masks = create_contour_masks(missing_contours,disparity_map.size(),false);
+
+        // Ensure no overlap
+        vector<int> good_indexes = test_for_overlap(combined_mask,missing_contour_masks,missing_contours);
+
+        // Extract valid data
+        missing_contour_masks = extract_masks(missing_contour_masks,good_indexes);
+        missing_contours = extract_contours(missing_contours,good_indexes);
+
+        // Combine data
+        vector<Mat> masks;
+        masks.reserve(contour_masks.size()+missing_contour_masks.size());
+        masks.insert(masks.end(),contour_masks.begin(),contour_masks.end());
+        masks.insert(masks.end(),missing_contour_masks.begin(),missing_contour_masks.end());
+
+        contours combined_contours;
+        vector<vector<Point>> contour_shapes;
+        vector<Vec4i> hierarchies;
+        contour_shapes.reserve(big_contours.contour_vector.size() + missing_contours.contour_vector.size());
+        hierarchies.reserve(big_contours.hierarchy.size() + missing_contours.hierarchy.size());
+
+        contour_shapes.insert(contour_shapes.end(),big_contours.contour_vector.begin(),big_contours.contour_vector.end());
+        contour_shapes.insert(contour_shapes.end(),missing_contours.contour_vector.begin(),missing_contours.contour_vector.end());
+
+        hierarchies.insert(hierarchies.end(), big_contours.hierarchy.begin(), big_contours.hierarchy.end());
+        hierarchies.insert(hierarchies.end(), missing_contours.hierarchy.begin(), missing_contours.hierarchy.end());
+
+        combined_contours.contour_vector = contour_shapes;
+        combined_contours.hierarchy = hierarchies;
+
+        // View all mask
+        for(int i = 0; i < masks.size(); i++){
+            string title = "mask " + to_string(i);
+            imshow(title,masks.at(i));
+        }
+        waitKey(0);
+
+        // Get depth channel
+        Mat channels[3];
+        split(depth_map,channels);
+        Mat depth_channel = channels[2];
+
+        // Get average disparity below masks
+        vector<Scalar> depth_means = get_average_mask_value(masks, depth_channel);
+
+        // Identify possible obstacles (Currently nothing gets accepted)
+        vector<int> valid_indexes = depth_validate_contours(masks,depth_channel,depth_means);
+
+        // Convert to obstacle struct
+        possible_obstacles = create_obstacles(masks,combined_contours,valid_indexes);
+
+        // View all mask
+        for(int i = 0; i < possible_obstacles.size(); i++){
+            string title = "mask " + to_string(i);
+            imshow(title,possible_obstacles.at(i).mask);
+        }
+        waitKey(0);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return possible_obstacles;
+}
+
+// -- Methods for extracting a line map --
+Mat detecting::get_line_frame(Mat frame){
+    Mat line_frame;
+    try{
+        // Find edges in disparity map
+        Canny(frame, line_frame, canny_bottom_thresh,canny_top_thresh,sobel_kernel,use_l2); // 100 200
+
+        // Apply closing
+        morphologyEx(line_frame,line_frame,MORPH_CLOSE,line_closing_kernel);
+
+        // Make bounding box
+        rectangle(line_frame,Point(0,0),Point(line_frame.cols-1,line_frame.rows-1),WHITE,1);
+
+        // Apply thinning
+        ximgproc::thinning(line_frame,line_frame,ximgproc::THINNING_ZHANGSUEN);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return line_frame;
+}
+
+// -- Methods for working with contours --
+contours detecting::get_big_contours(Mat line_frame){
+    contours big_contours;
+    try{
+        // Find contours
+        vector<vector<Point>> contour_list;
+        vector<Vec4i> hierarchy;
+        findContours(line_frame,contour_list,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+        // Remove small ones
+        for(vector<vector<Point>>::iterator it = contour_list.begin(); it!=contour_list.end(); ){
+            if(it->size() < contour_size_threshold){
+                it=contour_list.erase(it);
+            }
+            else{
+                ++it;
+            }
+        }
+
+        // Prepare output
+        big_contours.contour_vector = contour_list;
+        big_contours.hierarchy = hierarchy;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return big_contours;
+}
+
+vector<Mat> detecting::create_contour_masks(contours input_contours, Size frame_size, bool morph){
+    vector<Mat> masks;
+    try{
+        for(size_t i = 0; i < input_contours.contour_vector.size(); i++){
+            Mat mask = Mat::zeros(frame_size,CV_8U);
+
+            drawContours(mask,input_contours.contour_vector,(int)i, WHITE, -1, LINE_8,input_contours.hierarchy,0);
+
+            // Apply closing to mask
+            if(morph == true){
+                morphologyEx(mask,mask,MORPH_OPEN,contour_closing_kernel);
+                morphologyEx(mask,mask,MORPH_CLOSE,contour_closing_kernel);
+            }
+
+            // Push back mask
+            masks.push_back(mask);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return masks;
+}
+
+Mat detecting::combine_masks(vector<Mat> masks){
+    Mat combined_mask  = Mat::zeros(masks.at(0).size(),CV_8U);;
+    try{
+        for(size_t i = 0; i < masks.size(); i++){
+            combined_mask = combined_mask | masks.at(i);
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return combined_mask;
+}
+
+contours detecting::locate_missing_contours(Mat combined_mask){
+    contours missing_contours;
+    try{
+        // Make bounding box around combined mask
+        Mat bordered = combined_mask.clone();
+        rectangle(bordered,Point(0,0),Point(bordered.cols-1,bordered.rows-1),WHITE,1);
+
+
+        // Find missing contours
+        vector<vector<Point>> missing_contours_vector;
+        vector<Vec4i> missing_hierarchy;
+
+        findContours(bordered,missing_contours_vector,missing_hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+        // prepare output
+        missing_contours.contour_vector = missing_contours_vector;
+        missing_contours.hierarchy = missing_hierarchy;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return missing_contours;
+}
+
+vector<int>  detecting::test_for_overlap(Mat combined_mask, vector<Mat> masks, contours input_contours){
+    vector<int> filtered_indexes;
+    try{
+        // Analyze contours
+        for(int i = 0; i < masks.size(); i++){
+            Mat overlap = masks.at(i) & combined_mask;
+
+            double circumfrence = arcLength(input_contours.contour_vector.at(i),true);
+
+            if(countNonZero(overlap) < circumfrence){
+                filtered_indexes.push_back(i);
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_indexes;
+}
+
+vector<Mat> detecting::extract_masks(vector<Mat> masks, vector<int> indexes){
+    vector<Mat> remaining_masks;
+    try{
+        for(int i = 0; i < indexes.size();i++){
+            remaining_masks.push_back(masks.at(indexes.at(i)));
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return remaining_masks;
+}
+
+
+contours detecting::extract_contours(contours input_contours, std::vector<int> indexes){
+    contours remaining_contours;
+    try{
+        vector<vector<Point>> contour_vectors;
+        vector<Vec4i> hierachies;
+        for(int i = 0; i < indexes.size(); i++){
+            int valid_index = indexes.at(i);
+            vector<Point> valid_contour = input_contours.contour_vector.at(valid_index);
+            Vec4i valid_hierachy = input_contours.hierarchy.at(valid_index);
+
+            contour_vectors.push_back(valid_contour);
+            hierachies.push_back(valid_hierachy);
+        }
+        remaining_contours.contour_vector = contour_vectors;
+        remaining_contours.hierarchy = hierachies;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return remaining_contours;
+}
+
+// -- Valdidation methods of initial masks --
+vector<int> detecting::depth_validate_contours(vector<Mat> masks, Mat depth_map, vector<Scalar> average_depths){
+    vector<int> valid_indexes;
+    try{
+        // Get outer border of each mask, by dilating and subtract from original mask
+        for(int mask_index = 0; mask_index < masks.size(); mask_index++){
+            Mat current_mask = masks.at(mask_index);
+
+            // Dilate
+            Mat dilated_mask;
+            dilate(current_mask,dilated_mask,border_kernel);
+
+            // subtract original mask
+            Mat border = dilated_mask-current_mask;
+
+            // Get indexes of border
+            Mat border_indexes;
+            findNonZero(border,border_indexes);
+
+            cout << average_depths.at(mask_index)[0] << endl;
+
+            // Go through points
+            int bigger_depth_count = 0;
+            for(int point_index = 0; point_index < border_indexes.size().height; point_index++){
+
+                // Check if value at index is smaller or bigger
+                Point current_point = border_indexes.at<Point>(point_index);
+                float average_depth = depth_map.at<float>(current_point);
+
+                if(average_depth > average_depths.at(mask_index)[0]){
+                    bigger_depth_count++;
+                }
+            }
+
+            // Ensure that 90 percent of sorounding pixels are bigger for it to maybe be an obstacle
+            int limit = int(border_indexes.size().height*deeper_threshold);
+
+            if(bigger_depth_count >= limit){
+                valid_indexes.push_back(mask_index);
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return valid_indexes;
+}
+
+// -- Methods that analyse disparity --
+vector<Scalar> detecting::get_average_mask_value(vector<Mat> masks, Mat frame){
+    vector<Scalar> average_values;
+    try{
+        Mat positive_coordinates = frame >= 0.0;
+        for(size_t i = 0; i < masks.size(); i++){
+            Mat current_mask = masks.at(i) & positive_coordinates;
+
+            Scalar average_value = mean(frame,current_mask);
+            average_values.push_back(average_value);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return average_values;
+}
+
+// -- Methods for creating obstacles --
+vector<obstacle> detecting::create_obstacles(vector<Mat> masks, contours input_contours, vector<int> valid_indexes){
+    vector<obstacle> obstacles;
+    try{
+        for(int i = 0; i < valid_indexes.size(); i++){
+            int current_index = valid_indexes.at(i);
+
+            obstacle new_obstacle;
+            new_obstacle.contour = input_contours.contour_vector.at(current_index);
+            new_obstacle.mask = masks.at(current_index);
+
+            obstacles.push_back(new_obstacle);
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return obstacles;
+}
+
 // -- Methods for analysing depth differences -- (Currently all in one method. Split later when acceptable flow is determined.)
 vector<obstacle> detecting::get_depth_difference(Mat depth_map){
     vector<obstacle> obstacles;
@@ -240,6 +581,8 @@ vector<obstacle> detecting::get_depth_difference(Mat depth_map){
     }
     return obstacles;
 }
+
+
 
 
 // -- Methods for filtering possible obstacles --

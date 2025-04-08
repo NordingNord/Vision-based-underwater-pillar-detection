@@ -2000,3 +2000,54 @@
 //            if(frame_index > 7470){
 //                break;
 //            }
+
+//        for(vector<vector<Point>>::iterator it = contours.begin(); it!=contours.end();){
+//            int current_size = it->size();
+
+//            if(current_size > disparity_map.cols*disparity_map.rows*0.01){
+//                big_contours.push_back(*it);
+//            }
+//            else{
+//                ++it;
+//            }
+//        }
+
+//        // Create mask for invalid values
+//        Mat invalid = disparity_map == -16;
+
+//        // Dilate mask one pixel in rows alone to left and to right
+//        Mat_<int> temp_left_kernel(3,3);
+//        temp_left_kernel << 0,0,0,0,255,255,0,0,0;
+//        Mat left_kernel = temp_left_kernel;
+//        left_kernel.convertTo(left_kernel,CV_8U);
+//        Mat left_valid;
+//        dilate(invalid,left_valid,left_kernel);
+
+//        Mat_<int> temp_right_kernel(3,3);
+//        temp_right_kernel << 0,0,0,255,255,0,0,0,0;
+//        Mat right_kernel = temp_right_kernel;
+//        right_kernel.convertTo(right_kernel,CV_8U);
+//        Mat right_valid;
+//        dilate(invalid,right_valid,right_kernel);
+
+////        // Remove invalid mask from valid mask to get closest pixels
+//        left_valid = left_valid - invalid;
+//        right_valid = right_valid - invalid;
+
+//        // Get values of valid areas
+//        imshow("invalid", invalid);
+//        imshow("left",left_valid);
+//        imshow("right", right_valid);
+//        waitKey(0);
+
+        // Get coordinates of invalid points as well as closest valid points
+//        vector<Point> locations;
+//        findNonZero(invalid,locations);
+
+//        vector<Point> valid_locations;
+//        findNonZero(valid,valid_locations);
+
+//        // For each location find closest valid left and right location
+//        for(int i = 0; i < locations.size(); i++){
+
+//        }

@@ -69,24 +69,25 @@ z_coordinates = []
 points_3d = []
 colors = []
 
-with open('points_3d_good.csv',mode = 'r') as file:
+with open('new_points_3d_F_post.csv',mode = 'r') as file:
     csv_file = csv.DictReader(file)
     for line in csv_file:
-        x_coordinates.append(float(line.get("x")))
-        y_coordinates.append(float(line.get("y")))
-        z_coordinates.append(float(line.get("z")))
+        if(float(line.get("z")) >= 0.0):
+            x_coordinates.append(float(line.get("x")))
+            y_coordinates.append(float(line.get("y")))
+            z_coordinates.append(float(line.get("z")))
 
-        point_3d = []
-        point_3d.append(float(line.get("x")))
-        point_3d.append(float(line.get("y")))
-        point_3d.append(float(line.get("z")))
-        points_3d.append(np.array(point_3d))
+            point_3d = []
+            point_3d.append(float(line.get("x")))
+            point_3d.append(float(line.get("y")))
+            point_3d.append(float(line.get("z")))
+            points_3d.append(np.array(point_3d))
 
-        color = []
-        color.append(float(line.get("r"))/255.0)
-        color.append(float(line.get("g"))/255.0)
-        color.append(float(line.get("b"))/255.0)
-        colors.append(np.array(color))
+            color = []
+            color.append(float(line.get("r"))/255.0)
+            color.append(float(line.get("g"))/255.0)
+            color.append(float(line.get("b"))/255.0)
+            colors.append(np.array(color))
 colors = np.array(colors)
 points_3d = np.array(points_3d)
 
