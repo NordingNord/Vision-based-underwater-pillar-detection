@@ -38,6 +38,7 @@ public:
     cv::Mat equalize_clahe(cv::Mat frame);
 
 private:
+    // All these variables should be set in main
     float highpass_maximum = 2.5;
     float highpass_minimum = 0.5;
     float highpass_cutoff_coef = 1.0;
@@ -45,7 +46,7 @@ private:
 
     // -- CLAHE settings --
     double contrast_threshold = 40.0; // Also called clipLimit
-    cv::Size grid_size = cv::Size(8,8);
+    cv::Size grid_size = cv::Size(8,8); // Way too small and should be set from main
 };
 
 #endif // PREPROCESSING_ALGORITHMS_H

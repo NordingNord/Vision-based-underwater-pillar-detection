@@ -253,6 +253,16 @@ void pipeline::set_disparity_and_depth_steps(float speckle_percentage, double ma
     }
 }
 
+void pipeline::set_obstacle_finding_steps(int edge_detection, bool blur, bool equalize, int equalize_alg, bool close, bool thin, bool morph_initial, bool clean_final, bool dilate_validation,int expansions, Size dilation_size, int max_background, int max_foreground){
+    try{
+        detector.set_pipeline_settings(edge_detection, blur, equalize, equalize_alg, close, thin, morph_initial, clean_final, dilate_validation,expansions, dilation_size, max_background, max_foreground);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+}
+
+
 
 // -- The pipelines --
 void pipeline::run_triangulation_pipeline(int disparity_filter){
@@ -1136,6 +1146,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
         Size temp_dimensions = dimensions;
         temp_dimensions.width = temp_dimensions.width * 2;
         VideoWriter video("disparity_full_post_process.avi",CV_FOURCC('M','J','P','G'),5, temp_dimensions);
+        VideoWriter video_danger("danger_areas_lower_max.avi",CV_FOURCC('M','J','P','G'),5, temp_dimensions);
 
         // Prepare rectification
         stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
@@ -1198,7 +1209,16 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             cout << "Disparity and depth found in " << duration.count() << " ms." << endl;
 
             // Detect possible obstacles
+            start = chrono::high_resolution_clock::now();
+
             vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Possible obstacles found in " << duration.count() << " ms." << endl;
+
+            // Filter obstacles
+
 
 
 
@@ -1206,42 +1226,39 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
 
             // Visualize possible obstacles
             vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
-            Mat cut_first_frame = stereo_system.remove_invalid_edge(first_frame);
-            Mat warning_frame = visualizer.show_possible_obstacles(danger_zones,cut_first_frame);
 
-            imshow("warning", warning_frame);
-            waitKey(0);
+            for(int i = 0; i < danger_zones.size(); i++){
+                danger_zones.at(i) = converter.expand_to_original_size(danger_zones.at(i),dimensions,BORDER_REPLICATE);
+            }
+
+            Mat temp_first = converter.expand_to_original_size(first_frame,dimensions);
+
+            Mat warning_frame = visualizer.show_possible_obstacles(danger_zones,temp_first);
+
+
+//            imshow("f",warning_frame);
+//            waitKey(0);
 
             // Write disparity map
             Mat disparity_map_color = disparity_map.clone();
+
             if(disparity_map_color.size() != dimensions){
                 disparity_map_color = converter.expand_to_original_size(disparity_map_color,dimensions);
             }
             applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
-            Mat temp_first = converter.expand_to_original_size(first_frame,dimensions);
+
+            hconcat(warning_frame,disparity_map_color,warning_frame);
+
             hconcat(disparity_map_color,temp_first,disparity_map_color);
-//            imshow("doneski", disparity_map_color);
-//            waitKey(0);
+
             video.write(disparity_map_color);
+            video_danger.write(warning_frame);
+
 
             // Write depth map
             //converter.write_3d_points("new_points_3d_F_post.csv",depth,second_frame);
 
 
-
-
-
-//            // Get danger zones
-//            vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
-
-//            // Prepare vizualization of possible obstacles
-//            Mat cut_first_frame = stereo_system.remove_invalid_edge(first_frame);
-//            Mat warning_frame = visualizer.show_possible_obstacles(danger_zones,cut_first_frame);
-
-//            Mat warning_temp = warning_frame.clone();
-//            resize(warning_temp,warning_temp,Size(),0.5,0.5,INTER_LINEAR);
-//            imshow("warning", warning_temp);
-//            waitKey(0);
 
 //            // Filter obstacles
 //            start = chrono::high_resolution_clock::now();

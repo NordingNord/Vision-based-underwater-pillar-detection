@@ -153,15 +153,15 @@ int main(){
 
     // -- obstacle candidate settings --
     int blur_size = 21;
-    double low_thresh = 150;
+    double low_thresh = 100;
     double high_thresh = 200;
     int sobel_size = 3;
-    bool l2_status = false;
+    bool l2_status = true;
     int size_thresh = 500;
     cv::Mat line_kernel = getStructuringElement(MORPH_RECT,Size(5,5),Point(-1,-1));
     cv::Mat contour_kernel = getStructuringElement(MORPH_RECT,Size(71,71),Point(-1,-1));
-    cv::Mat border_kernel = getStructuringElement(MORPH_CROSS,Size(3,3),Point(-1,-1));
-    float border_threshold = 0.9;
+    cv::Mat border_kernel = getStructuringElement(MORPH_ELLIPSE,Size(3,3),Point(-1,-1)); // usually single pixel expansion, (3,3) usually cross
+    float border_threshold = 0.75;
 
     // -- Obstacle filter settings --
     float rectangle_acceptance_threshold = 0.25; // The percentage of a bounding rectangle that is allowed to contain out of obstacle pixels. If exceeded, the obstacle must either not be rectangular or contain more than one rectangle.
@@ -200,6 +200,21 @@ int main(){
     bool consistensy_check = false;
     bool horizontal_fill = false;
 
+    // -- Identify possible obstacles --
+    int edge_detection = LINE_MODE_MORPH; // Method used for creating an edge image
+    bool blur = true; // If blur should be applied before edge detection
+    bool equalize = false; // If histogram equalization should be conducted before edge detection
+    int equalize_alg = EQUALIZE_CLAHE; // Algorithm used for histogram equalization
+    bool close = true; // If edges should be closed
+    bool thin = true; // If edges should be thinned
+    bool morph_initial = false; // Should holes and pertruding elements be removed from the initial obstacles
+    bool clean_final = true; // Should holes and pertruding elements be removed from the final obstacles
+    bool dilate_validation = false; // Dilate masks slightly before validation
+    int expansions = 6; // Number of dilation performed during validation
+    cv::Size dilation_size = cv::Size(5,5); // Size of dilation kernel used for the MORPH mode of edge detection
+    int max_background = 50; // Lower bound of thresholding done in MORPH edge detection. TODO: SET LOWER
+    int max_foreground = 255; // Upper bound of thresholding done in MORPH edge detection.
+
     // -- RUN PIPELINE --
     pipeline detection_triangulation(bottom_video,top_video); // Setup mode and video feeds
     detection_triangulation.set_parameter_paths(bottom_paramter_path, top_parameter_path); // Setup camera data
@@ -216,6 +231,7 @@ int main(){
     detection_triangulation.set_slic_settings(slic_method,region_size,ruler,slic_iterations);
     detection_triangulation.set_preprocessing_steps(color_match,luminosity_match,homomorphic_filter,clahe,pre_rectify);
     detection_triangulation.set_disparity_and_depth_steps(speckle_percentage,max_speckle_diff,track,fill,speckle_filter,use_processed,consistensy_check,horizontal_fill);
+    detection_triangulation.set_obstacle_finding_steps(edge_detection,blur,equalize,equalize_alg,close,thin,morph_initial,clean_final,dilate_validation,expansions,dilation_size,max_background,max_foreground);
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);

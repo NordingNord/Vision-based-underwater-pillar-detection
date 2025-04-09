@@ -78,6 +78,9 @@ public:
 
     void set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track = false, bool fill = false, bool speckle_filter = false, bool use_processed = false, bool consistensy_check = false, bool horizontal_fill = false);
 
+    void set_obstacle_finding_steps(int edge_detection = LINE_MODE_MORPH, bool blur = true, bool equalize = false, int equalize_alg = EQUALIZE_CLAHE, bool close = true, bool thin = true, bool morph_initial = true, bool clean_final = true, bool dilate_validation = true,int expansions = 5, cv::Size dilation_size = cv::Size(5,5), int max_background = 100, int max_foreground = 255);
+
+
     // -- The pipelines --
     void run_triangulation_pipeline(int disparity_filter);
 

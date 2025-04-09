@@ -21,7 +21,11 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
         contours big_contours = get_big_contours(disparity_lines);
 
         // Get masks for all surviving contours
-        vector<Mat> contour_masks = create_contour_masks(big_contours,disparity_map.size(),true);
+        vector<Mat> contour_masks = create_contour_masks(big_contours,disparity_map.size(),morph_initial_masks);
+
+        if(contour_masks.size() == 0){
+            throw runtime_error("No possible obstacles found.");
+        }
 
         // Combine masks
         Mat combined_mask = combine_masks(contour_masks);
@@ -45,6 +49,10 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
         masks.insert(masks.end(),contour_masks.begin(),contour_masks.end());
         masks.insert(masks.end(),missing_contour_masks.begin(),missing_contour_masks.end());
 
+        if(masks.size() == 0){
+            throw runtime_error("No possible obstacles found.");
+        }
+
         contours combined_contours;
         vector<vector<Point>> contour_shapes;
         vector<Vec4i> hierarchies;
@@ -60,13 +68,6 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
         combined_contours.contour_vector = contour_shapes;
         combined_contours.hierarchy = hierarchies;
 
-        // View all mask
-        for(int i = 0; i < masks.size(); i++){
-            string title = "mask " + to_string(i);
-            imshow(title,masks.at(i));
-        }
-        waitKey(0);
-
         // Get depth channel
         Mat channels[3];
         split(depth_map,channels);
@@ -75,18 +76,26 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
         // Get average disparity below masks
         vector<Scalar> depth_means = get_average_mask_value(masks, depth_channel);
 
+        // Dilate masks if desired
+        if(dilate_depth_validation == true){
+            Mat kernel = getStructuringElement(MORPH_ELLIPSE, Size(3,3));
+            for(int i = 0; i < masks.size();i++){
+                dilate(masks.at(i),masks.at(i),kernel);
+            }
+        }
+
         // Identify possible obstacles (Currently nothing gets accepted)
         vector<int> valid_indexes = depth_validate_contours(masks,depth_channel,depth_means);
 
         // Convert to obstacle struct
         possible_obstacles = create_obstacles(masks,combined_contours,valid_indexes);
 
-        // View all mask
-        for(int i = 0; i < possible_obstacles.size(); i++){
-            string title = "mask " + to_string(i);
-            imshow(title,possible_obstacles.at(i).mask);
-        }
-        waitKey(0);
+//        // View all mask
+//        for(int i = 0; i < possible_obstacles.size(); i++){
+//            string title = "mask " + to_string(i);
+//            imshow(title,possible_obstacles.at(i).mask);
+//        }
+//        waitKey(0);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -98,17 +107,71 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
 Mat detecting::get_line_frame(Mat frame){
     Mat line_frame;
     try{
+        Mat working_frame = frame.clone();
+
+        if(apply_equalization == true){
+            if(equalize_mode == EQUALIZE_CLAHE){
+                preprocessing_algorithms preprocessor;
+                working_frame = preprocessor.equalize_clahe(working_frame);
+            }
+            else if(equalize_mode == EQUALIZE_FULL){
+                equalizeHist(working_frame,working_frame);
+            }
+            else{
+                throw runtime_error("Unknown equalization mode. Please use EQUALIZE_CLAHE or EQUALIZE_FULL.");
+            }
+        }
+
+        if(apply_blur == true){
+            medianBlur(working_frame,working_frame,median_blur_size);
+
+        }
+
         // Find edges in disparity map
-        Canny(frame, line_frame, canny_bottom_thresh,canny_top_thresh,sobel_kernel,use_l2); // 100 200
+        if(line_mode == LINE_MODE_CANNY){
+            Canny(working_frame, line_frame, canny_bottom_thresh,canny_top_thresh,sobel_kernel,use_l2);
+        }
+        else if(line_mode == LINE_MODE_MORPH){
+            line_frame = get_manual_line_frame(working_frame);
+        }
+        else{
+            throw runtime_error("Unrecognised line mode. Please choose either LINE_MODE_MORPH or LINE_MODE_CANNY");
+        }
 
         // Apply closing
-        morphologyEx(line_frame,line_frame,MORPH_CLOSE,line_closing_kernel);
+        if(close_lines == true){
+            morphologyEx(line_frame,line_frame,MORPH_CLOSE,line_closing_kernel);
+        }
 
         // Make bounding box
-        rectangle(line_frame,Point(0,0),Point(line_frame.cols-1,line_frame.rows-1),WHITE,1);
+        rectangle(line_frame,Point(0,0),Point(line_frame.cols-1,line_frame.rows-1),WHITE,DRAW_WIDTH_1P);
 
         // Apply thinning
-        ximgproc::thinning(line_frame,line_frame,ximgproc::THINNING_ZHANGSUEN);
+        if(thin_lines == true){
+            ximgproc::thinning(line_frame,line_frame,ximgproc::THINNING_ZHANGSUEN);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return line_frame;
+}
+
+Mat detecting::get_manual_line_frame(Mat frame){
+    Mat line_frame;
+    try{
+        // Threshold high disparity areas
+        Mat thresholded_frame;
+        threshold(frame,thresholded_frame,max_background_disparity,max_foreground_disparity,THRESH_BINARY);
+
+        // Dilate threshold image
+        Mat kernel = getStructuringElement(MORPH_RECT,edge_dilation_size);
+        Mat dilated_mask;
+        morphologyEx(thresholded_frame,dilated_mask, MORPH_DILATE,kernel);
+
+        // Get absolute differece between dilated and thresholded frame
+        absdiff(dilated_mask,thresholded_frame,line_frame);
+
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -151,16 +214,20 @@ vector<Mat> detecting::create_contour_masks(contours input_contours, Size frame_
         for(size_t i = 0; i < input_contours.contour_vector.size(); i++){
             Mat mask = Mat::zeros(frame_size,CV_8U);
 
-            drawContours(mask,input_contours.contour_vector,(int)i, WHITE, -1, LINE_8,input_contours.hierarchy,0);
+            drawContours(mask,input_contours.contour_vector,(int)i, WHITE, DRAW_WIDTH_INFILL, LINE_8,input_contours.hierarchy,DRAW_SINGLE_CONTOUR);
 
-            // Apply closing to mask
+            // Apply closing to mask (currently not that good)
+            //imshow("mask",mask);
             if(morph == true){
-                morphologyEx(mask,mask,MORPH_OPEN,contour_closing_kernel);
-                morphologyEx(mask,mask,MORPH_CLOSE,contour_closing_kernel);
+                mask = clean_contour_mask(mask);
+                //imshow("morphed",mask);
             }
+            //waitKey(0);
 
-            // Push back mask
-            masks.push_back(mask);
+            // Push back mask if not entire image
+            if(countNonZero(mask) < frame_size.width*frame_size.height){
+                masks.push_back(mask);
+            }
         }
     }
     catch(const exception& error){
@@ -170,7 +237,7 @@ vector<Mat> detecting::create_contour_masks(contours input_contours, Size frame_
 }
 
 Mat detecting::combine_masks(vector<Mat> masks){
-    Mat combined_mask  = Mat::zeros(masks.at(0).size(),CV_8U);;
+    Mat combined_mask  = Mat::zeros(masks.front().size(),CV_8U);
     try{
         for(size_t i = 0; i < masks.size(); i++){
             combined_mask = combined_mask | masks.at(i);
@@ -188,7 +255,7 @@ contours detecting::locate_missing_contours(Mat combined_mask){
     try{
         // Make bounding box around combined mask
         Mat bordered = combined_mask.clone();
-        rectangle(bordered,Point(0,0),Point(bordered.cols-1,bordered.rows-1),WHITE,1);
+        rectangle(bordered,Point(0,0),Point(bordered.cols-1,bordered.rows-1),WHITE,DRAW_WIDTH_1P);
 
 
         // Find missing contours
@@ -241,7 +308,6 @@ vector<Mat> detecting::extract_masks(vector<Mat> masks, vector<int> indexes){
     return remaining_masks;
 }
 
-
 contours detecting::extract_contours(contours input_contours, std::vector<int> indexes){
     contours remaining_contours;
     try{
@@ -264,6 +330,46 @@ contours detecting::extract_contours(contours input_contours, std::vector<int> i
     return remaining_contours;
 }
 
+vector<Mat> detecting::clean_contour_masks(vector<Mat> masks){
+    vector<Mat> cleaned_masks;
+    try{
+        for(size_t i = 0; i < masks.size(); i++){
+            Mat mask = masks.at(i).clone();
+
+            mask = clean_contour_mask(mask);
+
+            cleaned_masks.push_back(mask);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return cleaned_masks;
+}
+
+Mat detecting::clean_contour_mask(Mat mask){
+    Mat clean_mask = mask.clone();
+    try{
+        // open to remove pertruding elements (like plant life)
+        morphologyEx(clean_mask,clean_mask,MORPH_OPEN,contour_closing_kernel);
+
+        // expand frame to ensure posibility of closing at edges
+        int expand_size = clean_mask.cols;
+        copyMakeBorder(clean_mask,clean_mask,expand_size,expand_size,expand_size,expand_size,BORDER_CONSTANT,BLACK);
+
+        // Close gaps in shape
+        morphologyEx(clean_mask,clean_mask,MORPH_CLOSE,contour_closing_kernel);
+
+        // Remove padding
+        clean_mask = clean_mask(Range(expand_size,clean_mask.rows-expand_size),Range(expand_size,clean_mask.cols-expand_size));
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return clean_mask;
+}
+
 // -- Valdidation methods of initial masks --
 vector<int> detecting::depth_validate_contours(vector<Mat> masks, Mat depth_map, vector<Scalar> average_depths){
     vector<int> valid_indexes;
@@ -272,37 +378,64 @@ vector<int> detecting::depth_validate_contours(vector<Mat> masks, Mat depth_map,
         for(int mask_index = 0; mask_index < masks.size(); mask_index++){
             Mat current_mask = masks.at(mask_index);
 
-            // Dilate
-            Mat dilated_mask;
-            dilate(current_mask,dilated_mask,border_kernel);
+            // Dilate a couple of times to compensate for slight error
+            for(int expansion = 0; expansion < max_expansions; expansion++){
+                // Dilate
+                Mat dilated_mask;
+                dilate(current_mask,dilated_mask,border_kernel);
 
-            // subtract original mask
-            Mat border = dilated_mask-current_mask;
+                // subtract original mask
+                Mat border = dilated_mask-current_mask;
 
-            // Get indexes of border
-            Mat border_indexes;
-            findNonZero(border,border_indexes);
+                // Ensure invalid points are not counted
+                Mat valid = depth_map >= MIN_DEPTH;
+                border = valid & border;
 
-            cout << average_depths.at(mask_index)[0] << endl;
+                // Get indexes of border
+                Mat border_indexes;
+                findNonZero(border,border_indexes);
 
-            // Go through points
-            int bigger_depth_count = 0;
-            for(int point_index = 0; point_index < border_indexes.size().height; point_index++){
+                // Go through points
+                int bigger_depth_count = 0;
+//                vector<Point> bad_locals; // test
+                for(int point_index = 0; point_index < border_indexes.size().height; point_index++){
 
-                // Check if value at index is smaller or bigger
-                Point current_point = border_indexes.at<Point>(point_index);
-                float average_depth = depth_map.at<float>(current_point);
+                    // If average depth is invalid, it is imposible to say if mask is an obstacle
+                    if(average_depths.at(mask_index)[0] == INVALID_FLOAT){
+                        break;
+                    }
 
-                if(average_depth > average_depths.at(mask_index)[0]){
-                    bigger_depth_count++;
+                    // Check if value at index is smaller or bigger
+                    Point current_point = border_indexes.at<Point>(point_index);
+                    float average_depth = depth_map.at<float>(current_point);
+
+                    if(average_depth > average_depths.at(mask_index)[0]){
+                        bigger_depth_count++;
+                    }
+//                    else{
+//                        bad_locals.push_back(current_point);
+//                    }
                 }
-            }
 
-            // Ensure that 90 percent of sorounding pixels are bigger for it to maybe be an obstacle
-            int limit = int(border_indexes.size().height*deeper_threshold);
+                // Test analyze bad areas
+//                Mat test_mask  = Mat::zeros(current_mask.size(),CV_8U);
+//                for(int i = 0; i < bad_locals.size(); i++){
+//                    test_mask.at<uchar>(bad_locals.at(i)) = 255;
+//                }
 
-            if(bigger_depth_count >= limit){
-                valid_indexes.push_back(mask_index);
+                // Ensure that 90 percent of sorounding pixels are bigger for it to maybe be an obstacle
+                int limit = int(border_indexes.size().height*deeper_threshold);
+//                cout << bigger_depth_count << " | " << limit << endl;
+//                imshow("bad",test_mask);
+//                waitKey(0);
+
+                if(bigger_depth_count >= limit){
+                    valid_indexes.push_back(mask_index);
+                    break;
+                }
+                else{
+                    current_mask = dilated_mask.clone();
+                }
             }
         }
     }
@@ -316,18 +449,82 @@ vector<int> detecting::depth_validate_contours(vector<Mat> masks, Mat depth_map,
 vector<Scalar> detecting::get_average_mask_value(vector<Mat> masks, Mat frame){
     vector<Scalar> average_values;
     try{
-        Mat positive_coordinates = frame >= 0.0;
-        for(size_t i = 0; i < masks.size(); i++){
-            Mat current_mask = masks.at(i) & positive_coordinates;
+        Mat positive_coordinates = frame >= MIN_DEPTH;
 
-            Scalar average_value = mean(frame,current_mask);
-            average_values.push_back(average_value);
+        float inf = std::numeric_limits<float>::infinity();
+        Mat infinite_coordinates = frame == inf;
+
+        Mat not_infinite;
+        bitwise_not(infinite_coordinates, not_infinite);
+
+        positive_coordinates = positive_coordinates & not_infinite;
+
+
+        for(int i = 0; i < masks.size(); i++){
+            Mat current_mask = masks.at(i) & positive_coordinates;
+            Mat bad_values;
+            bitwise_not(current_mask,bad_values,masks.at(i));
+
+            // If most values are invalid, set average depth as invalid
+            if(countNonZero(current_mask) <= countNonZero(bad_values)){
+                average_values.push_back(INVALID_FLOAT);
+            }
+            else{
+                Scalar average_value = mean(frame,current_mask);
+                average_values.push_back(average_value);
+            }
         }
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
     return average_values;
+}
+
+void detecting::define_max_background(Mat disparity_map){
+    try{
+
+        // Another solution might be to cluster in two (After removing outliers like small very close speckles)
+
+        // Create list of all values
+        Mat temp_map = disparity_map.clone();
+        double min,max;
+        minMaxLoc(temp_map,min,max);
+        vector<double> values;
+        while(max > 0.0){
+            values.push_back(max);
+            char val = int(max);
+            Mat mask = temp_map == val;
+            temp_map.setTo(val,mask);
+            minMaxLoc(temp_map,min,max);
+        }
+
+        // Count all occurences of each value
+        vector<int> counts;
+        for(int i = 0; i < values.size(); i++){
+            char val = int(values.at(i));
+            Mat mask = disparity_map == val;
+            counts.push_back(countNonZero(mask));
+        }
+
+        // Find most common element
+        vector<int>::iterator most_common_index = max_element(counts.begin(),counts.end());
+        std::size_t index = std::distance(std::begin(my_vector), iterator);
+        most_common_index
+
+
+
+        // Remove most common from list
+        vector
+
+        // Find second most common element
+        // Value in between the two is set to max background
+
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
 }
 
 // -- Methods for creating obstacles --
@@ -341,6 +538,10 @@ vector<obstacle> detecting::create_obstacles(vector<Mat> masks, contours input_c
             new_obstacle.contour = input_contours.contour_vector.at(current_index);
             new_obstacle.mask = masks.at(current_index);
 
+            if(clean_final_masks == true){
+                new_obstacle.original_mask = new_obstacle.mask;
+                new_obstacle.mask = clean_contour_mask(new_obstacle.mask);
+            }
             obstacles.push_back(new_obstacle);
         }
 
@@ -2332,6 +2533,49 @@ void detecting::set_obstacle_filter_settings(float rectangle_threshold, float si
         cout << "Error: " << error.what() << endl;
     }
 }
+
+void detecting::set_pipeline_settings(int edge_detection, bool blur, bool equalize, int equalize_alg, bool close, bool thin, bool morph_initial, bool clean_final, bool dilate_validation,int expansions, Size dilation_size, int max_background, int max_foreground){
+    try{
+        // Pipeline variables
+        if(edge_detection != LINE_MODE_MORPH && edge_detection != LINE_MODE_CANNY){
+            throw runtime_error("Unknown line mode. Please use LINE_MODE_MORPH or LINE_MODE_CANNY");
+        }
+        line_mode = edge_detection;
+
+        apply_blur = blur;
+
+        apply_equalization = equalize;
+
+        if(equalize_alg != EQUALIZE_CLAHE && equalize_alg != EQUALIZE_FULL){
+            throw runtime_error("Unknown equalizing mode. Please use EQUALIZE_CLAHE or EQUALIZE_FULL");
+        }
+
+        equalize_mode = equalize_alg;
+
+        close_lines = close;
+
+        thin_lines = thin;
+
+        morph_initial_masks = morph_initial;
+
+        clean_final_masks = clean_final;
+
+        dilate_depth_validation = dilate_validation;
+
+        // Morph variables
+        edge_dilation_size = dilation_size;
+
+        max_background_disparity = max_background;
+        max_foreground_disparity = max_foreground;
+
+        max_expansions = expansions;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+
+}
+
 
 // -- Convinience methods --
 bool detecting::check_valid_split(Vec4i line, int direction, Mat mask){

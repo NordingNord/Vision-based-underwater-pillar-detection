@@ -13,6 +13,7 @@
 #include "visualization.h"
 #include "calculator.h"
 #include "filters.h"
+#include "preprocessing_algorithms.h"
 
 // -- Defines --
 static const int DIRECTION_LEFT = 0;
@@ -21,6 +22,22 @@ static const int DIRECTION_UP = 2;
 static const int DIRECTION_DOWN = 3;
 
 static const int WHITE = 255;
+static const int BLACK = 0;
+
+static const float INVALID_FLOAT = -1.0;
+
+static const int LINE_MODE_CANNY = 0;
+static const int LINE_MODE_MORPH = 1;
+
+static const int EQUALIZE_CLAHE = 0;
+static const int EQUALIZE_FULL = 1;
+
+static const int DRAW_WIDTH_1P = 1;
+static const int DRAW_WIDTH_INFILL = -1;
+
+static const int DRAW_SINGLE_CONTOUR = 0;
+
+static const float MIN_DEPTH = 0.0;
 
 
 // -- Class --
@@ -35,6 +52,8 @@ public:
 
     // -- Methods for extracting a line map --
     cv::Mat get_line_frame(cv::Mat frame);
+
+    cv::Mat get_manual_line_frame(cv::Mat frame);
 
     // -- Methods for working with contours --
     contours get_big_contours(cv::Mat line_frame);
@@ -51,8 +70,14 @@ public:
 
     contours extract_contours(contours input_contours, std::vector<int> indexes);
 
+    std::vector<cv::Mat> clean_contour_masks(std::vector<cv::Mat> masks);
+
+    cv::Mat clean_contour_mask(cv::Mat mask);
+
     // -- Methods that analyse disparity --
     std::vector<cv::Scalar> get_average_mask_value(std::vector<cv::Mat> masks, cv::Mat frame);
+
+    void define_max_background(cv::Mat disparity_map);
 
     // -- Valdidation methods of initial masks --
     std::vector<int> depth_validate_contours(std::vector<cv::Mat> masks, cv::Mat depth_map, std::vector<cv::Scalar> average_depths);
@@ -82,6 +107,8 @@ public:
     cv::Mat ensure_single_obstacle(cv::Mat mask, cv::Vec4i first_line, cv::Vec4i last_line);
 
     cv::Mat ensure_single_obstacle(cv::Mat mask); // Faster version that just keeps the biggest contour
+
+
 
     // -- Methods that splits all obstacles into viable rectangles. --
     std::vector<obstacle> split_into_rectangles(std::vector<obstacle> obstacles);
@@ -114,6 +141,8 @@ public:
     void set_possible_obstacles_settings(int blur_size, double low_thresh, double high_thresh, int sobel_size, bool l2_status, int size_thresh, cv::Mat line_kernel, cv::Mat contour_kernel, cv::Mat border_kernel, float border_threshold);
 
     void set_obstacle_filter_settings(float rectangle_acceptance_threshold, float size_limit, int hough_thresh, double min_length, double max_gap, int step_limit, float decline_thresh, float rectangle_ratio, int obstacle_cutoff);
+
+    void set_pipeline_settings(int edge_detection = LINE_MODE_MORPH, bool blur = true, bool equalize = false, int equalize_alg = EQUALIZE_CLAHE, bool close = true, bool thin = true, bool morph_initial = true, bool clean_final = true, bool dilate_validation = true,int expansions = 5, cv::Size dilation_size = cv::Size(5,5), int max_background = 100, int max_foreground = 255);
 
     // -- Convinience methods --
     bool check_valid_split(cv::Vec4i line, int direction, cv::Mat mask);
@@ -165,6 +194,34 @@ private:
     float rectangle_size_ratio;
 
     int obstacle_size_threshold;
+
+
+    // Pipeline variables
+    int line_mode = LINE_MODE_MORPH;
+
+    bool apply_blur = true;
+
+    bool apply_equalization = false;
+
+    int equalize_mode = EQUALIZE_CLAHE;
+
+    bool close_lines = true;
+
+    bool thin_lines = true;
+
+    bool morph_initial_masks = true;
+
+    bool clean_final_masks = true;
+
+    bool dilate_depth_validation = true;
+
+    // Morph variables
+    cv::Size edge_dilation_size = cv::Size(5,5);
+
+    int max_background_disparity = 100;
+    int max_foreground_disparity = 255;
+
+    int max_expansions = 5;
 
 
 };
