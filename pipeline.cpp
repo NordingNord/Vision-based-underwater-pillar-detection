@@ -253,9 +253,9 @@ void pipeline::set_disparity_and_depth_steps(float speckle_percentage, double ma
     }
 }
 
-void pipeline::set_obstacle_finding_steps(int edge_detection, bool blur, bool equalize, int equalize_alg, bool close, bool thin, bool morph_initial, bool clean_final, bool dilate_validation,int expansions, Size dilation_size, int max_background, int max_foreground){
+void pipeline::set_obstacle_finding_steps(int edge_detection, bool blur, bool equalize, int equalize_alg, bool close, bool thin, bool morph_initial, bool clean_final, bool dilate_validation,int expansions, bool estimate, Size dilation_size, int max_background, int max_foreground){
     try{
-        detector.set_pipeline_settings(edge_detection, blur, equalize, equalize_alg, close, thin, morph_initial, clean_final, dilate_validation,expansions, dilation_size, max_background, max_foreground);
+        detector.set_pipeline_settings(edge_detection, blur, equalize, equalize_alg, close, thin, morph_initial, clean_final, dilate_validation,expansions,estimate, dilation_size, max_background, max_foreground);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -1062,7 +1062,7 @@ void pipeline::run_disparity_pipeline(int disparity_filter){
             // Filter obstacles
             start = chrono::high_resolution_clock::now();
 
-            vector<obstacle> filtered_obstacles = detector.filter_obstacles(obstacles,first_frame);
+            vector<obstacle> filtered_obstacles = detector.filter_obstacles(obstacles);
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -1146,7 +1146,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
         Size temp_dimensions = dimensions;
         temp_dimensions.width = temp_dimensions.width * 2;
         VideoWriter video("disparity_full_post_process.avi",CV_FOURCC('M','J','P','G'),5, temp_dimensions);
-        VideoWriter video_danger("danger_areas_lower_max.avi",CV_FOURCC('M','J','P','G'),5, temp_dimensions);
+        VideoWriter video_danger("danger_areas_canny.avi",CV_FOURCC('M','J','P','G'),5, temp_dimensions);
 
         // Prepare rectification
         stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
@@ -1156,9 +1156,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
         Mat first_frame, second_frame;
         Mat last_first_frame;
         vector<obstacle> last_obstacles;
-
-        int good_count = 0;
-        int bad_count = 0;
+        bool cropped_last_from_top;
 
         // Timing
         auto stop = chrono::high_resolution_clock::now();
@@ -1198,7 +1196,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Preprocessing completed in " << duration.count() << " ms." << endl;
 
-            // Get disparity and depth maps
+            // Get disparity and depth maps (Improvements need to be made)
             start = chrono::high_resolution_clock::now();
             vector<Mat> disparity_and_depth = get_disparity_and_depth(first_frame,second_frame);
             Mat disparity_map = disparity_and_depth.at(0);
@@ -1208,7 +1206,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Disparity and depth found in " << duration.count() << " ms." << endl;
 
-            // Detect possible obstacles
+            // Detect possible obstacles (Improvements need to be made)
             start = chrono::high_resolution_clock::now();
 
             vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
@@ -1217,107 +1215,112 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Possible obstacles found in " << duration.count() << " ms." << endl;
 
-            // Filter obstacles
-
-
-
-
-
-
-            // Visualize possible obstacles
+            // Save masks for later visualization
             vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
 
+            // Filter obstacles
+            start = chrono::high_resolution_clock::now();
+
+            obstacles = detector.filter_obstacles(obstacles);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Filtered obstacles in  " << duration.count() << " ms." << endl;
+
+            // Identify obstacles
+            start = chrono::high_resolution_clock::now();
+
+            obstacles = detector.detect_type(obstacles,depth);
+
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
+
+            // If desired. Patch gap
+            if(patch_gaps == true){
+                start = chrono::high_resolution_clock::now();
+                if(last_first_frame.size() != first_frame.size()){
+                    int width = min(last_first_frame.size().width, first_frame.size().width);
+                    int height = min(last_first_frame.size().height, first_frame.size().height);
+
+                    if(last_first_frame.size().width > width || last_first_frame.size().height > height){
+                        converter.crop_image(last_first_frame,Size(width,height),stereo_system.get_crop_status());
+                        last_obstacles = converter.crop_obstacles(last_obstacles,Size(width,height),stereo_system.get_crop_status());
+                    }
+                    else{
+                        converter.crop_image(first_frame,Size(width,height),cropped_last_from_top);
+                        obstacles = converter.crop_obstacles(obstacles,Size(width,height),cropped_last_from_top);
+                    }
+                }
+
+                vector<obstacle> obstacles_temp = patch_obstacle_gap(obstacles,last_obstacles,first_frame,last_first_frame);
+
+                // Update last info, without keeping the moved obstacles
+                last_first_frame = first_frame;
+                last_obstacles = obstacles;
+                cropped_last_from_top = stereo_system.get_crop_status();
+                obstacles = obstacles_temp;
+
+
+                stop = chrono::high_resolution_clock::now();
+                duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+                cout << "Gap patched in  " << duration.count() << " ms." << endl;
+            }
+            else{
+                // Update last info
+                last_first_frame = first_frame.clone();
+                last_obstacles = obstacles;
+                cropped_last_from_top = stereo_system.get_crop_status();
+            }
+
+            // JUST TEST VISUALIZATION FROM HERE ON OUT
+
+            // Convert frame to original size
+            first_frame = converter.expand_to_original_size(first_frame,dimensions);
+
+            // Convert obstacles to original size
+            for(int i = 0; i < obstacles.size(); i++){
+                obstacles.at(i).mask = converter.expand_to_original_size(obstacles.at(i).mask,dimensions,BORDER_REPLICATE);
+            }
+
+            // Convert danger zones to original size
             for(int i = 0; i < danger_zones.size(); i++){
                 danger_zones.at(i) = converter.expand_to_original_size(danger_zones.at(i),dimensions,BORDER_REPLICATE);
             }
 
-            Mat temp_first = converter.expand_to_original_size(first_frame,dimensions);
 
-            Mat warning_frame = visualizer.show_possible_obstacles(danger_zones,temp_first);
+            // Visualize possible obstacles
+            Mat warning_frame = visualizer.show_possible_obstacles(danger_zones,first_frame);
+
+            imshow("WARNING", warning_frame);
+            waitKey(0);
+
+            // Visualize final obstacles
+            Mat final_warning = visualizer.show_obstacles(obstacles,first_frame);
+
+            imshow("FINAL WARNING", final_warning);
+            waitKey(0);
 
 
-//            imshow("f",warning_frame);
-//            waitKey(0);
+//            // Write disparity map
+//            Mat disparity_map_color = disparity_map.clone();
 
-            // Write disparity map
-            Mat disparity_map_color = disparity_map.clone();
+//            if(disparity_map_color.size() != dimensions){
+//                disparity_map_color = converter.expand_to_original_size(disparity_map_color,dimensions);
+//            }
+//            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
 
-            if(disparity_map_color.size() != dimensions){
-                disparity_map_color = converter.expand_to_original_size(disparity_map_color,dimensions);
-            }
-            applyColorMap(disparity_map_color,disparity_map_color,COLORMAP_JET); // CV_8UC3 -> access using cv::Vec3b
+//            hconcat(warning_frame,disparity_map_color,warning_frame);
 
-            hconcat(warning_frame,disparity_map_color,warning_frame);
+//            hconcat(disparity_map_color,temp_first,disparity_map_color);
 
-            hconcat(disparity_map_color,temp_first,disparity_map_color);
-
-            video.write(disparity_map_color);
-            video_danger.write(warning_frame);
+//            video.write(disparity_map_color);
+//            video_danger.write(warning_frame);
 
 
             // Write depth map
             //converter.write_3d_points("new_points_3d_F_post.csv",depth,second_frame);
 
-
-
-//            // Filter obstacles
-//            start = chrono::high_resolution_clock::now();
-
-//            vector<obstacle> filtered_obstacles = detector.filter_obstacles(obstacles,first_frame);
-
-//            stop = chrono::high_resolution_clock::now();
-//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-//            cout << "Filtered obstacles in  " << duration.count() << " ms." << endl;
-
-
-//            // Find obstacle types
-//            start = chrono::high_resolution_clock::now();
-
-//            filtered_obstacles = detector.detect_type(filtered_obstacles,normalized_depth_map);
-
-//            stop = chrono::high_resolution_clock::now();
-//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-//            cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
-
-
-//            // If no obstacles, use last obstacles
-//            vector<obstacle> temp_obstacles = filtered_obstacles;
-//            if(filtered_obstacles.size() == 0){
-//                // Find features in last and current frame
-//                vector<KeyPoint> keypoints = feature_handler.find_features(first_frame);
-//                vector<KeyPoint> last_keypoints = feature_handler.find_features(last_first_frame);
-
-//                Mat descriptors = feature_handler.get_descriptors(first_frame,keypoints);
-//                Mat last_descriptors = feature_handler.get_descriptors(last_first_frame,last_keypoints);
-
-//                // Match features
-//                vector<DMatch> matches = feature_handler.match_features(last_descriptors,descriptors);
-
-//                // Clean matches
-//                vector<DMatch> filtered_matches = filtering_sytem.filter_matches(matches,last_keypoints,keypoints);
-//                vector<vector<KeyPoint>> remaining_keypoints = converter.remove_unmatches_keypoints(filtered_matches,last_keypoints,keypoints);
-//                last_keypoints = remaining_keypoints.at(0);
-
-//                // Perform optical flow
-//                vector<vector<float>> movement = optical_flow_system.get_optical_flow_movement(converter.keypoints_to_points(last_keypoints),last_first_frame,first_frame);
-
-//                // Use optical flow results to move obstacles
-//                temp_obstacles = detector.patch_detection_gap(last_obstacles,movement,converter.keypoints_to_points(last_keypoints));
-
-
-//            }
-//            // Update last info
-//            last_first_frame = first_frame.clone();
-//            last_obstacles = filtered_obstacles;
-//            filtered_obstacles = temp_obstacles;
-
-//            // Visualize final obstacles
-//            Mat final_warning = visualizer.show_obstacles(filtered_obstacles,cut_first_frame);
-
-//            Mat final_warning_temp = final_warning.clone();
-//            resize(final_warning_temp,final_warning_temp,Size(),0.5,0.5,INTER_LINEAR);
-//            imshow("final warning", final_warning_temp);
-//            waitKey(0);
 
             // Destroy windows before new run
             destroyAllWindows();
@@ -1713,4 +1716,36 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
     return disparity_and_depth;
 }
 
+
+vector<obstacle> pipeline::patch_obstacle_gap(vector<obstacle> current_obstacles, vector<obstacle> old_obstacles, Mat frame, Mat old_frame){
+    vector<obstacle> patched_obstacles = current_obstacles;
+    try{
+        if(current_obstacles.size() < old_obstacles.size()){
+            // Find features in last and current frame
+            vector<KeyPoint> keypoints = feature_handler.find_features(frame);
+            vector<KeyPoint> old_keypoints = feature_handler.find_features(old_frame);
+
+            Mat descriptors = feature_handler.get_descriptors(frame,keypoints);
+            Mat old_descriptors = feature_handler.get_descriptors(old_frame,old_keypoints);
+
+            // Match features
+            vector<DMatch> matches = feature_handler.match_features(old_descriptors,descriptors);
+
+            // Clean matches
+            vector<DMatch> filtered_matches = filtering_sytem.filter_matches(matches,old_keypoints,keypoints);
+            vector<vector<KeyPoint>> remaining_keypoints = converter.remove_unmatches_keypoints(filtered_matches,old_keypoints,keypoints);
+            old_keypoints = remaining_keypoints.at(0);
+
+            // Perform optical flow
+            vector<vector<float>> movement = optical_flow_system.get_optical_flow_movement(converter.keypoints_to_points(old_keypoints),old_frame,frame);
+
+            // Use optical flow results to move obstacles
+            patched_obstacles = detector.patch_detection_gap(old_obstacles,movement,converter.keypoints_to_points(old_keypoints));
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return patched_obstacles;
+}
 

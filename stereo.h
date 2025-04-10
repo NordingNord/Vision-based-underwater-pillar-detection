@@ -73,6 +73,8 @@ public:
 
     cv::Size get_callibration_size();
 
+    bool get_crop_status();
+
     // -- Methods for cleaning maps after disparity mapping --
     cv::Mat remove_invalid_edge(cv::Mat frame, int edge = LEFT); // Removes edge made by disparity mapping
 
@@ -139,6 +141,9 @@ private:
     // -- WLS Filter parameters --
     double lamda;
     double sigma;
+
+    // -- Parameter for what direction cropping took place
+    bool cropped_top;
 
     // -- Test gab gab --
     cv::Mat Q_test;

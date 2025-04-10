@@ -306,3 +306,55 @@ cv::Mat converting::expand_to_original_size(cv::Mat frame, cv::Size original_siz
     }
     return expanded_frame;
 }
+
+Mat converting::crop_image(Mat frame, Size new_size, bool crop_from_top){
+    Mat cropped_frame = frame.clone();
+    try{
+        if(frame.size().height < new_size.height || frame.size().width < new_size.width){
+            throw runtime_error("Cannot crop to larger size.");
+        }
+        else{
+            // Get width and height differences
+            int width_diff = frame.size().width - new_size.width;
+            int height_diff = frame.size().height - new_size.height;
+
+            // Crop from left
+            Range horizontal_crop = Range(width_diff,frame.size().width);
+
+            // Crop from either top or bottom
+            Range vertical_crop;
+
+            if(crop_from_top == true){
+                vertical_crop = Range(height_diff,frame.size().height);
+            }
+            else{
+                vertical_crop = Range(0,frame.size().height-height_diff);
+            }
+
+            // Crop
+            cropped_frame = frame(vertical_crop,horizontal_crop);
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return cropped_frame;
+}
+
+vector<obstacle> converting::crop_obstacles(vector<obstacle> obstacles, Size new_size, bool crop_from_top){
+    vector<obstacle> cropped_obstacles = obstacles;
+    try{
+        // Contours are not changed, so if they are needed later problems will occur
+        for(int i = 0; i < cropped_obstacles.size(); i++){
+            cropped_obstacles.at(i).mask = crop_image(cropped_obstacles.at(i).mask,new_size,crop_from_top);
+            cropped_obstacles.at(i).original_mask = crop_image(cropped_obstacles.at(i).original_mask,new_size,crop_from_top);
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return cropped_obstacles;
+}
+

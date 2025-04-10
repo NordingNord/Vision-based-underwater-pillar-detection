@@ -44,6 +44,9 @@ public:
     // -- Superpixel visualization methods --
     cv::Mat show_super_pixel_borders(cv::Mat frame, super_pixel_frame data, cv::Vec3b color  = {0,0,0});
 
+    // -- Methods for visualizing lines --
+    cv::Mat show_line_borders(std::vector<cv::Vec4i> horizontal_lines, std::vector<cv::Vec4i> vertical_lines, cv::Mat mask);
+
 private:
 
 };

@@ -2051,3 +2051,322 @@
 //        for(int i = 0; i < locations.size(); i++){
 
 //        }
+
+
+//vector<obstacle> detecting::split_into_rectangles_corner(vector<obstacle> obstacles){
+//    vector<obstacle> accepted_obstacles;
+//    try{
+//        // Step 0: Split current obstacles into rectangles
+//        vector<Mat> viable_splits;
+//        vector<Mat> original_masks;
+
+//        for(int obstacle_index = 0; obstacle_index < obstacles.size(); obstacle_index++){
+
+//            // Get current data
+//            vector<Point> contour = obstacles.at(obstacle_index).contour;
+//            Mat mask = obstacles.at(obstacle_index).mask;
+
+//            // Draw bounding rectangle
+//            RotatedRect current_rectangle = minAreaRect(contour);
+//            Point2f rectangle_points[4];
+//            current_rectangle.points(rectangle_points);
+//            vector<Point> rectangle_points_vector = {rectangle_points[0],rectangle_points[1],rectangle_points[2],rectangle_points[3]};
+//            vector<vector<Point>> points;
+//            points.push_back(rectangle_points_vector);
+//            Mat bounding_box = Mat::zeros(mask.size(),CV_8U);
+//            drawContours(bounding_box,points,0,WHITE,-1,LINE_8);
+
+//            // Check if bounding box contains more than threshold percent error (Error being pixel within box that do not belong to mask)
+//            Mat error_mask = bounding_box-mask;
+//            int mask_count = countNonZero(mask);
+//            int error_count = countNonZero(error_mask);
+
+//            // If big error the obstacle should be split
+//            if(error_count > int(mask_count*accept_rectangle_threshold)){
+//                vector<Mat> obstacles_to_be_split = {mask};
+//                int original_contour_size = mask_count;
+
+//                while(obstacles_to_be_split.size() > 0){
+
+//                    // Step 1: find biggest remaining contour
+//                    vector<vector<Point>> contours;
+//                    vector<Vec4i> hierarchy;
+//                    findContours(obstacles_to_be_split.at(0),contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+//                    int biggest = 0;
+//                    vector<Point> biggest_contour;
+//                    for(vector<vector<Point>>::iterator it = contours.begin(); it!=contours.end(); ){
+//                        int current_size = it->size();
+
+//                        if(current_size > biggest){
+//                            biggest = current_size;
+//                            biggest_contour = *it;
+//                        }
+//                        else{
+//                            ++it;
+//                        }
+//                    }
+//                    vector<vector<Point>> temp_contours = {biggest_contour};
+//                    Mat contour_mask =  Mat::zeros(mask.size(),CV_8U);
+//                    drawContours(contour_mask,temp_contours,0,WHITE,-1);
+
+//                    // Step 2: Find edges
+//                    Mat edge_mask;
+//                    Canny(contour_mask,edge_mask,50,200,3);
+
+
+//                    Mat test = Mat::zeros(mask.size(),CV_8U);
+//                    drawContours(test,temp_contours,0,WHITE,1);
+//                    imshow("the mask", contour_mask);
+//                    imshow("the edge", edge_mask);
+//                    imshow("new idea", test);
+//                    waitKey(0);
+
+//                    // Step 3: Find best but different lines
+//                    line_data best_line_data, second_best_line_data;
+//                    best_line_data = get_best_line(edge_mask,hough_threshold,min_line_length,max_line_gap,false,false);
+//                    Vec4i best_line = best_line_data.line;
+//                    double best_angle = best_line_data.angle;
+//                    second_best_line_data = get_best_line(edge_mask,hough_threshold,min_line_length,max_line_gap,true,best_angle, 45.0);
+//                    Vec4i second_best_line = second_best_line_data.line;
+//                    double second_best_angle = second_best_line_data.angle;
+
+//                    // Stop if two different lines cant be found
+//                    if(second_best_line[0] == second_best_line[2] && second_best_line[1] == second_best_line[3]){
+//                        break;
+//                    }
+
+//                    // Step 4: Move lines until obstacle is lost
+//                    int first_direction = get_obstacle_direction(best_angle,best_line,contour_mask);
+//                    int second_direction = get_obstacle_direction(second_best_angle,second_best_line,contour_mask);
+
+//                    vector<Vec4i> first_movement = get_line_borders(first_direction,best_line,contour_mask,step_threshold,decline_threshold);
+//                    Vec4i new_best_line = first_movement.at(1);
+
+//                    vector<Vec4i> second_movement = get_line_borders(second_direction,second_best_line,contour_mask,step_threshold,decline_threshold);
+//                    Vec4i new_second_best_line = second_movement.at(1);
+
+//                    // Step 5: Detect inner corner (The corner where cutting with either line will result in there being an obstacle in both cuts)
+//                    bool best_line_validity = check_valid_split(best_line,first_direction,mask);
+//                    bool second_best_line_validity = check_valid_split(second_best_line, second_direction,mask);
+//                    bool new_best_validity = check_valid_split(new_best_line,first_direction, mask);
+//                    bool new_second_best_validity = check_valid_split(new_second_best_line, second_direction, mask);
+
+//                    vector<Vec4i> split_lines;
+//                    if(best_line_validity == true && second_best_line_validity == true){
+//                        split_lines = {best_line,second_best_line};
+//                    }
+//                    else if(new_best_validity == true && new_second_best_validity == true){
+//                        split_lines = {new_best_line, new_second_best_line};
+//                    }
+//                    else{
+//                        throw runtime_error("No inner corner could be found.");
+//                    }
+
+
+//                    // Step 6: split obstacle in two based on lines and direction
+//                    Mat best_split = get_best_split(split_lines.at(0),first_direction,mask);
+//                    Mat second_best_split = get_best_split(split_lines.at(1),second_direction,mask);
+
+//                    // Get best split masks
+//                    Mat best_split_mask = get_best_split_mask(split_lines.at(0),first_direction,mask);
+//                    Mat second_best_split_mask = get_best_split_mask(split_lines.at(1),second_direction,mask);
+
+//                    // Get point of no intersection
+//                    Mat no_go_zone = best_split_mask | second_best_split_mask;
+//                    bitwise_not(no_go_zone,no_go_zone);
+
+//                    // Remove this areas for best splits
+//                    Mat no_go_zone_best = no_go_zone & best_split;
+//                    bitwise_xor(best_split,no_go_zone_best,best_split);
+//                    Mat no_go_zone_second_best = no_go_zone & second_best_split;
+//                    bitwise_xor(second_best_split,no_go_zone_second_best,second_best_split);
+
+//                    // Step 7: Check if cuts can be estimated as rectangles
+//                    vector<vector<Point>> best_split_contours;
+//                    vector<Vec4i> best_split_hierarchy;
+//                    findContours(best_split,best_split_contours,best_split_hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+//                    int best_split_biggest = 0;
+//                    vector<Point> best_split_biggest_contour;
+//                    for(vector<vector<Point>>::iterator it = best_split_contours.begin(); it!=best_split_contours.end(); ){
+//                        int current_size = it->size();
+
+//                        if(current_size > best_split_biggest){
+//                            best_split_biggest = current_size;
+//                            best_split_biggest_contour = *it;
+//                        }
+//                        else{
+//                            ++it;
+//                        }
+//                    }
+
+//                    Mat best_mask = Mat::zeros(mask.size(),CV_8U);
+//                    vector<vector<Point>> temp = {best_split_biggest_contour};
+//                    drawContours(best_mask,temp,0,255,-1);
+
+//                    vector<vector<Point>> second_best_split_contours;
+//                    vector<Vec4i> second_best_split_hierarchy;
+//                    findContours(second_best_split,second_best_split_contours,second_best_split_hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+//                    int second_best_split_biggest = 0;
+//                    vector<Point> second_best_split_biggest_contour;
+//                    for(vector<vector<Point>>::iterator it = second_best_split_contours.begin(); it!=second_best_split_contours.end(); ){
+//                        int current_size = it->size();
+
+//                        if(current_size > second_best_split_biggest){
+//                            second_best_split_biggest = current_size;
+//                            second_best_split_biggest_contour = *it;
+//                        }
+//                        else{
+//                            ++it;
+//                        }
+//                    }
+
+//                    Mat second_best_mask = Mat::zeros(mask.size(),CV_8U);
+//                    vector<vector<Point>> second_temp = {second_best_split_biggest_contour};
+//                    drawContours(second_best_mask,second_temp,0,255,-1);
+
+//                    RotatedRect best_rectangle = minAreaRect(best_split_biggest_contour);
+//                    Point2f best_rectangle_points[4];
+//                    best_rectangle.points(best_rectangle_points);
+//                    vector<Point> best_rectangle_points_vector = {best_rectangle_points[0],best_rectangle_points[1],best_rectangle_points[2],best_rectangle_points[3]};
+//                    vector<vector<Point>> best_points;
+//                    best_points.push_back(best_rectangle_points_vector);
+//                    Mat best_bounding_box = Mat::zeros(mask.size(),CV_8U);
+//                    drawContours(best_bounding_box,best_points,0,WHITE,-1,LINE_8);
+
+//                    RotatedRect second_best_rectangle = minAreaRect(second_best_split_biggest_contour);
+//                    Point2f second_best_rectangle_points[4];
+//                    second_best_rectangle.points(second_best_rectangle_points);
+//                    vector<Point> second_best_rectangle_points_vector = {second_best_rectangle_points[0],second_best_rectangle_points[1],second_best_rectangle_points[2],second_best_rectangle_points[3]};
+//                    vector<vector<Point>> second_best_points;
+//                    second_best_points.push_back(second_best_rectangle_points_vector);
+//                    Mat second_best_bounding_box = Mat::zeros(mask.size(),CV_8U);
+//                    drawContours(second_best_bounding_box,second_best_points,0,WHITE,-1,LINE_8);
+
+//                    Mat best_error_mask = best_bounding_box-best_mask;
+//                    int best_mask_count = countNonZero(best_mask);
+//                    int best_error_count = countNonZero(best_error_mask);
+
+//                    Mat second_best_error_mask = second_best_bounding_box-second_best_mask;
+//                    int second_best_mask_count = countNonZero(second_best_mask);
+//                    int second_best_error_count = countNonZero(second_best_error_mask);
+
+//                    // What about remaining data cut out during splitting?
+//                    if(best_error_count > int(best_mask_count*accept_rectangle_threshold) && best_mask_count > original_contour_size*obstacle_size_limit){
+//                        obstacles_to_be_split.push_back(best_split);
+//                    }
+//                    else if(best_mask_count > original_contour_size*obstacle_size_limit){
+//                        viable_splits.push_back(best_mask);
+//                        original_masks.push_back(mask);
+//                    }
+//                    if(second_best_error_count > int(second_best_mask_count*accept_rectangle_threshold) && second_best_mask_count > original_contour_size*obstacle_size_limit){
+//                        obstacles_to_be_split.push_back(second_best_split);
+//                    }
+//                    else if(second_best_mask_count > original_contour_size*obstacle_size_limit){
+//                        viable_splits.push_back(second_best_mask);
+//                        original_masks.push_back(mask);
+//                    }
+//                    Mat remaining_mask = obstacles_to_be_split.at(0)-best_mask;
+//                    remaining_mask = remaining_mask - second_best_mask;
+
+//                    if(countNonZero(remaining_mask) > original_contour_size*obstacle_size_limit){
+//                        obstacles_to_be_split.push_back(remaining_mask);
+//                    }
+
+//                   obstacles_to_be_split.erase(obstacles_to_be_split.begin());
+//                }
+//            }
+//            else{
+//                viable_splits.push_back(mask);
+//                original_masks.push_back(mask);
+//            }
+//        }
+
+//        // Clean viable obstacles
+//        for(int i = 0; i < viable_splits.size(); i++){
+//            // Find contour
+//            vector<Point> contour;
+//            findNonZero(viable_splits.at(i),contour);
+
+//            // Find best fit line for each obstacle
+//            Vec4f fitted_line;
+//            fitLine(contour,fitted_line, DIST_L2, 0, 0.1, 0.1);
+
+//            // Find angle of line
+//            int biggest_distance = int(sqrt(viable_splits.at(i).cols*viable_splits.at(i).cols + viable_splits.at(i).rows * viable_splits.at(i).rows));
+//            Point start = Point(fitted_line[2]-fitted_line[0]*biggest_distance,fitted_line[3]-fitted_line[1]*biggest_distance);
+//            Point end = Point(fitted_line[2]+fitted_line[0]*biggest_distance,fitted_line[3]+fitted_line[1]*biggest_distance);
+
+//            double angle = calculations.calculate_angle(start,end);
+//            angle = angle + (90*M_PI/180); // Shift to align with x-axis
+
+//            // Check if line is vertical or horizontal
+//            int direction;
+//            if(angle*180/M_PI < abs(angle*180/M_PI-90)){
+//                direction = DIRECTION_RIGHT;
+//            }
+//            else{
+//                direction = DIRECTION_UP;
+//            }
+
+//            // Get best fit mask
+//            Vec4i current_line;
+//            current_line[0] = start.x;
+//            current_line[1] = start.y;
+//            current_line[2] = end.x;
+//            current_line[3] = end.y;
+//            vector<Vec4i> borders = get_best_fit_borders(direction,current_line,viable_splits.at(i));
+
+//            Mat best_fit_mask = Mat::zeros(viable_splits.at(i).size(),CV_8U);
+//            vector<Point> points = {Point(borders.at(0)[0],borders.at(0)[1]),Point(borders.at(1)[0],borders.at(1)[1]),Point(borders.at(1)[2],borders.at(1)[3]), Point(borders.at(0)[2],borders.at(0)[3])};
+//            vector<vector<Point>> temp = {points};
+//            drawContours(best_fit_mask,temp,0,255,-1);
+
+//            Mat final_mask = best_fit_mask & viable_splits.at(i);
+
+
+//            obstacle current_obstacle;
+//            current_obstacle.type = "Unknown";
+
+//            vector<vector<Point>> contours;
+//            vector<Vec4i> hierarchy;
+//            findContours(final_mask,contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+//            int biggest = 0;
+//            vector<Point> biggest_contour;
+//            for(vector<vector<Point>>::iterator it = contours.begin(); it!=contours.end(); ){
+//                int current_size = it->size();
+
+//                if(current_size > biggest){
+//                    biggest = current_size;
+//                    biggest_contour = *it;
+//                }
+//                else{
+//                    ++it;
+//                }
+//            }
+//            current_obstacle.contour = biggest_contour;
+
+//            // use rectangle as obstacle shape
+//            RotatedRect current_rectangle = minAreaRect(biggest_contour);
+//            Point2f rectangle_points[4];
+//            current_rectangle.points(rectangle_points);
+//            vector<Point> rectangle_points_vector = {rectangle_points[0],rectangle_points[1],rectangle_points[2],rectangle_points[3]};
+//            vector<vector<Point>> temp_points;
+//            temp_points.push_back(rectangle_points_vector);
+//            Mat bounding_box = Mat::zeros(viable_splits.at(i).size(),CV_8U);
+//            drawContours(bounding_box,temp_points,0,WHITE,-1,LINE_8);
+
+//            current_obstacle.mask = bounding_box;
+//            current_obstacle.original_mask = original_masks.at(i);
+
+//            accepted_obstacles.push_back(current_obstacle);
+//        }
+//    }
+//    catch(const exception& error){
+//        cout << "Error: " << error.what() << endl;
+//    }
+//    return accepted_obstacles;
+//}

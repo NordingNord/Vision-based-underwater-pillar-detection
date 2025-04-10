@@ -324,3 +324,38 @@ Mat visualization::show_super_pixel_borders(Mat frame, super_pixel_frame data, V
     }
     return visualized_frame;
 }
+
+
+// -- Methods for visualizing lines --
+Mat visualization::show_line_borders(vector<Vec4i> horizontal_lines, vector<Vec4i> vertical_lines, Mat mask){
+    Mat image;
+    try{
+        Mat temp_frame = mask.clone();
+
+        // convert to color
+        cvtColor(temp_frame, temp_frame, COLOR_GRAY2BGR);
+
+        // Draw horizontal lines
+        int red = 255;
+        for(int i = 0; i < horizontal_lines.size(); i++){
+            Vec4i current_line = horizontal_lines.at(i);
+            line(temp_frame,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),Scalar(0,0,red),3,LINE_AA);
+            red -= 50;
+        }
+
+        // Draw vertical lines
+        int green = 255;
+        for(int i = 0; i < vertical_lines.size(); i++){
+            Vec4i current_line = vertical_lines.at(i);
+            line(temp_frame,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),Scalar(0,green,0),3,LINE_AA);
+            green -= 50;
+        }
+
+        // Prepare output
+        image = temp_frame;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return image;
+}

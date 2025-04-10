@@ -78,7 +78,7 @@ public:
 
     void set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track = false, bool fill = false, bool speckle_filter = false, bool use_processed = false, bool consistensy_check = false, bool horizontal_fill = false);
 
-    void set_obstacle_finding_steps(int edge_detection = LINE_MODE_MORPH, bool blur = true, bool equalize = false, int equalize_alg = EQUALIZE_CLAHE, bool close = true, bool thin = true, bool morph_initial = true, bool clean_final = true, bool dilate_validation = true,int expansions = 5, cv::Size dilation_size = cv::Size(5,5), int max_background = 100, int max_foreground = 255);
+    void set_obstacle_finding_steps(int edge_detection = LINE_MODE_MORPH, bool blur = true, bool equalize = false, int equalize_alg = EQUALIZE_CLAHE, bool close = true, bool thin = true, bool morph_initial = true, bool clean_final = true, bool dilate_validation = true,int expansions = 5, bool estimate = true, cv::Size dilation_size = cv::Size(5,5), int max_background = 100, int max_foreground = 255);
 
 
     // -- The pipelines --
@@ -100,6 +100,8 @@ public:
     std::vector<cv::Mat> preprocess_steps(cv::Mat first_i_frame, cv::Mat second_i_frame);
 
     std::vector<cv::Mat> get_disparity_and_depth(cv::Mat first_i_frame, cv::Mat second_i_frame);
+
+    std::vector<obstacle> patch_obstacle_gap(std::vector<obstacle> current_obstacles, std::vector<obstacle> old_obstacles, cv::Mat frame, cv::Mat old_frame);
 
 
 
@@ -177,6 +179,7 @@ private:
     double speckle_diff = 0.0;
     bool use_processed_disparity = false;
     bool apply_horizontal_fill = false;
+    bool patch_gaps = true;
 
 
 

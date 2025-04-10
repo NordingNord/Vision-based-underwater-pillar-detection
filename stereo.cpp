@@ -899,6 +899,17 @@ Size stereo::get_callibration_size(){
     return dimensions;
 }
 
+bool stereo::get_crop_status(){
+    bool crop_status;
+    try{
+        crop_status = cropped_top;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return crop_status;
+}
+
 // -- Methods for cleaning maps after disparity mapping --
 Mat stereo::remove_invalid_edge(Mat frame, int edge){
     Mat frame_without_edge;
@@ -1004,7 +1015,7 @@ vector<Mat> stereo::phase_correlation(Mat reference, Mat source){
         // Warp frame
         warpAffine(source,projected_frame,transform,reference.size());
 
-        // Remove invalid rows (Cut top of one frame and bottom of other)
+        // Remove invalid rows
         int start_row = 0;
         int start_row_ref = 0;
 
@@ -1015,11 +1026,13 @@ vector<Mat> stereo::phase_correlation(Mat reference, Mat source){
             start_row = start_row+ceil(translation.y); // round(translation.y)
             start_row_ref += ceil(translation.y);
             //end_row_ref -= round(translation.y);
+            cropped_top = true;
         }
         else{
             end_row = end_row + ceil(translation.y);
             end_row_ref += ceil(translation.y);
             //start_row_ref -= round(translation.y);
+            cropped_top = false;
         }
 
         projected_frame = projected_frame(Range(start_row,end_row),Range(0,source.cols));

@@ -41,6 +41,10 @@ public:
     // -- Methods for reshaping --
     cv::Mat expand_to_original_size(cv::Mat frame, cv::Size original_size, int border_type = cv::BORDER_CONSTANT);
 
+    cv::Mat crop_image(cv::Mat frame, cv::Size new_size, bool crop_from_top);
+
+    std::vector<obstacle> crop_obstacles(std::vector<obstacle> obstacles, cv::Size new_size, bool crop_from_top);
+
 
 
 private:

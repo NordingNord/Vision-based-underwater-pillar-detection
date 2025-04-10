@@ -152,13 +152,13 @@ int main(){
     TermCriteria termination_criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03); //  count is the maximum number of iterations while eps is epsilon is a limit for how little the window is allowed to be moved before stopping the proecess
 
     // -- obstacle candidate settings --
-    int blur_size = 21;
-    double low_thresh = 100;
-    double high_thresh = 200;
-    int sobel_size = 3;
+    int blur_size = 11; // Kernel size for median blur performed before edge detection
+    double low_thresh = 50; // Lower hysteris threshold used in canny. Bellow this value -> Not an edge
+    double high_thresh = 100; // Upper hysteris threshold used in canny. Above this value -> Good edge
+    int sobel_size = 3; // Extended sobel kernel size: Lower value -> more edges more noise. Bigger value -> less edges more smooth less noise. For my prupose low is better.
     bool l2_status = true;
     int size_thresh = 500;
-    cv::Mat line_kernel = getStructuringElement(MORPH_RECT,Size(5,5),Point(-1,-1));
+    cv::Mat line_kernel = getStructuringElement(MORPH_RECT,Size(11,11),Point(-1,-1)); // Kernel used for closing of lines, before contour detection
     cv::Mat contour_kernel = getStructuringElement(MORPH_RECT,Size(71,71),Point(-1,-1));
     cv::Mat border_kernel = getStructuringElement(MORPH_ELLIPSE,Size(3,3),Point(-1,-1)); // usually single pixel expansion, (3,3) usually cross
     float border_threshold = 0.75;
@@ -170,7 +170,7 @@ int main(){
     double min_length = 50.0; // Minimum length of a line to be set as a line segment
     double max_gap = 10.0; // Max allowed gap between points that constitues a line segment.
     int step_limit = 5; // Number of steps taken without change, before start edge is concluded upon.
-    float decline_thresh = 0.75; // Percentage of decrease in valid pixels before end line is concluded upon
+    float decline_thresh = 0.90; // Percentage of decrease in valid pixels before end line is concluded upon
     float rectangle_ratio = 1.5; // Size ratio that the bounding rectangle must have to be deemed a pillar or pertruding edge. Basically the rectangle must be taller than wide or wider than tall to be accpeted.
     int obstacle_cutoff = 1920; //  Used to be  max(frame.cols,frame.rows). Basically just a hard size cutoff
 
@@ -201,7 +201,7 @@ int main(){
     bool horizontal_fill = false;
 
     // -- Identify possible obstacles --
-    int edge_detection = LINE_MODE_MORPH; // Method used for creating an edge image
+    int edge_detection = LINE_MODE_CANNY; // Method used for creating an edge image
     bool blur = true; // If blur should be applied before edge detection
     bool equalize = false; // If histogram equalization should be conducted before edge detection
     int equalize_alg = EQUALIZE_CLAHE; // Algorithm used for histogram equalization
@@ -211,8 +211,9 @@ int main(){
     bool clean_final = true; // Should holes and pertruding elements be removed from the final obstacles
     bool dilate_validation = false; // Dilate masks slightly before validation
     int expansions = 6; // Number of dilation performed during validation
+    bool estimate = true; // Estimate max background instead of setting a hard cap
     cv::Size dilation_size = cv::Size(5,5); // Size of dilation kernel used for the MORPH mode of edge detection
-    int max_background = 50; // Lower bound of thresholding done in MORPH edge detection. TODO: SET LOWER
+    int max_background = 100; // Lower bound of thresholding done in MORPH edge detection. TODO: SET LOWER
     int max_foreground = 255; // Upper bound of thresholding done in MORPH edge detection.
 
     // -- RUN PIPELINE --
@@ -231,7 +232,7 @@ int main(){
     detection_triangulation.set_slic_settings(slic_method,region_size,ruler,slic_iterations);
     detection_triangulation.set_preprocessing_steps(color_match,luminosity_match,homomorphic_filter,clahe,pre_rectify);
     detection_triangulation.set_disparity_and_depth_steps(speckle_percentage,max_speckle_diff,track,fill,speckle_filter,use_processed,consistensy_check,horizontal_fill);
-    detection_triangulation.set_obstacle_finding_steps(edge_detection,blur,equalize,equalize_alg,close,thin,morph_initial,clean_final,dilate_validation,expansions,dilation_size,max_background,max_foreground);
+    detection_triangulation.set_obstacle_finding_steps(edge_detection,blur,equalize,equalize_alg,close,thin,morph_initial,clean_final,dilate_validation,expansions,estimate,dilation_size,max_background,max_foreground);
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
