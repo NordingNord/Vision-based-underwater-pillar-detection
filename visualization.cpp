@@ -339,7 +339,7 @@ Mat visualization::show_line_borders(vector<Vec4i> horizontal_lines, vector<Vec4
         int red = 255;
         for(int i = 0; i < horizontal_lines.size(); i++){
             Vec4i current_line = horizontal_lines.at(i);
-            line(temp_frame,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),Scalar(0,0,red),3,LINE_AA);
+            line(temp_frame,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),Scalar(0,0,red),1,LINE_AA);
             red -= 50;
         }
 
@@ -347,7 +347,7 @@ Mat visualization::show_line_borders(vector<Vec4i> horizontal_lines, vector<Vec4
         int green = 255;
         for(int i = 0; i < vertical_lines.size(); i++){
             Vec4i current_line = vertical_lines.at(i);
-            line(temp_frame,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),Scalar(0,green,0),3,LINE_AA);
+            line(temp_frame,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),Scalar(0,green,0),1,LINE_AA);
             green -= 50;
         }
 

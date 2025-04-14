@@ -91,11 +91,11 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
         possible_obstacles = create_obstacles(masks,combined_contours,valid_indexes);
 
 //        // View all mask
-//        for(int i = 0; i < possible_obstacles.size(); i++){
-//            string title = "mask " + to_string(i);
-//            imshow(title,possible_obstacles.at(i).mask);
-//        }
-//        waitKey(0);
+        for(int i = 0; i < possible_obstacles.size(); i++){
+            string title = "mask " + to_string(i);
+            imshow(title,possible_obstacles.at(i).mask);
+        }
+        waitKey(0);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -212,6 +212,24 @@ contours detecting::get_big_contours(Mat line_frame){
         cout << "Error: " << error.what() << endl;
     }
     return big_contours;
+}
+
+contours detecting::get_contours(Mat line_frame){
+    contours output_contours;
+    try{
+        // Find contours
+        vector<vector<Point>> contour_list;
+        vector<Vec4i> hierarchy;
+        findContours(line_frame,contour_list,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+        // Prepare output
+        output_contours.contour_vector = contour_list;
+        output_contours.hierarchy = hierarchy;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return output_contours;
 }
 
 vector<Mat> detecting::create_contour_masks(contours input_contours, Size frame_size, bool morph){
@@ -439,7 +457,7 @@ Mat detecting::get_contour_edge(vector<vector<Point>> contour, Size mask_size, b
         // remove clean border from edge mask
         if(remove_border == true){
             Mat border = Mat::zeros(mask_size,CV_8U);
-            rectangle(border,Point(0,0),Point(contour_edge.cols,contour_edge.rows),WHITE,DRAW_WIDTH_1P);
+            rectangle(border,Point(0,0),Point(contour_edge.cols-1,contour_edge.rows-1),WHITE,DRAW_WIDTH_1P);
             Mat intersections = border & contour_edge;
             contour_edge.setTo(BLACK,intersections);
         }
@@ -628,10 +646,14 @@ vector<obstacle> detecting::create_obstacles(vector<Mat> masks, contours input_c
             obstacle new_obstacle;
             new_obstacle.contour = input_contours.contour_vector.at(current_index);
             new_obstacle.mask = masks.at(current_index);
+            new_obstacle.original_mask = new_obstacle.mask;
 
             if(clean_final_masks == true){
-                new_obstacle.original_mask = new_obstacle.mask;
-                new_obstacle.mask = clean_contour_mask(new_obstacle.mask);
+                Mat cleaned_mask = clean_contour_mask(new_obstacle.mask);
+                // ensure that obstacle was not removed
+                if(countNonZero(cleaned_mask) != 0){
+                    new_obstacle.mask = cleaned_mask;
+                }
             }
             obstacles.push_back(new_obstacle);
         }
@@ -702,11 +724,54 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                 vector<obstacle> temp_obstacles;
 
                 // Get edge map
-                vector<vector<Point>> temp_contours = {contour};
-                Mat edge_mask = get_contour_edge(temp_contours,mask.size(),true);
+                Mat eroded_mask;
+                erode(mask,eroded_mask,border_kernel,Point(-1,-1),1);
+                Mat edge_mask = mask-eroded_mask;
+
+                // remove clean border from edge mask
+                if(remove_border == true){
+                    Mat border = Mat::zeros(mask.size(),CV_8U);
+                    rectangle(border,Point(0,0),Point(mask.cols-1,mask.rows-1),WHITE,3);
+                    Mat intersections = border & edge_mask;
+                    edge_mask.setTo(BLACK,intersections);
+                }
+
+//                ximgproc::thinning(edge_mask,edge_mask,ximgproc::THINNING_ZHANGSUEN);
+
+                contours all_contours = get_contours(edge_mask);
+                Mat new_edge_mask = Mat::zeros(edge_mask.size(),CV_8U);
+
+                for(int i = 0; i < all_contours.contour_vector.size(); i++){
+                    vector<Point> temp_approx;
+                    Mat temp = Mat::zeros(edge_mask.size(),CV_8U);
+                    drawContours(temp,all_contours.contour_vector,i,WHITE,DRAW_WIDTH_1P);
+                    temp = temp & edge_mask;
+                    vector<Point> locations;
+                    findNonZero(temp,locations);
+
+                    approxPolyDP(locations,temp_approx,25,false);
+                    for(int j = 1; j < temp_approx.size(); j++){
+                        line(new_edge_mask,temp_approx.at(j-1),temp_approx.at(j),WHITE);
+                    }
+                }
+
+                imshow("simply edge", new_edge_mask);
+                imshow("edge",edge_mask); // Issues probably in bad recognision of edges
+                waitKey(0);
+
+                // test
+                edge_mask = new_edge_mask.clone();
+                dilate(edge_mask,edge_mask,border_kernel,Point(-1,-1),2);
+
+
+//                vector<vector<Point>> temp_contours = {contour};
+//                Mat edge_mask = get_contour_edge(temp_contours,mask.size(),true);
+                Mat all_line_test = edge_mask.clone();
 
                 // Find all valid lines
                 vector<line_data> lines =  get_all_lines(edge_mask,hough_threshold,min_line_length,max_line_gap);
+
+                // SOmething goes wrong below
 
                 // Go through all lines to get mask
                 for(int i = 0; i < lines.size(); i++){
@@ -714,12 +779,24 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     Vec4i current_line = lines.at(i).line;
                     double angle = lines.at(i).angle;
 
+                    line(all_line_test,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),150,1);
+
+                    Mat my_test = mask.clone();
+                    line(my_test,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),150,1);
+
                     // move line until obstacle is lost
                     int direction = get_obstacle_direction(angle,current_line,mask);
 
+                    // The issue is here. The lines are simply not moved in the correct direction
                     vector<Vec4i> borders = get_biggest_drop_borders(direction,current_line,mask);
                     current_line = borders.at(0);
                     Vec4i end_line = borders.at(1);
+
+                    Mat test = Mat::zeros(mask.size(),CV_8U);
+                    line(test,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),WHITE);
+                    line(test,Point(end_line[0],end_line[1]),Point(end_line[2],end_line[3]),WHITE);
+                    imshow("the lines",test);
+                    waitKey(0);
 
                     // Create mask
                     Mat border_mask = Mat::zeros(mask.size(),CV_8U);
@@ -729,10 +806,14 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
                     // Get contour
                     vector<Point> new_contour = get_biggest_contour(border_mask);
+                    vector<vector<Point>> temp_new_contour = {new_contour};
 
                     // Draw contour
                     Mat new_contour_mask = Mat::zeros(mask.size(),CV_8U);
-                    drawContours(new_contour_mask,{new_contour},0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
+                    cout << "happens here due to empty border mask and thus no contours" << endl;
+                    imshow("border",border_mask);
+                    waitKey(0);
+                    drawContours(new_contour_mask,{temp_new_contour},0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
 
                     // Draw bounding rectangle
                     Mat new_bounding_box = get_bounding_rectangle(new_contour,mask.size());
@@ -746,7 +827,7 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     // Keep mask if rectangular
                     if(new_error_count <= new_max_error){
                         obstacle new_obstacle;
-                        new_obstacle.original_mask = mask;
+                        new_obstacle.original_mask = obstacles.at(obstacle_index).original_mask;
                         new_obstacle.mask = new_contour_mask;
                         new_obstacle.contour = new_contour;
 
@@ -754,22 +835,38 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     }
                 }
 
+
+
+                imshow("edge with lines",all_line_test); // Issues probably in bad recognision of edges
+                waitKey(0);
+
                 // Remove all obstacles wholy within others
                 for(int i = 0; i < temp_obstacles.size(); i++){
                     bool within_another = false;
+                    imshow("obstacle",temp_obstacles.at(i).mask);
                     for(int j = 0; j < temp_obstacles.size(); j++){
                         if(i != j){
-                            // Test for overlap
+                            // Test for overlap while ensuring that they are not just the same
                             Mat overlap = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
                             int overlap_count = countNonZero(overlap);
-                            if(overlap_count == CountNonZero(temp_obstacles.at(i).mask)){
+
+                            if(overlap_count == countNonZero(temp_obstacles.at(i).mask) && countNonZero(temp_obstacles.at(i).mask) != countNonZero(temp_obstacles.at(j).mask)){
                                 within_another = true;
+                            }
+                            // Combine obstacles that are very similar
+                            else if(overlap_count >= int(countNonZero(temp_obstacles.at(i).mask)*overlap_threshold)){
+                                temp_obstacles.at(i).mask = temp_obstacles.at(i).mask | temp_obstacles.at(j).mask;
                             }
                         }
                     }
+                    string survived = "killed";
                     if(within_another == false){
                         accepted_obstacles.push_back(temp_obstacles.at(i));
+                        survived = "survived";
                     }
+                    cout << survived << endl;
+                    waitKey(0);
+
                 }
             }
             else{
@@ -801,14 +898,33 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
             throw runtime_error("No obstacles survived splitting.");
         }
 
+        // Clean masks if desired
+        if(clean_shapes == true){
+            for(int i = 0; i < remaining_obstacles.size();i++){
+                remaining_obstacles.at(i) = clean_obstacle(remaining_obstacles.at(i),use_rectangle_shape);
+            }
+        }
+
         // Step 2: Remove obstacles that fall bellow the desired ratio of 1.5 and above to indicates obstacles longer than wide like a pillar and pertruding edge.
         remaining_obstacles = filter_rectangle_shape(remaining_obstacles,rectangle_size_ratio);
+
+        if(remaining_obstacles.size() == 0){
+            throw runtime_error("No obstacles survived rectangle filter.");
+        }
 
         // Step 3: Remove obstacles that do not touch any edge.
         remaining_obstacles = filter_border(remaining_obstacles);
 
+        if(remaining_obstacles.size() == 0){
+            throw runtime_error("No obstacles survived edge filter.");
+        }
+
         // Step 4: Remove tiny obstacles
         remaining_obstacles = filter_size(remaining_obstacles, obstacle_size_limit);
+
+        if(remaining_obstacles.size() == 0){
+            throw runtime_error("No obstacles survived size filter.");
+        }
 
         // Prepare output
         final_obstacles = remaining_obstacles;
@@ -829,20 +945,26 @@ vector<line_data> detecting::get_all_lines(Mat edge_mask,int threshold, double m
         HoughLinesP(edge_mask,lines,1,CV_PI/180,threshold,min_length,max_gap);
 
         // Go through all lines and extent
+        //Mat test = Mat::zeros(edge_mask.size(),CV_8U);
+        //Mat test_2 = Mat::zeros(edge_mask.size(),CV_8U);
         for(int i = 0; i < lines.size(); i++){
             // get start and end points of line
             Point start = Point(lines.at(i)[0],lines.at(i)[1]);
             Point end = Point(lines.at(i)[2],lines.at(i)[3]);
 
-            // Extent lines
+            //line(test,start,end,WHITE);
+
+            // Extent lines (Error due to y being reversed) In opencv cos and sin should be reveresed due to the coordinate system
             double angle = calculations.calculate_angle(start,end);
-            angle = angle + (90*M_PI/180); // Shift to align with x-axis
-            double a = cos(angle);
-            double b = sin(angle);
-            start.x = cvRound(start.x + edge_mask.cols*(-b));
-            start.y = cvRound(start.y + edge_mask.rows*(a));
-            end.x = cvRound(end.x - edge_mask.cols*(-b));
-            end.y = cvRound(end.y - edge_mask.rows*(a));
+            //angle = angle + (90*M_PI/180); // Shift to align with x-axis
+            double a = sin(angle);
+            double b = cos(angle);
+            start.x = (int)cvRound(start.x + edge_mask.cols*(-b));
+            end.y = (int)cvRound(end.y + edge_mask.rows*(a));
+            end.x = (int)cvRound(end.x - edge_mask.cols*(-b));
+            start.y = (int)cvRound(start.y - edge_mask.rows*(a));
+
+            //line(test_2,start,end,WHITE);
 
             // Limit to border with weird non-math method
             Mat border_mask = Mat::zeros(edge_mask.size(),CV_8U);
@@ -887,12 +1009,16 @@ vector<line_data> detecting::get_all_lines(Mat edge_mask,int threshold, double m
             else{
                 throw runtime_error("Line does not hit border");
             }
+            //imshow("test",test);
 
             // Update lines
             lines.at(i)[0] = best_start.x;
             lines.at(i)[1] = best_start.y;
             lines.at(i)[2] = best_end.x;
             lines.at(i)[3] = best_end.y;
+
+            //imshow("test 2",test_2);
+            //waitKey(0);
 
             // Assign to output
             line_data final_line;
@@ -946,9 +1072,12 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
         int biggest_decrease = 0;
         Vec4i line_prior_to_decrease;
         bool line_found = false;
+        bool max_found = false;
+        int steps_since_fall = 0;
+        int decrease_addon = 0;
 
         Mat initial_line_mask =  Mat::zeros(mask.size(),CV_8U);
-        line(initial_line_mask,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),WHITE,WHITE,DRAW_WIDTH_1P,LINE_AA);
+        line(initial_line_mask,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),WHITE,DRAW_WIDTH_1P,LINE_AA);
         int initial_line_size = countNonZero(initial_line_mask);
 
         // Move line to find place of biggest drop
@@ -974,6 +1103,12 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
 
             // Count size of line
             int line_size = countNonZero(line_mask);
+            if(line_size == 0){
+                if(line_found == false){
+                     line_prior_to_decrease = initial_line;
+                }
+                break;
+            }
 
             // Find scale factor (Used to handle situations where the line extends beyond the frame)
             float scale_factor = float(line_size)/float(initial_line_size);
@@ -985,7 +1120,17 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
             Mat match_mask = line_mask & mask;
             int match_count = countNonZero(match_mask);
 
-            // Calculate decrease
+            // Continue until max is found
+            if(match_count > last_matches && max_found == false){
+                last_matches = match_count;
+                continue;
+            }
+            else if(max_found == false){
+                max_found = true;
+            }
+
+
+            // Calculate decrease (Issue if there is only a slight decrease: cuts of parts of obstacle)
             int decrease = 0;
             if(last_matches > 0 && match_count < last_matches){
                 decrease = last_matches-match_count;
@@ -994,28 +1139,35 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
             // Weigh decrease based on scale factor
             decrease = floor(decrease * (1+(1-scale_factor)));
 
-            // Check if biggest decrease
-            if(decrease > biggest_decrease){
+            // Check if biggest decrease and if big enough to call a decrease
+            if(decrease+decrease_addon > biggest_decrease && decrease > 50){ // temp value
                 biggest_decrease = decrease;
                 line_prior_to_decrease = new_line;
                 line_found = true;
+                steps_since_fall = 0;
+                decrease_addon = 0;
             }
             else if(step == max_index && line_found == false){
                 line_prior_to_decrease = new_line;
             }
             else{
+                if(line_found == true){
+                    steps_since_fall++;
+                    // If alot of steps have passed since last major drop, stop
+                    if(steps_since_fall >= max_steps_since_fall){
+                        break;
+                    }
+                }
                 // Ensure no sudden big increase
                 int increase = match_count-last_matches;
-
-                if(increase > increase_stopper*line_size){
+                if(increase > int(increase_stopper*line_size)){
                     if(line_found == false){
                          line_prior_to_decrease = initial_line;
                     }
                     break;
                 }
+                decrease_addon += decrease;
             }
-
-
             // Update last values
             last_matches = match_count;
         }
@@ -1029,13 +1181,170 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
     return borders;
 }
 
+vector<Vec4i> detecting::get_best_fit_borders(int direction, Vec4i initial_line, Mat mask){
+    vector<Vec4i> obstacle_lines;
+    try{
+        // Move line in both directions until both start and end have been found
+        bool start_found = false;
+        bool end_found = false;
+        int step = 0;
+        Mat initial_line_mask =  Mat::zeros(mask.size(),CV_8U);
+        line(initial_line_mask,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),WHITE,1,LINE_AA);
+        int initial_line_size = countNonZero(initial_line_mask);
+        int most_matches = 0;
+        int start_steps = 0;
+        int end_steps = 0;
+        Vec4i start_line;
+        Vec4i end_line;
+
+        while(start_found == false || end_found == false){
+            // Get line movements
+            Mat line_mask_1 =  Mat::zeros(mask.size(),CV_8U);
+            Mat line_mask_2 =  Mat::zeros(mask.size(),CV_8U);
+            if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
+                // Check for limit
+                if(start_found == false){
+                    line(line_mask_1,Point(initial_line[0]+step,initial_line[1]),Point(initial_line[2]+step,initial_line[3]),WHITE,1,LINE_AA);
+                }
+                if(end_found == false){
+                    line(line_mask_2,Point(initial_line[0]-step,initial_line[1]),Point(initial_line[2]-step,initial_line[3]),WHITE,1,LINE_AA);
+                }
+            }
+            else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
+                // Check for limit
+                if(start_found == false){
+                    line(line_mask_1,Point(initial_line[0],initial_line[1]+step),Point(initial_line[2],initial_line[3]+step),WHITE,1,LINE_AA);
+                }
+                if(end_found == false){
+                    line(line_mask_2,Point(initial_line[0],initial_line[1]-step),Point(initial_line[2],initial_line[3]-step),WHITE,1,LINE_AA);
+                }
+            }
+
+//            Mat temp_mask = line_mask_1 | line_mask_2;
+//            imshow("line_masks",temp_mask);
+//            waitKey(0);
+
+            if(start_found == false){
+                // Count line size
+                int size_1 = countNonZero(line_mask_1);
+
+                // Find scale factor
+                float scale_factor_1 = float(size_1)/float(initial_line_size);
+
+                // Avoid edge case where line is completely on border and thus half missing
+                if(scale_factor_1 > 1.0){
+                    scale_factor_1 = 1.0;
+                }
+
+                // Count matches
+                Mat matches_1 = line_mask_1 & mask;
+                int matches_count_1 = countNonZero(matches_1);
+
+                // Find gaps
+                vector<vector<Point>> lines_in_line;
+                vector<Vec4i> hierarchy;
+                findContours(matches_1,lines_in_line,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+                // check if matches are good
+                if(matches_count_1 >= int(most_matches*scale_factor_1)*0.90 && lines_in_line.size() == 1){ // 5% leeway
+                    if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
+                        start_line[0] = initial_line[0]+step;
+                        start_line[1] = initial_line[1];
+                        start_line[2] = initial_line[2]+step;
+                        start_line[3] = initial_line[3];
+                    }
+                    else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
+                        start_line[0] = initial_line[0];
+                        start_line[1] = initial_line[1]+step;
+                        start_line[2] = initial_line[2];
+                        start_line[3] = initial_line[3]+step;
+                    }
+                    most_matches = matches_count_1;
+                    start_steps = 0;
+                }
+                else{
+                    start_steps++;
+                }
+                // Check if limit is hit
+                if(start_steps >= step_threshold){
+                    start_found = true;
+                }
+            }
+            if(end_found == false){
+                // Count line size
+                int size_2 = countNonZero(line_mask_2);
+
+                // Find scale factor
+                float scale_factor_2 = float(size_2)/float(initial_line_size);
+
+                // Avoid edge case where line is completely on border and thus half missing
+                if(scale_factor_2 > 1.0){
+                    scale_factor_2 = 1.0;
+                }
+
+                // Count matches
+                Mat matches_2 = line_mask_2 & mask;
+                int matches_count_2 = countNonZero(matches_2);
+
+                // Find gaps
+                vector<vector<Point>> lines_in_line;
+                vector<Vec4i> hierarchy;
+                findContours(matches_2,lines_in_line,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+                // check if matches are good
+                if(matches_count_2 >= int(most_matches*scale_factor_2)*0.90 && lines_in_line.size() == 1){
+                    if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
+                        end_line[0] = initial_line[0]-step;
+                        end_line[1] = initial_line[1];
+                        end_line[2] = initial_line[2]-step;
+                        end_line[3] = initial_line[3];
+                    }
+                    else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
+                        end_line[0] = initial_line[0];
+                        end_line[1] = initial_line[1]-step;
+                        end_line[2] = initial_line[2];
+                        end_line[3] = initial_line[3]-step;
+                    }
+                    most_matches = matches_count_2;
+                    end_steps = 0;
+                }
+                else{
+                    end_steps++;
+                }
+
+                // Check if limit is hit
+                if(end_steps >= step_threshold){
+                    end_found = true;
+                }
+            }
+//            temp_mask = mask.clone();
+//            line(temp_mask,Point(start_line[0],start_line[1]),Point(start_line[2],start_line[3]),150,1);
+//            line(temp_mask,Point(end_line[0],end_line[1]),Point(end_line[2],end_line[3]),150,1);
+//            imshow("first line",temp_mask);
+//            waitKey(0);
+            step++;
+        }
+        // Prepare output
+        obstacle_lines = {start_line, end_line};
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return obstacle_lines;
+}
 
 // -- Methods for moving lines --
 int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask){
     int direction = 0;
     try{
-        // Check if angle is closer to 0 degrees (Vertical) else it must be horizontal
-        if(angle*180/M_PI < abs(angle*180/M_PI-90)){
+        // Check if angle is closer to 90 degrees (Vertical) else it must be horizontal
+        cout << angle*180/M_PI << endl;
+        double distance_to_90 = abs(90-angle*180/M_PI);
+        cout << distance_to_90 << endl;
+        if(angle*180/M_PI > distance_to_90){
+            cout << "move left or right" << endl;
+
+
             // Create directional line masks
             Mat left_mask = Mat::zeros(mask.size(),CV_8U);
             Mat right_mask = Mat::zeros(mask.size(),CV_8U);
@@ -1085,6 +1394,278 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
     }
     return direction;
 }
+
+
+// -- Postprocessing methods --
+obstacle detecting::clean_obstacle(obstacle input_obstacle, bool rectangle_shape){
+    obstacle cleaned_obstacle = input_obstacle;
+    try{
+        // Find contour in mask
+        Mat mask = input_obstacle.mask;
+
+        vector<Point> contour;
+        findNonZero(mask,contour);
+
+        // Find best fit line
+        Vec4f fitted_line;
+        fitLine(contour,fitted_line, DIST_L2, 0, 0.1, 0.1);
+
+        // Find angle of line
+        int biggest_distance = int(sqrt(mask.cols*mask.cols + mask.rows * mask.rows));
+
+        Point start = Point(fitted_line[2]-fitted_line[0]*biggest_distance,fitted_line[3]-fitted_line[1]*biggest_distance);
+        Point end = Point(fitted_line[2]+fitted_line[0]*biggest_distance,fitted_line[3]+fitted_line[1]*biggest_distance);
+
+        double angle = calculations.calculate_angle(start,end);
+        angle = angle;// + (90*M_PI/180); // Shift to align with x-axis
+
+        // Check if line is vertical or horizontal
+        cout << angle*180/M_PI << endl;
+        int direction;
+        double dist_to_90 = abs(90*M_PI/180-angle);
+        if(angle*180/M_PI > dist_to_90*180/M_PI){
+            direction = DIRECTION_RIGHT;
+        }
+        else{
+            direction = DIRECTION_UP;
+        }
+
+        // Get best fit mask
+        Vec4i current_line;
+        current_line[0] = start.x;
+        current_line[1] = start.y;
+        current_line[2] = end.x;
+        current_line[3] = end.y;
+
+        // ISSUE: wrong direction is given
+        vector<Vec4i> borders = get_best_fit_borders(direction,current_line,mask); // get best fit border have not been cleaned yet
+
+        Mat best_fit_mask = Mat::zeros(mask.size(),CV_8U);
+
+        vector<Point> points = {Point(borders.at(0)[0],borders.at(0)[1]),Point(borders.at(1)[0],borders.at(1)[1]),Point(borders.at(1)[2],borders.at(1)[3]), Point(borders.at(0)[2],borders.at(0)[3])};
+        vector<vector<Point>> temp = {points};
+        drawContours(best_fit_mask,temp,0,WHITE,DRAW_WIDTH_INFILL);
+
+        Mat final_mask = best_fit_mask & mask;
+
+        // ensure single contour
+        Mat temp_mat = Mat::zeros(mask.size(),CV_8U);
+        vector<Point> biggest_contour = get_biggest_contour(final_mask);
+        vector<vector<Point>> temp_contour = {biggest_contour};
+        drawContours(temp_mat,temp_contour,0,WHITE,DRAW_WIDTH_INFILL);
+        final_mask = temp_mat;
+
+
+        // If obstacle shape is desired
+        if(rectangle_shape == true){
+            Mat bounding_box = get_bounding_rectangle(biggest_contour,mask.size());
+            final_mask = bounding_box;
+        }
+
+
+        // Update output
+        cleaned_obstacle.mask = final_mask;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return cleaned_obstacle;
+}
+
+// -- Identification methods --
+vector<obstacle> detecting::detect_type(vector<obstacle> obstacles, Mat depth_map){
+    vector<obstacle> type_obstacles;
+    try{
+        for(int obstacle_index = 0; obstacle_index < obstacles.size(); obstacle_index++){
+            vector<string> types;
+
+            // Method 1: Check average sorounding depth of border
+            string type_1 = depth_based_type(obstacles.at(obstacle_index),depth_map,50.0);
+            types.push_back(type_1);
+//            cout << "New obstacle:" << endl;
+//            cout << type_1 << endl;
+
+            // Method 2: Check if depth rounding is seen between edges and center
+            string type_2 = rounding_based_type(obstacles.at(obstacle_index),depth_map);
+            types.push_back(type_2);
+//            cout << type_2 << endl;
+
+            // Method 3: Fit parabola
+
+            // count type instances
+            int pillar_count = 0;
+            int edge_count = 0;
+            for(int i = 0; i < types.size(); i++){
+                if(types.at(i) == "Pillar"){
+                    pillar_count++;
+                }
+                else if(types.at(i) == "Edge"){
+                    edge_count++;
+                }
+            }
+
+            // Select most voted for type
+            if(pillar_count > edge_count){
+                obstacles.at(obstacle_index).type = "Pillar";
+            }
+            else if(edge_count > pillar_count){
+                obstacles.at(obstacle_index).type = "Edge";
+            }
+            else{
+                obstacles.at(obstacle_index).type = "Unknown";
+            }
+
+            // Prepare output
+            type_obstacles.push_back(obstacles.at(obstacle_index));
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return type_obstacles;
+}
+
+string detecting::depth_based_type(obstacle obstacle_to_check, Mat depth_map, float threshold){
+    string type = "Unknown";
+    try{
+        // Extent current mask to get sorounding border (use original mask, since new masks might have simplified them skewing the results).
+        Mat mask = obstacle_to_check.original_mask;
+
+        Mat kernel_element = getStructuringElement(MORPH_CROSS,Size(3,3),Point(-1,-1));
+
+        Mat dilated_mask;
+        dilate(mask,dilated_mask,kernel_element);
+
+        Mat border = dilated_mask-mask;
+
+        // Find mean depth of sorounding and obstacle
+        Mat depth_channel;
+        if(depth_map.channels() > 1){
+            Mat channels[3];
+            split(depth_map,channels);
+            depth_channel = channels[2];
+        }
+        else{
+            depth_channel = depth_map;
+        }
+
+        //Scalar mean_depth = mean(depth_channel,border);
+        //Scalar mean_obstacle_depth = mean(depth_map,obstacle_to_check.mask);
+
+        vector<Mat> masks = {border,obstacle_to_check.mask};
+        vector<Scalar> depth_means = get_average_mask_value(masks, depth_channel);
+
+        Scalar mean_depth = depth_means.at(0);
+        Scalar mean_obstacle_depth = depth_means.at(1);
+
+        // Determine type based on mean_depth to obstacle depth difference
+        Scalar diff = mean_depth-mean_obstacle_depth;
+        if(diff.val[0] > threshold || mean_depth.val[0] == -1){
+            type = "Pillar"; // Pillar if depth difference is more than threshold
+        }
+        else if(diff.val[0] > 0){
+            type = "Edge"; // If depth diff is positive but not that big it must be an edge
+        }
+        // If none of those cases are true the sorounding is closer than the obstacle, which is weird.
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return type;
+}
+
+string detecting::rounding_based_type(obstacle obstacle_to_check, Mat depth_map){
+    string type = "Unknown";
+    try{
+        // erode current mask to split obstacles into two parts (edges and center).
+        Mat mask = obstacle_to_check.mask;
+
+        vector<Point> contour = obstacle_to_check.contour;
+        RotatedRect rectangle = minAreaRect(contour);
+        Point2f rectangle_points[4];
+        rectangle.points(rectangle_points);
+        float first_edge_distance = abs(calculations.calculate_euclidean_distance(rectangle_points[0].x, rectangle_points[0].y, rectangle_points[1].x, rectangle_points[1].y));
+        float second_edge_distance = abs(calculations.calculate_euclidean_distance(rectangle_points[1].x, rectangle_points[1].y, rectangle_points[2].x, rectangle_points[2].y));
+        int kernel_size = int(min(first_edge_distance,second_edge_distance)/3); // erode with one third of smallest edge
+        if(kernel_size % 2 == 0){
+            kernel_size++;
+        }
+        Mat kernel_element = getStructuringElement(MORPH_CROSS,Size(kernel_size,kernel_size),Point(-1,-1));
+
+        Mat center_mask;
+        erode(mask,center_mask,kernel_element);
+
+        Mat edge_mask = mask-center_mask;
+
+        // find edge and center mean
+        Mat depth_channel;
+        if(depth_map.channels() > 1){
+            Mat channels[3];
+            split(depth_map,channels);
+            depth_channel = channels[2];
+        }
+        else{
+            depth_channel = depth_map;
+        }
+
+        vector<Mat> masks = {edge_mask,center_mask};
+        vector<Scalar> depth_means = get_average_mask_value(masks, depth_channel);
+
+        Scalar mean_edge_depth = depth_means.at(0);
+        Scalar mean_center_depth = depth_means.at(1);
+
+        // Get difference
+        Scalar diff = mean_edge_depth- mean_center_depth; // edge depth first since they should have bigger depth
+
+        // pillar if difference is more than 1% of center average
+        if(diff.val[0] > mean_center_depth.val[0]*0.01){
+            type = "Pillar";
+        }
+        else if(diff.val[0] > -mean_center_depth.val[0]*0.01){ // Give some negative leeway for if it is an edge. (since slight errors might occur)
+            type = "Edge";
+        }
+        // Otherwise unknown
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return type;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1470,189 +2051,6 @@ vector<Vec4i> detecting::get_line_borders(int direction, Vec4i initial_line, Mat
     return obstacle_lines;
 }
 
-vector<Vec4i> detecting::get_best_fit_borders(int direction, Vec4i initial_line, Mat mask){
-    vector<Vec4i> obstacle_lines;
-    try{
-//        // determine max index based on direction (distance from current line to border)
-//        int max_index_1, max_index_2;
-//        if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
-//            max_index_1 = max(initial_line[0],initial_line[2]);
-//            max_index_2 = (mask.cols-1)-min(initial_line[0],initial_line[2]);
-//        }
-//        else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
-//            max_index_1 = max(initial_line[1],initial_line[3]);
-//            max_index_2 = (mask.rows-1)-min(initial_line[1],initial_line[3]);
-//        }
-
-        // Move line in both directions until both start and end have been found
-        bool start_found = false;
-        bool end_found = false;
-        int step = 0;
-        Mat initial_line_mask =  Mat::zeros(mask.size(),CV_8U);
-        line(initial_line_mask,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),WHITE,1,LINE_AA);
-        int initial_line_size = countNonZero(initial_line_mask);
-        int most_matches = 0;
-        int start_steps = 0;
-        int end_steps = 0;
-        Vec4i start_line;
-        Vec4i end_line;
-//        Mat temp;
-        while(start_found == false || end_found == false){
-            // Get line movements
-            Mat line_mask_1 =  Mat::zeros(mask.size(),CV_8U);
-            Mat line_mask_2 =  Mat::zeros(mask.size(),CV_8U);
-            if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
-                // Check for limit
-//                if(step >= max_index_1){
-//                    start_found = true;
-//                }
-//                if(step >= max_index_2){
-//                    end_found = true;
-//                }
-                if(start_found == false){
-                    line(line_mask_1,Point(initial_line[0]+step,initial_line[1]),Point(initial_line[2]+step,initial_line[3]),WHITE,1,LINE_AA);
-                }
-                if(end_found == false){
-                    line(line_mask_2,Point(initial_line[0]-step,initial_line[1]),Point(initial_line[2]-step,initial_line[3]),WHITE,1,LINE_AA);
-                }
-            }
-            else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
-                // Check for limit
-//                if(step >= max_index_1){
-//                    start_found = true;
-//                }
-//                if(step >= max_index_2){
-//                    end_found = true;
-//                }
-                if(start_found == false){
-                    line(line_mask_1,Point(initial_line[0],initial_line[1]+step),Point(initial_line[2],initial_line[3]+step),WHITE,1,LINE_AA);
-                }
-                if(end_found == false){
-                    line(line_mask_2,Point(initial_line[0],initial_line[1]-step),Point(initial_line[2],initial_line[3]-step),WHITE,1,LINE_AA);
-                }
-            }
-            if(start_found == false){
-                // Count line size
-                int size_1 = countNonZero(line_mask_1);
-
-                // Find scale factor
-                float scale_factor_1 = float(size_1)/float(initial_line_size);
-
-                // Avoid edge case where line is completely on border and thus half missing
-                if(scale_factor_1 > 1.0){
-                    scale_factor_1 = 1.0;
-                }
-
-                // Count matches
-                Mat matches_1 = line_mask_1 & mask;
-                int matches_count_1 = countNonZero(matches_1);
-
-                // Find gaps
-                vector<vector<Point>> lines_in_line;
-                vector<Vec4i> hierarchy;
-                findContours(matches_1,lines_in_line,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
-
-                // check if matches are good
-                if(matches_count_1 >= int(most_matches*scale_factor_1)*0.90 && lines_in_line.size() == 1){ // 5% leeway
-                    if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
-                        start_line[0] = initial_line[0]+step;
-                        start_line[1] = initial_line[1];
-                        start_line[2] = initial_line[2]+step;
-                        start_line[3] = initial_line[3];
-                    }
-                    else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
-                        start_line[0] = initial_line[0];
-                        start_line[1] = initial_line[1]+step;
-                        start_line[2] = initial_line[2];
-                        start_line[3] = initial_line[3]+step;
-                    }
-                    most_matches = matches_count_1;
-                    start_steps = 0;
-                }
-                else{
-                    start_steps++;
-                }
-                // Check if limit is hit
-                if(start_steps >= step_threshold){
-                    start_found = true;
-                }
-            }
-            if(end_found == false){
-                // Count line size
-                int size_2 = countNonZero(line_mask_2);
-
-                // Find scale factor
-                float scale_factor_2 = float(size_2)/float(initial_line_size);
-
-                // Avoid edge case where line is completely on border and thus half missing
-                if(scale_factor_2 > 1.0){
-                    scale_factor_2 = 1.0;
-                }
-
-                // Count matches
-                Mat matches_2 = line_mask_2 & mask;
-                int matches_count_2 = countNonZero(matches_2);
-
-                // Find gaps
-                vector<vector<Point>> lines_in_line;
-                vector<Vec4i> hierarchy;
-                findContours(matches_2,lines_in_line,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
-
-                // check if matches are good
-                if(matches_count_2 >= int(most_matches*scale_factor_2)*0.90 && lines_in_line.size() == 1){
-                    if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
-                        end_line[0] = initial_line[0]-step;
-                        end_line[1] = initial_line[1];
-                        end_line[2] = initial_line[2]-step;
-                        end_line[3] = initial_line[3];
-                    }
-                    else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
-                        end_line[0] = initial_line[0];
-                        end_line[1] = initial_line[1]-step;
-                        end_line[2] = initial_line[2];
-                        end_line[3] = initial_line[3]-step;
-                    }
-                    most_matches = matches_count_2;
-                    end_steps = 0;
-                }
-                else{
-                    end_steps++;
-                }
-
-                // Check if limit is hit
-                if(end_steps >= step_threshold){
-                    end_found = true;
-                }
-            }
-//            if(start_found == false && end_found == false){
-//                temp = line_mask_1 | line_mask_2;
-//            }
-//            else if( start_found == true && end_found == true){
-//                temp = Mat::zeros(mask.size(),CV_8U);
-//                line(temp,Point(start_line[0],start_line[1]),Point(start_line[2],start_line[3]),150,3);
-//                line(temp,Point(end_line[0],end_line[1]),Point(end_line[2],end_line[3]),150,3);
-//            }
-//            else if(start_found == true){
-//                temp = line_mask_2.clone();
-//                line(temp,Point(start_line[0],start_line[1]),Point(start_line[2],start_line[3]),150,3);
-//            }
-//            else if(end_found == true){
-//                temp = line_mask_1.clone();
-//                line(temp,Point(end_line[0],end_line[1]),Point(end_line[2],end_line[3]),150,3);
-//            }
-//            resize(temp,temp,Size(),0.5,0.5,INTER_LINEAR);
-//            imshow("borders", temp);
-//            waitKey(0);
-            step++;
-        }
-        // Prepare output
-        obstacle_lines = {start_line, end_line};
-    }
-    catch(const exception& error){
-        cout << "Error: " << error.what() << endl;
-    }
-    return obstacle_lines;
-}
 
 line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_length, double max_gap, bool compare, double compare_angle, double angle_threshold){
     line_data best_line;
@@ -2597,140 +2995,6 @@ vector<obstacle> detecting::filter_size(vector<obstacle> obstacles, int threshol
         cout << "Error: " << error.what() << endl;
     }
     return accepted_obstacles;
-}
-
-// -- Methods for detecting obstacle type --
-vector<obstacle> detecting::detect_type(vector<obstacle> obstacles, Mat depth_map){
-    vector<obstacle> type_obstacles;
-    try{
-        for(int obstacle_index = 0; obstacle_index < obstacles.size(); obstacle_index++){
-            vector<string> types;
-
-            // Method 1: Check average sorounding depth of border
-            cout << "before depth" << endl;
-            string type_1 = depth_based_type(obstacles.at(obstacle_index),depth_map,50.0);
-            types.push_back(type_1);
-
-            // Method 2: Check if depth rounding is seen between edges and center
-            cout << "before rounding" << endl;
-            string type_2 = rounding_based_type(obstacles.at(obstacle_index),depth_map);
-            types.push_back(type_2);
-
-            // Method 3: Fit parabola
-
-            // count type instances
-            int pillar_count = 0;
-            int edge_count = 0;
-            for(int i = 0; i < types.size(); i++){
-                if(types.at(i) == "Pillar"){
-                    pillar_count++;
-                }
-                else if(types.at(i) == "Edge"){
-                    edge_count++;
-                }
-            }
-
-            // Select most voted for type
-            if(pillar_count > edge_count){
-                obstacles.at(obstacle_index).type = "Pillar";
-            }
-            else if(edge_count > pillar_count){
-                obstacles.at(obstacle_index).type = "Edge";
-            }
-            else{
-                obstacles.at(obstacle_index).type = "Unknown";
-            }
-
-            // Prepare output
-            type_obstacles.push_back(obstacles.at(obstacle_index));
-        }
-    }
-    catch(const exception& error){
-        cout << "Error: " << error.what() << endl;
-    }
-    return type_obstacles;
-}
-
-string detecting::depth_based_type(obstacle obstacle_to_check, Mat depth_map, float threshold){
-    string type = "Unknown";
-    try{
-        // Extent current mask to get sorounding border (use original mask, since new masks might have simplified them skewing the results).
-        Mat mask = obstacle_to_check.original_mask;
-
-        Mat kernel_element = getStructuringElement(MORPH_CROSS,Size(3,3),Point(-1,-1));
-
-        Mat dilated_mask;
-        dilate(mask,dilated_mask,kernel_element);
-
-        Mat border = dilated_mask-mask;
-
-        // Find mean depth of sorounding
-        Scalar mean_depth = mean(depth_map,border);
-
-        // Find mean depth of obstacle (using new mask this time)
-        Scalar mean_obstacle_depth = mean(depth_map,obstacle_to_check.mask);
-
-        // Determine type based on mean_depth to obstacle depth difference
-        Scalar diff = mean_depth-mean_obstacle_depth;
-        if(diff.val[0] > threshold){
-            type = "Pillar"; // Pillar if depth difference is more than threshold
-        }
-        else if(diff.val[0] > 0){
-            type = "Edge"; // If depth diff is positive but not that big it must be an edge
-        }
-        // If none of those cases are true the sorounding is closer than the obstacle, which is weird.
-    }
-    catch(const exception& error){
-        cout << "Error: " << error.what() << endl;
-    }
-    return type;
-}
-
-string detecting::rounding_based_type(obstacle obstacle_to_check, Mat depth_map){
-    string type = "Unknown";
-    try{
-        // erode current mask to split obstacles into two parts (edges and center).
-        Mat mask = obstacle_to_check.mask;
-
-        vector<Point> contour = obstacle_to_check.contour;
-        RotatedRect rectangle = minAreaRect(contour);
-        Point2f rectangle_points[4];
-        rectangle.points(rectangle_points);
-        float first_edge_distance = abs(calculations.calculate_euclidean_distance(rectangle_points[0].x, rectangle_points[0].y, rectangle_points[1].x, rectangle_points[1].y));
-        float second_edge_distance = abs(calculations.calculate_euclidean_distance(rectangle_points[1].x, rectangle_points[1].y, rectangle_points[2].x, rectangle_points[2].y));
-        int kernel_size = int(min(first_edge_distance,second_edge_distance)/3); // erode with one third of smallest edge
-        if(kernel_size % 2 == 0){
-            kernel_size++;
-        }
-        Mat kernel_element = getStructuringElement(MORPH_CROSS,Size(kernel_size,kernel_size),Point(-1,-1));
-
-        Mat center_mask;
-        erode(mask,center_mask,kernel_element);
-
-        Mat edge_mask = mask-center_mask;
-
-        // Find edge mean
-        Scalar mean_edge_depth = mean(depth_map,edge_mask);
-
-        // Find center mean
-        Scalar mean_center_depth = mean(depth_map,center_mask);
-
-        // Get difference
-        Scalar diff = mean_edge_depth- mean_center_depth; // edge depth first since they should have bigger depth
-
-        // pillar if difference is more than 1% of center average
-        if(diff.val[0] > mean_center_depth.val[0]*0.01){
-            type = "Pillar";
-        }
-        else if(diff.val[0] > -mean_center_depth.val[0]*0.01){ // Give some negative leeway for if it is an edge. (since slight errors might occur)
-            type = "Edge";
-        }
-        // Otherwise unknown
-    }
-    catch(const exception& error){
-        cout << "Error: " << error.what() << endl;
-    }
-    return type;
 }
 
 

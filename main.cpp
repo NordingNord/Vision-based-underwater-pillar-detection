@@ -166,9 +166,9 @@ int main(){
     // -- Obstacle filter settings --
     float rectangle_acceptance_threshold = 0.25; // The percentage of a bounding rectangle that is allowed to contain out of obstacle pixels. If exceeded, the obstacle must either not be rectangular or contain more than one rectangle.
     float size_limit = 0.1; // Percentage of original obstacle size needed to continue splitting. If below splitting is stopped.
-    int hough_thresh = 10; // Minimum votes needed to be seen as a line
-    double min_length = 50.0; // Minimum length of a line to be set as a line segment
-    double max_gap = 10.0; // Max allowed gap between points that constitues a line segment.
+    int hough_thresh = 20; // Minimum votes needed to be seen as a line
+    double min_length = 10.0; // Minimum length of a line to be set as a line segment
+    double max_gap = 0.0; // Max allowed gap between points that constitues a line segment.
     int step_limit = 5; // Number of steps taken without change, before start edge is concluded upon.
     float decline_thresh = 0.90; // Percentage of decrease in valid pixels before end line is concluded upon
     float rectangle_ratio = 1.5; // Size ratio that the bounding rectangle must have to be deemed a pillar or pertruding edge. Basically the rectangle must be taller than wide or wider than tall to be accpeted.

@@ -57,6 +57,7 @@ public:
 
     // -- Methods for working with contours --
     contours get_big_contours(cv::Mat line_frame);
+    contours get_contours(cv::Mat line_frame);
 
     std::vector<cv::Mat> create_contour_masks(contours input_contours, cv::Size frame_size, bool morph);
 
@@ -105,8 +106,27 @@ public:
 
     std::vector<cv::Vec4i> get_biggest_drop_borders(int direction, cv::Vec4i initial_line, cv::Mat mask);
 
+    std::vector<cv::Vec4i> get_best_fit_borders(int direction, cv::Vec4i initial_line, cv::Mat mask);
+
     // -- Methods for moving lines --
     int get_obstacle_direction(double angle, cv::Vec4i initial_line, cv::Mat mask);
+
+    // -- Postprocessing methods --
+    obstacle clean_obstacle(obstacle input_obstacle, bool rectangle_shape);
+
+    // -- Identification methods --
+    std::vector<obstacle> detect_type(std::vector<obstacle> obstacles, cv::Mat depth_map);
+
+    std::string depth_based_type(obstacle obstacle_to_check, cv::Mat depth_map,  float threshold);
+
+    std::string rounding_based_type(obstacle obstacle_to_check, cv::Mat depth_map);
+
+
+
+
+
+
+
 
 
 
@@ -116,8 +136,6 @@ public:
     // -- Methods for assisting with obstacle detection --
     std::vector<cv::Vec4i> get_line_borders(int direction, cv::Vec4i initial_line, cv::Mat mask, int step_threshold, float decline_threshold);
 
-    std::vector<cv::Vec4i> get_best_fit_borders(int direction, cv::Vec4i initial_line, cv::Mat mask);
-
     line_data get_best_line(cv::Mat edge_mask,int threshold, double min_length, double max_gap, bool compare = false, double compare_angle = 0.0, double angle_threshold = 45.0);
 
     line_data get_best_line(cv::Mat edge_mask,int threshold, double min_length, double max_gap, bool col_banned = false, bool row_banned = false, int ban_threshold = 0, int col_1 = 0, int col_2 = 0, int row_1 = 0, int row_2 = 0);
@@ -125,8 +143,6 @@ public:
     cv::Mat ensure_single_obstacle(cv::Mat mask, cv::Vec4i first_line, cv::Vec4i last_line);
 
     cv::Mat ensure_single_obstacle(cv::Mat mask); // Faster version that just keeps the biggest contour
-
-
 
     // -- Methods that splits all obstacles into viable rectangles. --
     std::vector<obstacle> split_into_rectangles(std::vector<obstacle> obstacles);
@@ -145,12 +161,6 @@ public:
     // -- Methods that filter based on size --
     std::vector<obstacle> filter_size(std::vector<obstacle> obstacles, int threshold);
 
-    // -- Methods for detecting obstacle type --
-    std::vector<obstacle> detect_type(std::vector<obstacle> obstacles, cv::Mat depth_map);
-
-    std::string depth_based_type(obstacle obstacle_to_check, cv::Mat depth_map,  float threshold);
-
-    std::string rounding_based_type(obstacle obstacle_to_check, cv::Mat depth_map);
 
     // -- Methods for handling gaps in detections --
     std::vector<obstacle> patch_detection_gap(std::vector<obstacle> last_obstacles, std::vector<std::vector<float>> movements, std::vector<cv::Point2f> points);
@@ -217,6 +227,12 @@ private:
 
     double increase_stopper = 0.3;
 
+    int max_steps_since_fall = 100;
+
+    bool remove_border = true;
+
+    double overlap_threshold = 0.9;
+
 
     // Pipeline variables
     int line_mode = LINE_MODE_MORPH;
@@ -240,6 +256,11 @@ private:
     bool estimate_background = true;
 
     bool remove_background = true;
+
+    bool clean_shapes = false;
+
+    bool use_rectangle_shape = true;
+
 
     // Morph variables
     cv::Size edge_dilation_size = cv::Size(5,5);

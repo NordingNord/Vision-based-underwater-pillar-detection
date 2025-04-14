@@ -1210,6 +1210,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             start = chrono::high_resolution_clock::now();
 
             vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
+            cout << obstacles.size() << endl;
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -1237,8 +1238,9 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
 
             // If desired. Patch gap
-            if(patch_gaps == true){
+            if(patch_gaps == true && obstacles.size() < last_obstacles.size()){
                 start = chrono::high_resolution_clock::now();
+                // This might be bad
                 if(last_first_frame.size() != first_frame.size()){
                     int width = min(last_first_frame.size().width, first_frame.size().width);
                     int height = min(last_first_frame.size().height, first_frame.size().height);
@@ -1705,6 +1707,7 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
         // convert to CV_8 if not already done
         if(disparity_map.type() != CV_8UC1){
             disparity_map = stereo_system.process_disparity(disparity_map);
+            disparity_map_org = stereo_system.process_disparity(disparity_map_org);
         }
 
         // Prepare output
