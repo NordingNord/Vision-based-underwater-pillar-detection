@@ -81,6 +81,8 @@ public:
 
     cv::Mat get_contour_edge(std::vector<std::vector<cv::Point>> contour, cv::Size mask_size, bool remove_border = false);
 
+    cv::Point get_contour_center(cv::Mat contour_mask);
+
     // -- Methods that analyse disparity --
     std::vector<cv::Scalar> get_average_mask_value(std::vector<cv::Mat> masks, cv::Mat frame);
 
@@ -260,6 +262,8 @@ private:
     bool clean_shapes = false;
 
     bool use_rectangle_shape = true;
+
+    bool limit_to_border = false;
 
 
     // Morph variables

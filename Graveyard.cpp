@@ -2370,3 +2370,76 @@
 //    }
 //    return accepted_obstacles;
 //}
+
+//                            // Check if identical to previous mask
+//                            Mat difference;
+//                            bitwise_xor(new_contour_mask,temp_obstacles.at(k).mask,difference);
+
+//                            if(countNonZero(difference) == 0){
+////                                imshow("the killed",new_contour_mask);
+////                                imshow("the killer",temp_obstacles.at(k).mask);
+////                                waitKey(0);
+//                                accept = false;
+//                                break;
+//                            }
+
+
+//                // Remove all obstacles wholy within others
+//                for(int i = 0; i < temp_obstacles.size(); i++){
+//                    bool within_another = false;
+////                    imshow("obstacle",temp_obstacles.at(i).mask);
+//                    // new test for overlap
+////                    Mat remainder = temp_obstacles.at(i).mask.clone();
+//                    for(int j = 0; j < temp_obstacles.size(); j++){
+//                        if(i != j){
+//                            // new test (remove overlap as we go)
+////                            remainder = remainder-temp_obstacles.at(j).mask;
+//                            //bitwise_xor(not_overlap,temp_obstacles.at(j).mask,not_overlap);
+//                            //Mat temp = not_overlap & temp_obstacles.at(j).mask;
+//                            //not_overlap = not_overlap - temp;
+
+////                            imshow("overlap",remainder);
+////                            imshow("new obstacle",temp_obstacles.at(j).mask);
+////                            waitKey(0);
+
+////                            if(countNonZero(remainder) == 0){
+////                                break;
+////                            }
+//                            // Just remove obstacles wholly within another
+//                            Mat overlap = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
+//                            int overlap_count = countNonZero(overlap);
+
+//                            if(overlap_count == countNonZero(temp_obstacles.at(i).mask)){
+//                                within_another = true;
+//                            }
+
+//                            // Test for overlap while ensuring that they are not just the same
+////                            Mat overlap = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
+////                            int overlap_count = countNonZero(overlap);
+
+////                            if(overlap_count == countNonZero(temp_obstacles.at(i).mask) && countNonZero(temp_obstacles.at(i).mask) != countNonZero(temp_obstacles.at(j).mask)){
+////                                within_another = true;
+////                            }
+////                            // Combine obstacles that are very similar
+////                            else if(overlap_count >= int(countNonZero(temp_obstacles.at(i).mask)*overlap_threshold)){
+////                                temp_obstacles.at(i).mask = temp_obstacles.at(i).mask | temp_obstacles.at(j).mask;
+////                            }
+//                        }
+//                    }
+//                    // New check (check for some unique part)
+////                    string survived = "killed";
+////                    if(countNonZero(remainder) > 0){
+////                        accepted_obstacles.push_back(temp_obstacles.at(i));
+////                        survived = "survived";
+////                    }
+
+//                    string survived = "killed";
+//                    if(within_another == false){
+//                        accepted_obstacles.push_back(temp_obstacles.at(i));
+//                        survived = "survived";
+//                    }
+////                    cout << survived << endl;
+////                    waitKey(0);
+//                }
+
+//            cout << accepted_obstacles.size() << endl;

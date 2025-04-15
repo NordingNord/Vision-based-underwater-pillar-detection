@@ -102,7 +102,6 @@ double calculator::calculate_angle(Point start, Point end){
     double angle;
     try{
         angle = atan2(end.y-start.y,end.x-start.x);
-
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

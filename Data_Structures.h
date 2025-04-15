@@ -148,6 +148,7 @@ struct obstacle{
     cv::Mat original_mask;
     std::vector<cv::Point> contour;
     std::string type;
+    double original_angle;
 };
 
 // Information about a line

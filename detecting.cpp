@@ -91,11 +91,11 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
         possible_obstacles = create_obstacles(masks,combined_contours,valid_indexes);
 
 //        // View all mask
-        for(int i = 0; i < possible_obstacles.size(); i++){
-            string title = "mask " + to_string(i);
-            imshow(title,possible_obstacles.at(i).mask);
-        }
-        waitKey(0);
+//        for(int i = 0; i < possible_obstacles.size(); i++){
+//            string title = "mask " + to_string(i);
+//            imshow(title,possible_obstacles.at(i).mask);
+//        }
+//        waitKey(0);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -469,6 +469,19 @@ Mat detecting::get_contour_edge(vector<vector<Point>> contour, Size mask_size, b
     return contour_edge;
 }
 
+Point detecting::get_contour_center(Mat contour_mask){
+    Point center;
+    try{
+        Moments contour_moments = moments(contour_mask,true);
+        center.x = contour_moments.m10/contour_moments.m00;
+        center.y = contour_moments.m01/contour_moments.m00;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return center;
+}
+
 // -- Valdidation methods of initial masks --
 vector<int> detecting::depth_validate_contours(vector<Mat> masks, Mat depth_map, vector<Scalar> average_depths){
     vector<int> valid_indexes;
@@ -755,9 +768,9 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     }
                 }
 
-                imshow("simply edge", new_edge_mask);
-                imshow("edge",edge_mask); // Issues probably in bad recognision of edges
-                waitKey(0);
+//                imshow("simply edge", new_edge_mask);
+//                imshow("edge",edge_mask); // Issues probably in bad recognision of edges
+//                waitKey(0);
 
                 // test
                 edge_mask = new_edge_mask.clone();
@@ -766,23 +779,18 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
 //                vector<vector<Point>> temp_contours = {contour};
 //                Mat edge_mask = get_contour_edge(temp_contours,mask.size(),true);
-                Mat all_line_test = edge_mask.clone();
 
                 // Find all valid lines
                 vector<line_data> lines =  get_all_lines(edge_mask,hough_threshold,min_line_length,max_line_gap);
 
-                // SOmething goes wrong below
+                // IDEA: FILTER lines by finding all intersections and then remove outliers.
 
                 // Go through all lines to get mask
                 for(int i = 0; i < lines.size(); i++){
                     // Get current line data
                     Vec4i current_line = lines.at(i).line;
                     double angle = lines.at(i).angle;
-
-                    line(all_line_test,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),150,1);
-
-                    Mat my_test = mask.clone();
-                    line(my_test,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),150,1);
+//                    cout << abs(angle*180/M_PI) << endl;
 
                     // move line until obstacle is lost
                     int direction = get_obstacle_direction(angle,current_line,mask);
@@ -792,11 +800,11 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     current_line = borders.at(0);
                     Vec4i end_line = borders.at(1);
 
-                    Mat test = Mat::zeros(mask.size(),CV_8U);
-                    line(test,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),WHITE);
-                    line(test,Point(end_line[0],end_line[1]),Point(end_line[2],end_line[3]),WHITE);
-                    imshow("the lines",test);
-                    waitKey(0);
+//                    Mat test = Mat::zeros(mask.size(),CV_8U);
+//                    line(test,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),WHITE);
+//                    line(test,Point(end_line[0],end_line[1]),Point(end_line[2],end_line[3]),WHITE);
+//                    imshow("the lines",test);
+//                    waitKey(0);
 
                     // Create mask
                     Mat border_mask = Mat::zeros(mask.size(),CV_8U);
@@ -810,10 +818,19 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
                     // Draw contour
                     Mat new_contour_mask = Mat::zeros(mask.size(),CV_8U);
-                    cout << "happens here due to empty border mask and thus no contours" << endl;
-                    imshow("border",border_mask);
-                    waitKey(0);
                     drawContours(new_contour_mask,{temp_new_contour},0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
+
+//                    // Test stuff
+//                    Mat work_in_progress = new_contour_mask.clone();
+//                    dilate(new_contour_mask,work_in_progress,border_kernel);
+//                    work_in_progress = work_in_progress-new_contour_mask;
+//                    int edge_len = countNonZero(work_in_progress);
+//                    work_in_progress = work_in_progress & mask;
+//                    int new_length = countNonZero(work_in_progress);
+//                    cout << edge_len << " -> " << new_length << endl;
+//                    imshow("mask",new_contour_mask);
+//                    waitKey(0);
+
 
                     // Draw bounding rectangle
                     Mat new_bounding_box = get_bounding_rectangle(new_contour,mask.size());
@@ -824,50 +841,207 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     int new_contour_size = countNonZero(new_contour_mask);
                     int new_max_error = int(new_contour_size*accept_rectangle_threshold);
 
-                    // Keep mask if rectangular
+                    // Keep mask if rectangular and not wholly within another mask
                     if(new_error_count <= new_max_error){
-                        obstacle new_obstacle;
-                        new_obstacle.original_mask = obstacles.at(obstacle_index).original_mask;
-                        new_obstacle.mask = new_contour_mask;
-                        new_obstacle.contour = new_contour;
+                        bool accept = true;
+                        vector<int> indexes_to_remove = {};
+                        for(int k = 0; k < temp_obstacles.size(); k++){
 
-                        temp_obstacles.push_back(new_obstacle);
-                    }
-                }
-
-
-
-                imshow("edge with lines",all_line_test); // Issues probably in bad recognision of edges
-                waitKey(0);
-
-                // Remove all obstacles wholy within others
-                for(int i = 0; i < temp_obstacles.size(); i++){
-                    bool within_another = false;
-                    imshow("obstacle",temp_obstacles.at(i).mask);
-                    for(int j = 0; j < temp_obstacles.size(); j++){
-                        if(i != j){
-                            // Test for overlap while ensuring that they are not just the same
-                            Mat overlap = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
+                            // Check if within another mask (can probably just replace the above method since it should catch both cases)
+                            Mat overlap = new_contour_mask & temp_obstacles.at(k).mask;
                             int overlap_count = countNonZero(overlap);
 
-                            if(overlap_count == countNonZero(temp_obstacles.at(i).mask) && countNonZero(temp_obstacles.at(i).mask) != countNonZero(temp_obstacles.at(j).mask)){
-                                within_another = true;
+                            if(overlap_count == countNonZero(new_contour_mask)){
+                                accept = false;
+                                break;
                             }
-                            // Combine obstacles that are very similar
-                            else if(overlap_count >= int(countNonZero(temp_obstacles.at(i).mask)*overlap_threshold)){
-                                temp_obstacles.at(i).mask = temp_obstacles.at(i).mask | temp_obstacles.at(j).mask;
+                            // Remove previous mask if this mask contains that mask
+                            else if(overlap_count == countNonZero(temp_obstacles.at(k).mask)){
+                                indexes_to_remove.push_back(k);
+                            }
+                        }
+                        if(accept == true){
+                            obstacle new_obstacle;
+                            new_obstacle.original_mask = obstacles.at(obstacle_index).original_mask;
+                            new_obstacle.mask = new_contour_mask;
+                            new_obstacle.contour = new_contour;
+                            new_obstacle.original_angle = angle;
+
+                            temp_obstacles.push_back(new_obstacle);
+                            if(indexes_to_remove.size() > 0){
+                                // removes from back to keep indexes intact
+                                for(int index = indexes_to_remove.size()-1; index >= 0; index--){
+                                    temp_obstacles.erase(temp_obstacles.begin()+indexes_to_remove.at(index));
+                                }
                             }
                         }
                     }
-                    string survived = "killed";
-                    if(within_another == false){
-                        accepted_obstacles.push_back(temp_obstacles.at(i));
-                        survived = "survived";
-                    }
-                    cout << survived << endl;
-                    waitKey(0);
-
                 }
+
+                cout << "Obstacles remaining: " << temp_obstacles.size() << endl;
+
+                // Play with similarity between obstacles (keep only similar elements)
+                for(int i = 0; i < temp_obstacles.size(); i++){
+                    Mat new_version = temp_obstacles.at(i).mask;
+                    vector<int> remove_these = {};
+//                    cout << "remaining: " << temp_obstacles.size() << endl;
+//                    imshow("obs",temp_obstacles.at(i).mask);
+//                    waitKey(0);
+//                    cout << "remove: " << endl;
+//                    Mat full_other_map = Mat::zeros(new_version.size(),CV_8U);
+                    for(int j = i+1; j < temp_obstacles.size(); j++){
+                        Mat intersection = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
+                        int intersection_count = countNonZero(intersection);
+                        if(intersection_count >= (int)countNonZero(temp_obstacles.at(i).mask)*0.95){
+                            new_version = new_version & temp_obstacles.at(j).mask;
+                            remove_these.push_back(j);
+//                            cout << j << endl;
+                        }
+//                        else{
+//                            imshow("not sim",temp_obstacles.at(j).mask);
+//                            waitKey(0);
+////                            full_other_map = full_other_map | temp_obstacles.at(j).mask;
+//                        }
+                    }
+                    if(remove_these.size() > 0){
+                        for(int j = remove_these.size()-1; j >= 0; j--){
+                            temp_obstacles.erase(temp_obstacles.begin()+remove_these.at(j));
+                        }
+                    }
+                    // Keep if not almost completely within all other obstacles
+                    //temp_obstacles.at(i).mask = new_version;
+                    temp_obstacles.at(i).contour = get_biggest_contour(new_version);
+                    vector<vector<Point>> temp_vec = {temp_obstacles.at(i).contour};
+                    Mat new_version_contour_mask = Mat::zeros(new_version.size(),CV_8U);
+                    drawContours(new_version_contour_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+                    temp_obstacles.at(i).mask = new_version_contour_mask;
+                    accepted_obstacles.push_back(temp_obstacles.at(i));
+//                    Mat new_intersection = new_version & full_other_map;
+//                    int new_intersection_count = countNonZero(new_intersection);
+//                    if(new_intersection_count < countNonZero(new_version)*0.95){
+//                        temp_obstacles.at(i).mask = new_version;
+//                        accepted_obstacles.push_back(temp_obstacles.at(i));
+//                    }
+//                    else{
+//                        imshow("oh no",new_version);
+//                        imshow("killer",full_other_map);
+//                        waitKey(0);
+//                    }
+                }
+
+                for(int be = 0; be < accepted_obstacles.size(); be++){
+                    string name = to_string(be);
+                    imshow(name,accepted_obstacles.at(be).mask);
+                }
+                waitKey(0);
+
+                cout << "obstacles remaining after similarity test: " << accepted_obstacles.size() << endl;
+
+                // Maybe if two are similar but not very similar and have similar angles, use average angle to create new line and use that to create cut
+                for(int i = 0; i < accepted_obstacles.size(); i++){
+                    vector<int> to_be_removed = {};
+                    for(int j = i+1; j < accepted_obstacles.size(); j++){
+                        Mat intersection = accepted_obstacles.at(i).mask & accepted_obstacles.at(j).mask;
+                        int intersection_count = countNonZero(intersection);
+                        if(intersection_count >= countNonZero(accepted_obstacles.at(i).mask)*0.75){
+
+                            vector<Point> contour, second_contour;
+                            findNonZero(accepted_obstacles.at(i).mask,contour);
+                            findNonZero(accepted_obstacles.at(j).mask,second_contour);
+
+//                            // Get best fit lines and angles
+//                            Vec4f fitted_line, second_fitted_line;
+//                            fitLine(contour,fitted_line, DIST_L2, 0, 0.1, 0.1);
+//                            fitLine(second_contour,second_fitted_line, DIST_L2, 0, 0.1, 0.1);
+
+//                            int biggest_distance = int(sqrt(accepted_obstacles.at(i).mask.cols*accepted_obstacles.at(i).mask.cols + accepted_obstacles.at(i).mask.rows * accepted_obstacles.at(i).mask.rows));
+
+//                            Point start = Point(fitted_line[2],fitted_line[3]);
+//                            Point end = Point(fitted_line[2]+fitted_line[0]*biggest_distance,fitted_line[3]+fitted_line[1]*biggest_distance);
+
+//                            Point second_start = Point(second_fitted_line[2],second_fitted_line[3]);
+//                            Point second_end =  Point(second_fitted_line[2]+second_fitted_line[0]*biggest_distance,second_fitted_line[3]+second_fitted_line[1]*biggest_distance);
+
+//                            Mat tempi = Mat::zeros(accepted_obstacles.at(i).mask.size(),CV_8U);
+//                            line(tempi,start,end,WHITE);
+//                            line(tempi,second_start,second_end,WHITE);
+//                            imshow("the lines",tempi);
+//                            waitKey(0);
+
+
+//                            double angle = calculations.calculate_angle(start,end);
+//                            double second_angle = calculations.calculate_angle(second_start,second_end);
+                            double angle = accepted_obstacles.at(i).original_angle;
+                            double second_angle = accepted_obstacles.at(j).original_angle;
+
+
+                            cout << angle*180/M_PI << " | " << second_angle*180/M_PI << endl;
+                            double diff = abs(angle*180/M_PI - abs(second_angle*180/M_PI));
+                            cout << "the diff: " << diff << endl;
+                            if(diff < 10.0){
+                                double average_angle = (angle+second_angle)/2.0;
+                                cout << "average angle: " << average_angle*180/M_PI << endl;
+
+                                Point mask_center = get_contour_center(accepted_obstacles.at(i).mask);
+
+                                int range = max(accepted_obstacles.at(i).mask.cols,accepted_obstacles.at(i).mask.rows);
+
+                                Vec4i new_line;
+                                double a = sin(angle);
+                                double b = cos(angle);
+
+                                new_line[0] = (int)cvRound(mask_center.x - range*b);
+                                new_line[1] = (int)cvRound(mask_center.y - range*a);
+                                new_line[2] = (int)cvRound(mask_center.x + range*b);
+                                new_line[3] = (int)cvRound(mask_center.y + range*a);
+
+                                int direction;
+                                double dist_to_90 = abs(90*M_PI/180-abs(angle));
+                                if(abs(angle*180/M_PI) > dist_to_90*180/M_PI){
+                                    direction = DIRECTION_RIGHT;
+                                }
+                                else{
+                                    direction = DIRECTION_UP;
+                                }
+
+                                vector<Vec4i> borders = get_best_fit_borders(direction,new_line,mask);
+
+                                Mat best_fit_mask = Mat::zeros(accepted_obstacles.at(i).mask.size(),CV_8U);
+
+                                vector<Point> points = {Point(borders.at(0)[0],borders.at(0)[1]),Point(borders.at(1)[0],borders.at(1)[1]),Point(borders.at(1)[2],borders.at(1)[3]), Point(borders.at(0)[2],borders.at(0)[3])};
+                                vector<vector<Point>> temp = {points};
+                                drawContours(best_fit_mask,temp,0,WHITE,DRAW_WIDTH_INFILL);
+
+                                Mat final_mask = best_fit_mask & mask;
+                                accepted_obstacles.at(i).mask = final_mask;
+                                accepted_obstacles.at(i).contour = get_biggest_contour(final_mask);
+
+                                final_mask = Mat::zeros(best_fit_mask.size(),CV_8U);
+                                vector<vector<Point>> temp_vec = {accepted_obstacles.at(i).contour};
+
+                                drawContours(final_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+                                accepted_obstacles.at(i).mask = final_mask;
+
+                                to_be_removed.push_back(j);
+                            }
+                            else{
+                                // keep the one that contains more mask values (seen as better fit)
+                                if(countNonZero(accepted_obstacles.at(i).mask) <  countNonZero(accepted_obstacles.at(j).mask)){
+                                    accepted_obstacles.at(i) = accepted_obstacles.at(j);
+                                }
+                                to_be_removed.push_back(j);
+                                cout << countNonZero(accepted_obstacles.at(i).mask) << " | " << countNonZero(accepted_obstacles.at(j).mask) << endl;
+                            }
+                        }
+                    }
+                    if(to_be_removed.size() > 0){
+                        for(int j = to_be_removed.size()-1; j >= 0; j--){
+                            accepted_obstacles.erase(accepted_obstacles.begin()+to_be_removed.at(j));
+                        }
+                    }
+                }
+                cout << "obstacles remaining after angle test: " << accepted_obstacles.size() << endl;
+
             }
             else{
                 accepted_obstacles.push_back(obstacles.at(obstacle_index));
@@ -877,6 +1051,11 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
+//    for(int i = 0; i < accepted_obstacles.size(); i++){
+//        string name = to_string(i);
+//        imshow(name,accepted_obstacles.at(i).mask);
+//    }
+//    cout << "obstacles accepted: " <<  accepted_obstacles.size() << endl;
     return accepted_obstacles;
 }
 
@@ -945,71 +1124,104 @@ vector<line_data> detecting::get_all_lines(Mat edge_mask,int threshold, double m
         HoughLinesP(edge_mask,lines,1,CV_PI/180,threshold,min_length,max_gap);
 
         // Go through all lines and extent
-        //Mat test = Mat::zeros(edge_mask.size(),CV_8U);
-        //Mat test_2 = Mat::zeros(edge_mask.size(),CV_8U);
         for(int i = 0; i < lines.size(); i++){
+//            Mat test = Mat::zeros(edge_mask.size(),CV_8U);
+//            Mat test_2;
             // get start and end points of line
             Point start = Point(lines.at(i)[0],lines.at(i)[1]);
             Point end = Point(lines.at(i)[2],lines.at(i)[3]);
 
-            //line(test,start,end,WHITE);
+//            line(test,start,end,WHITE);
 
             // Extent lines (Error due to y being reversed) In opencv cos and sin should be reveresed due to the coordinate system
             double angle = calculations.calculate_angle(start,end);
+
+            // ensure positive angle
+            if(angle < 0.0){
+                Point temp = start;
+                start = end;
+                end = temp;
+                angle = calculations.calculate_angle(start,end);
+
+            }
+
+//            cout << start.x << ", " << start.y << " -> " << end.x << ", " << end.y << endl;
+//            cout << "org angle: " << angle*180/M_PI << endl;
             //angle = angle + (90*M_PI/180); // Shift to align with x-axis
             double a = sin(angle);
             double b = cos(angle);
-            start.x = (int)cvRound(start.x + edge_mask.cols*(-b));
-            end.y = (int)cvRound(end.y + edge_mask.rows*(a));
-            end.x = (int)cvRound(end.x - edge_mask.cols*(-b));
-            start.y = (int)cvRound(start.y - edge_mask.rows*(a));
+            int range = max(edge_mask.rows,edge_mask.cols);
+            start.x = (int)cvRound(start.x - range*b);
+            start.y = (int)cvRound(start.y - range*a);
+            end.x = (int)cvRound(end.x + range*b);//edge_mask.cols*(b));
+            end.y = (int)cvRound(end.y + range*a);//edge_mask.rows*(a));
 
-            //line(test_2,start,end,WHITE);
+//            test_2 = test.clone();
+//            line(test_2,start,end,150);
 
             // Limit to border with weird non-math method
-            Mat border_mask = Mat::zeros(edge_mask.size(),CV_8U);
-            rectangle(border_mask,Point(0,0),Point(edge_mask.cols-1,edge_mask.rows-1),WHITE,1);
-
-            Mat slim_line = Mat::zeros(edge_mask.size(),CV_8U);
-            line(slim_line,start,end,WHITE,1,LINE_AA);
-
-            Mat ends = border_mask & slim_line;
-            Mat locations;
-            findNonZero(ends,locations);
-
-            Point best_start;
-            Point best_end;
+            Point best_start = start;
+            Point best_end = end;
             double best_angle = angle;
 
-            if(countNonZero(ends) > 2){
-                float biggest_distance = 0.0;
-                double best_angle_diff = 90;
-                // if more than two points choose, the ones furthest from eachother
-                for(int first_index = 0; first_index < locations.rows; first_index++){
-                    for(int second_index = 0; second_index < locations.rows; second_index++){
-                        Point first = locations.at<Point>(first_index);
-                        Point second = locations.at<Point>(second_index);
-                        float distance = abs(calculations.calculate_euclidean_distance(first.x,first.y,second.x,second.y));
-                        float new_angle = calculations.calculate_angle(first,second) + (90*M_PI/180);
-                        double angle_diff = abs(new_angle*180/M_PI-angle*180/M_PI);
-                        if(distance > biggest_distance && angle_diff < best_angle_diff){
-                            best_start = first;
-                            best_end = second;
-                            biggest_distance = distance;
-                            best_angle_diff = angle_diff;
-                            best_angle = new_angle;
+            if(limit_to_border == true){
+                Mat border_mask = Mat::zeros(edge_mask.size(),CV_8U);
+                rectangle(border_mask,Point(0,0),Point(edge_mask.cols-1,edge_mask.rows-1),WHITE,1);
+
+                Mat slim_line = Mat::zeros(edge_mask.size(),CV_8U);
+                line(slim_line,start,end,WHITE,1,LINE_AA);
+
+                Mat ends = border_mask & slim_line;
+                Mat locations;
+                findNonZero(ends,locations);
+
+
+                if(countNonZero(ends) > 2){
+                    float biggest_distance = 0.0;
+                    double best_angle_diff = 90;
+                    // if more than two points choose, the ones furthest from eachother
+                    for(int first_index = 0; first_index < locations.rows; first_index++){
+                        for(int second_index = 0; second_index < locations.rows; second_index++){
+                            Point first = locations.at<Point>(first_index);
+                            Point second = locations.at<Point>(second_index);
+                            float distance = abs(calculations.calculate_euclidean_distance(first.x,first.y,second.x,second.y));
+                            float new_angle = calculations.calculate_angle(first,second); // Used to plus 90 degrees
+                            // ensure positive
+                            if(new_angle < 0.0){
+                                Point temp = first;
+                                first = second;
+                                second = temp;
+                                new_angle = calculations.calculate_angle(first,second);
+                            }
+                            double angle_diff = abs(new_angle*180/M_PI-abs(angle*180/M_PI));
+    //                        cout << "Angle diff: " << angle_diff << endl;
+                            if(distance > biggest_distance && abs(angle_diff) < abs(best_angle_diff)){
+    //                            cout << "Winner with distance: " << distance << " and angle difference " << angle_diff << endl;
+                                best_start = first;
+                                best_end = second;
+                                biggest_distance = distance;
+                                best_angle_diff = angle_diff;
+                                best_angle = new_angle;
+                            }
+    //                        Mat another_test = Mat::zeros(edge_mask.size(),CV_8U);
+    //                        line(another_test,first,second,255);
+    //                        imshow("another",another_test);
+    //                        waitKey(0);
                         }
                     }
                 }
+                else if(countNonZero(ends) == 2){
+                    best_start = locations.at<Point>(0);
+                    best_end = locations.at<Point>(1);
+                }
+                else{
+                    throw runtime_error("Line does not hit border");
+                }
             }
-            else if(countNonZero(ends) == 2){
-                best_start = locations.at<Point>(0);
-                best_end = locations.at<Point>(1);
-            }
-            else{
-                throw runtime_error("Line does not hit border");
-            }
-            //imshow("test",test);
+
+
+//            imshow("test",test);
+//            line(test_2,best_start,best_end,WHITE);
 
             // Update lines
             lines.at(i)[0] = best_start.x;
@@ -1017,8 +1229,8 @@ vector<line_data> detecting::get_all_lines(Mat edge_mask,int threshold, double m
             lines.at(i)[2] = best_end.x;
             lines.at(i)[3] = best_end.y;
 
-            //imshow("test 2",test_2);
-            //waitKey(0);
+//            imshow("test 2",test_2);
+//            waitKey(0);
 
             // Assign to output
             line_data final_line;
@@ -1030,6 +1242,14 @@ vector<line_data> detecting::get_all_lines(Mat edge_mask,int threshold, double m
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
+
+//    for(int i = 0; i < final_lines.size(); i++){
+//        Mat test = Mat::zeros(edge_mask.size(),CV_8U);
+//        Vec4i the_line = final_lines.at(i).line;
+//        line(test,Point(the_line[0],the_line[1]),Point(the_line[2],the_line[3]),WHITE);
+//        imshow("final lines", test);
+//        waitKey(0);
+//    }
     return final_lines;
 }
 
@@ -1338,11 +1558,11 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
     int direction = 0;
     try{
         // Check if angle is closer to 90 degrees (Vertical) else it must be horizontal
-        cout << angle*180/M_PI << endl;
-        double distance_to_90 = abs(90-angle*180/M_PI);
-        cout << distance_to_90 << endl;
-        if(angle*180/M_PI > distance_to_90){
-            cout << "move left or right" << endl;
+//        cout << angle*180/M_PI << endl;
+        double distance_to_90 = abs(90-abs(angle*180/M_PI));
+//        cout << distance_to_90 << endl;
+        if(abs(angle*180/M_PI) > distance_to_90){
+//            cout << "move left or right" << endl;
 
 
             // Create directional line masks
@@ -1417,13 +1637,20 @@ obstacle detecting::clean_obstacle(obstacle input_obstacle, bool rectangle_shape
         Point end = Point(fitted_line[2]+fitted_line[0]*biggest_distance,fitted_line[3]+fitted_line[1]*biggest_distance);
 
         double angle = calculations.calculate_angle(start,end);
-        angle = angle;// + (90*M_PI/180); // Shift to align with x-axis
+        // ensure positive
+        if(angle < 0.0){
+            Point temp = start;
+            start = end;
+            end = temp;
+            angle = calculations.calculate_angle(start,end);
+        }
+        //angle = angle;// + (90*M_PI/180); // Shift to align with x-axis
 
         // Check if line is vertical or horizontal
-        cout << angle*180/M_PI << endl;
+//        cout << angle*180/M_PI << endl;
         int direction;
-        double dist_to_90 = abs(90*M_PI/180-angle);
-        if(angle*180/M_PI > dist_to_90*180/M_PI){
+        double dist_to_90 = abs(90*M_PI/180-abs(angle));
+        if(abs(angle*180/M_PI) > dist_to_90*180/M_PI){
             direction = DIRECTION_RIGHT;
         }
         else{
@@ -1437,7 +1664,6 @@ obstacle detecting::clean_obstacle(obstacle input_obstacle, bool rectangle_shape
         current_line[2] = end.x;
         current_line[3] = end.y;
 
-        // ISSUE: wrong direction is given
         vector<Vec4i> borders = get_best_fit_borders(direction,current_line,mask); // get best fit border have not been cleaned yet
 
         Mat best_fit_mask = Mat::zeros(mask.size(),CV_8U);
@@ -2070,13 +2296,14 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
 
             // Extent lines
             double angle = calculations.calculate_angle(start,end);
-            angle = angle + (90*M_PI/180); // Shift to align with x-axis
-            double a = cos(angle);
-            double b = sin(angle);
-            start.x = cvRound(start.x + edge_mask.cols*(-b));
-            start.y = cvRound(start.y + edge_mask.rows*(a));
-            end.x = cvRound(end.x - edge_mask.cols*(-b));
-            end.y = cvRound(end.y - edge_mask.rows*(a));
+            //angle = angle + (90*M_PI/180); // Shift to align with x-axis
+            double a = sin(angle);
+            double b = cos(angle);
+            int range = max(edge_mask.cols,edge_mask.rows);
+            start.x = cvRound(start.x - range*b);
+            start.y = cvRound(start.y - range*a);
+            end.x = cvRound(end.x + range*b);
+            end.y = cvRound(end.y + range*a);
 
             // Create mask
             Mat line_mask = Mat::zeros(edge_mask.size(),CV_8U);
@@ -2089,7 +2316,7 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
             // Check if bigger than previous
             bool approved = true;
             if(compare == true){
-                if(abs(angle-compare_angle) < (angle_threshold*M_PI/180) || abs(angle-(compare_angle+180*M_PI/180)) < (angle_threshold*M_PI/180) ){
+                if(abs(angle-abs(compare_angle)) < (angle_threshold*M_PI/180) || abs(angle-abs((compare_angle+180*M_PI/180))) < (angle_threshold*M_PI/180) ){
                     approved = false;
                 }
             }
@@ -2121,9 +2348,9 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
                             Point first = locations.at<Point>(first_index);
                             Point second = locations.at<Point>(second_index);
                             float distance = abs(calculations.calculate_euclidean_distance(first.x,first.y,second.x,second.y));
-                            float new_angle = calculations.calculate_angle(first,second) + (90*M_PI/180);
-                            double angle_diff = abs(new_angle*180/M_PI-angle*180/M_PI);
-                            if(distance > biggest_distance && angle_diff < best_angle_diff){
+                            float new_angle = calculations.calculate_angle(first,second);// + (90*M_PI/180);
+                            double angle_diff = abs(new_angle*180/M_PI-abs(angle*180/M_PI));
+                            if(distance > biggest_distance && abs(angle_diff) < abs(best_angle_diff)){
                                 best_start = first;
                                 best_end = second;
                                 biggest_distance = distance;
@@ -2178,13 +2405,14 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
 
             // Extent lines
             double angle = calculations.calculate_angle(start,end);
-            angle = angle + (90*M_PI/180); // Shift to align with x-axis
-            double a = cos(angle);
-            double b = sin(angle);
-            start.x = cvRound(start.x + edge_mask.cols*(-b));
-            start.y = cvRound(start.y + edge_mask.rows*(a));
-            end.x = cvRound(end.x - edge_mask.cols*(-b));
-            end.y = cvRound(end.y - edge_mask.rows*(a));
+            int range = max(edge_mask.cols,edge_mask.rows);
+            //angle = angle + (90*M_PI/180); // Shift to align with x-axis
+            double a = sin(angle);
+            double b = cos(angle);
+            start.x = cvRound(start.x - range*b);
+            start.y = cvRound(start.y - range*a);
+            end.x = cvRound(end.x + range*b);
+            end.y = cvRound(end.y + range*a);
 
             // Create mask
             Mat line_mask = Mat::zeros(edge_mask.size(),CV_8U);
@@ -2235,9 +2463,9 @@ line_data detecting::get_best_line(Mat edge_mask,int threshold, double min_lengt
                             Point first = locations.at<Point>(first_index);
                             Point second = locations.at<Point>(second_index);
                             float distance = abs(calculations.calculate_euclidean_distance(first.x,first.y,second.x,second.y));
-                            float new_angle = calculations.calculate_angle(first,second) + (90*M_PI/180);
-                            double angle_diff = abs(new_angle*180/M_PI-angle*180/M_PI);
-                            if(distance > biggest_distance && angle_diff < best_angle_diff){
+                            float new_angle = calculations.calculate_angle(first,second);// + (90*M_PI/180);
+                            double angle_diff = abs(new_angle*180/M_PI-abs(angle*180/M_PI));
+                            if(distance > biggest_distance && abs(angle_diff) < abs(best_angle_diff)){
                                 best_start = first;
                                 best_end = second;
                                 biggest_distance = distance;
@@ -2286,7 +2514,7 @@ Mat detecting::ensure_single_obstacle(Mat mask, Vec4i first_line, Vec4i last_lin
         work_line[3] = last_line[1];
 
         // Determine its angle
-        double angle = calculations.calculate_angle(Point(work_line[0],work_line[1]),Point(work_line[2],work_line[3])) + (90*M_PI/180);
+        double angle = calculations.calculate_angle(Point(work_line[0],work_line[1]),Point(work_line[2],work_line[3]));// + (90*M_PI/180);
 
         // Determine direction
         int direction = get_obstacle_direction(angle,work_line,mask);
@@ -2411,7 +2639,7 @@ vector<obstacle> detecting::split_into_rectangles(vector<obstacle> obstacles){
                 Vec4i last_start;
                 Vec4i last_end;
                 while(hasNonZero(remaining_mask) == true){ //&& biggest_contour_size > original_contour_size*obstacle_size_limit){ // Currently just 10% limit (removed second argument since it would be delayed due to biggest obstacle being found within the loop)
-                    cout << biggest_contour_size << " > " << original_contour_size << " * " << obstacle_size_limit << endl;
+//                    cout << biggest_contour_size << " > " << original_contour_size << " * " << obstacle_size_limit << endl;
                     // Find contours
                     vector<vector<Point>> contours;
                     vector<Vec4i> hierarchy;
@@ -2672,7 +2900,7 @@ vector<obstacle> detecting::split_into_rectangles_corner(vector<obstacle> obstac
 
 
 
-                    cout << best_line_validity << ", " << second_best_line_validity << " | " << new_best_validity << ", " << new_second_best_validity << endl;
+//                    cout << best_line_validity << ", " << second_best_line_validity << " | " << new_best_validity << ", " << new_second_best_validity << endl;
                     visualization visualizer;
                     vector<Vec4i> temp_1 = {best_line,new_best_line};
                     vector<Vec4i> temp_2 = {second_best_line,new_second_best_line};
@@ -2826,11 +3054,11 @@ vector<obstacle> detecting::split_into_rectangles_corner(vector<obstacle> obstac
             Point end = Point(fitted_line[2]+fitted_line[0]*biggest_distance,fitted_line[3]+fitted_line[1]*biggest_distance);
 
             double angle = calculations.calculate_angle(start,end);
-            angle = angle + (90*M_PI/180); // Shift to align with x-axis
+            angle = angle;// + (90*M_PI/180); // Shift to align with x-axis
 
             // Check if line is vertical or horizontal
             int direction;
-            if(angle*180/M_PI < abs(angle*180/M_PI-90)){
+            if(abs(angle*180/M_PI) > abs(90-abs(angle*180/M_PI))){
                 direction = DIRECTION_RIGHT;
             }
             else{

@@ -433,7 +433,7 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
 
                     double min,max;
                     minMaxLoc(disparity_map,&min,&max);
-                    cout << min << " -> " << max << endl;
+//                    cout << min << " -> " << max << endl;
                 }
                 if(disparity_filter != DISPARITY_FILTER_NONE){
                     // Visualize filtered disparity map
@@ -464,8 +464,8 @@ void pipeline::run_triangulation_pipeline(int disparity_filter){
 
                 old_second_points = old_disparity_points.at(0);
                 vector<Point2f> old_first_points = old_disparity_points.at(1);
-                cout << second_points.size() << endl;
-                cout << first_points.size() << endl;
+//                cout << second_points.size() << endl;
+//                cout << first_points.size() << endl;
 
 
                 // Visualize points in first and second frame
@@ -669,7 +669,7 @@ void pipeline::run_triangulation_pipeline_test(int disparity_filter){
 
                     double min,max;
                     minMaxLoc(disparity_map,&min,&max);
-                    cout << min << " -> " << max << endl;
+//                    cout << min << " -> " << max << endl;
                 }
                 if(disparity_filter != DISPARITY_FILTER_NONE){
                     // Visualize filtered disparity map
@@ -731,8 +731,8 @@ void pipeline::run_triangulation_pipeline_test(int disparity_filter){
 
                 old_first_points = old_disparity_points.at(0);
                 vector<Point2f> old_second_points = old_disparity_points.at(1);
-                cout << first_points.size() << endl;
-                cout << second_points.size() << endl;
+//                cout << first_points.size() << endl;
+//                cout << second_points.size() << endl;
 
 
                 // Visualize points in first and second frame
@@ -1210,7 +1210,6 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             start = chrono::high_resolution_clock::now();
 
             vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
-            cout << obstacles.size() << endl;
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -1367,7 +1366,7 @@ bool pipeline::check_rectification_inconsistensy(Mat first_frame, Mat second_fra
             // change sign due to direction
             angle = fabs(angle);
             // Take smallest
-            if(fabs(180.0*M_PI/180-angle) < fabs(angle)){
+            if(fabs(180.0*M_PI/180-angle) < angle){
                 angle = fabs(180.0*M_PI/180-angle);
             }
             angle = angle*180/M_PI; // Convert to degrees
