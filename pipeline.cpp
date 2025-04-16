@@ -1172,6 +1172,11 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
 
             // Increment index
             frame_index++;
+            cout << "Frame: " << frame_index << endl;
+
+            if(frame_index < 4){
+                continue;
+            }
 
             // Break if no more frames any of the videos
             if(first_frame.empty() || second_frame.empty()){

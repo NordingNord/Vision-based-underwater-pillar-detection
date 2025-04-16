@@ -2443,3 +2443,28 @@
 //                }
 
 //            cout << accepted_obstacles.size() << endl;
+
+
+//                    Mat new_intersection = new_version & full_other_map;
+//                    int new_intersection_count = countNonZero(new_intersection);
+//                    if(new_intersection_count < countNonZero(new_version)*0.95){
+//                        temp_obstacles.at(i).mask = new_version;
+//                        accepted_obstacles.push_back(temp_obstacles.at(i));
+//                    }
+//                    else{
+//                        imshow("oh no",new_version);
+//                        imshow("killer",full_other_map);
+//                        waitKey(0);
+//                    }
+//                        else{
+//                            imshow("not sim",temp_obstacles.at(j).mask);
+//                            waitKey(0);
+////                            full_other_map = full_other_map | temp_obstacles.at(j).mask;
+//                        }
+
+
+//                    cout << "remaining: " << temp_obstacles.size() << endl;
+//                    imshow("obs",temp_obstacles.at(i).mask);
+//                    waitKey(0);
+//                    cout << "remove: " << endl;
+//                    Mat full_other_map = Mat::zeros(new_version.size(),CV_8U);

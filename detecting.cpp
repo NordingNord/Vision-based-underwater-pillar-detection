@@ -397,12 +397,225 @@ Mat detecting::clean_contour_mask(Mat mask){
 Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
     Mat bounding_rectangle = Mat::zeros(frame_size,CV_8U);
     try{
+
+        Mat test_1 = Mat::zeros(frame_size,CV_8U);
+
+        for(int i = 0; i < contour.size(); i++){
+            test_1.at<uchar>(contour.at(i)) = 255;
+        }
+        dilate(test_1,test_1,border_kernel);
+        dilate(test_1,test_1,border_kernel);
+        dilate(test_1,test_1,border_kernel);
+        dilate(test_1,test_1,border_kernel);
+        dilate(test_1,test_1,border_kernel);
+        dilate(test_1,test_1,border_kernel);
+        dilate(test_1,test_1,border_kernel);
+        dilate(test_1,test_1,border_kernel);
+        dilate(test_1,test_1,border_kernel);
+
+
+//        vector<vector<Point>> temp = {contour};
+//        drawContours(test_1,temp,0,WHITE,DRAW_WIDTH_INFILL);
+        imshow("input contour",test_1);
+
+        // test flip and stuff
+
+        // find edge to add to
+        Mat left = Mat::zeros(frame_size, CV_8U);
+        Mat right = Mat::zeros(frame_size, CV_8U);
+        Mat top = Mat::zeros(frame_size, CV_8U);
+        Mat bottom = Mat::zeros(frame_size, CV_8U);
+
+        line(left,Point(0,0),Point(0,frame_size.height-1),WHITE);
+        line(right,Point(frame_size.width-1,0),Point(frame_size.width-1,frame_size.height-1),WHITE);
+        line(bottom, Point(0,frame_size.height-1),Point(frame_size.width-1,frame_size.height-1),WHITE);
+        line(top, Point(0,0), Point(frame_size.width-1,0),WHITE);
+
+        int count_left, count_right, count_top, count_bottom;
+        count_left = countNonZero(left & test_1);
+        count_right = countNonZero(right & test_1);
+        count_top = countNonZero(top & test_1);
+        count_bottom = countNonZero(bottom & test_1);
+
+        cout << count_left << ", " << count_right << ", " << count_top << ", " << count_bottom << endl;
+
+        int number_edges = 0;
+        if(count_left > 0){
+            number_edges++;
+        }
+        if(count_right > 0){
+            number_edges++;
+        }
+        if(count_top > 0){
+            number_edges++;
+        }
+        if(count_bottom > 0){
+            number_edges++;
+        }
+        Mat test_2;
+        vector<Point> big_contour;
+        if(number_edges == 0){
+            big_contour = contour;
+        }
+        else{
+            Mat comb;
+            if(max(count_left,count_right) > max(count_top,count_bottom)){
+                flip(test_1,test_2,1);
+                flip(test_2,test_2,0);
+                if(number_edges == 1){
+                    // Shift down
+                    Mat full = left | right | bottom | top;
+                    vector<Point> locations;
+                    findNonZero(full,locations);
+
+                    int smallest_dist_to_center = floor(temp_1.rows/2);
+                    for(int k = 0; k < locations.size();k++){
+                        if(abs(locations.at(k).y-temp_1.rows/2) < smallest_dist_to_center){
+                            smallest_dist_to_center = floor(locations.at(k).y-temp_1.rows/2);
+                        }
+                    }
+                    // Shift
+                }
+                cout << "place to right" << endl;
+                if(count_left > count_right && count_left > count_top && count_left > count_bottom){
+                    hconcat(test_2,test_1,comb);
+                }
+                else{
+                    hconcat(test_1,test_2,comb);
+                }
+
+                // add more to top to ensure long enough shape
+                if(number_edges > 2){
+                    Mat top_edge = top & test_1;
+                    Mat bottom_edge = bottom & test_1;
+
+                    vector<Point> top_locations, bottom_locations;
+                    findNonZero(top_edge,top_locations);
+                    findNonZero(bottom_edge,bottom_locations);
+
+                    int top_biggest_x = 0;
+                    int bottom_biggest_x = 0;
+                    int top_smallest_x = test_1.cols;
+                    int bottom_smallest_x = test_1.cols;
+
+                    for(int k = 0; k < top_locations.size(); k++){
+                        if(top_locations.at(k).x > top_biggest_x){
+                            top_biggest_x = top_locations.at(k).x;
+                        }
+                        if(top_locations.at(k).x < top_smallest_x){
+                            top_smallest_x = top_locations.at(k).x;
+                        }
+                    }
+
+                    for(int k = 0; k < bottom_locations.size(); k++){
+                        if(bottom_locations.at(k).x > bottom_biggest_x){
+                            bottom_biggest_x = bottom_locations.at(k).x;
+                        }
+                        if(bottom_locations.at(k).x < bottom_smallest_x){
+                            bottom_smallest_x = bottom_locations.at(k).x;
+                        }
+                    }
+
+
+                    float diff;
+                    if(abs(float(top_biggest_x-bottom_biggest_x)) > abs(float(top_smallest_x-bottom_smallest_x))){
+                        diff = float(top_biggest_x-bottom_biggest_x);
+                    }
+                    else{
+                        diff = float(top_smallest_x-bottom_smallest_x);
+                    }
+
+                    float translation_array[] = {1.0,0.0,diff,0.0,1.0,0.0};
+                    Mat translation = Mat(2,3,CV_32F,translation_array);
+
+                    Mat temp_comb;
+                    warpAffine(comb,temp_comb,translation,comb.size());
+                    vconcat(temp_comb,comb,comb);
+                }
+            }
+            else{
+                flip(test_1,test_2,0);
+                flip(test_2,test_2,1);
+                if(count_top > count_right && count_top > count_left && count_top > count_bottom){
+                    vconcat(test_2,test_1,comb);
+                }
+                else{
+                    vconcat(test_1,test_2,comb);
+                }
+                // add more to left to ensure long enough shape
+                if(number_edges > 2){
+                    Mat left_edge = left & test_1;
+                    Mat right_edge = right & test_1;
+                    vector<Point> left_locations, right_locations;
+                    findNonZero(left_edge,left_locations);
+                    findNonZero(right_edge,right_locations);
+
+                    int left_biggest_y = 0;
+                    int right_biggest_y = 0;
+                    int left_smallest_y = test_1.rows;
+                    int right_smallest_y = test_1.rows;
+
+                    for(int k = 0; k < left_locations.size(); k++){
+                        if(left_locations.at(k).y > left_biggest_y){
+                            left_biggest_y = left_locations.at(k).y;
+                        }
+                        if(left_locations.at(k).y < left_smallest_y){
+                            left_smallest_y = left_locations.at(k).y;
+                        }
+
+                    }
+
+                    for(int k = 0; k < right_locations.size(); k++){
+                        if(right_locations.at(k).y > right_biggest_y){
+                            right_biggest_y = right_locations.at(k).y;
+                        }
+                        if(right_locations.at(k).y < right_smallest_y){
+                            right_smallest_y = right_locations.at(k).y;
+                        }
+                    }
+
+                    float diff;
+                    if(abs(float(left_biggest_y-right_biggest_y)) > abs(float(left_smallest_y-right_smallest_y))){
+                        diff = float(left_biggest_y-right_biggest_y);
+                    }
+                    else{
+                        diff = float(left_smallest_y-right_smallest_y);
+                    }
+
+                    float translation_array[] = {1.0,0.0,0.0,0.0,1.0,diff};
+                    Mat translation = Mat(2,3,CV_32F,translation_array);
+
+                    Mat temp_comb;
+                    warpAffine(comb,temp_comb,translation,comb.size());
+                    hconcat(temp_comb,comb,comb);
+                }
+            }
+            big_contour = get_biggest_contour(comb);
+            Mat comb_temp;
+            resize(comb,comb_temp,Size(),0.5,0.5,INTER_LINEAR);
+
+            imshow("feaf",comb_temp);
+            waitKey(0);
+        }
+
         // Get rotatedRect element
-        RotatedRect current_rectangle = minAreaRect(contour);
+        //RotatedRect current_rectangle = minAreaRect(contour);
+        RotatedRect current_rectangle = minAreaRect(big_contour);
+
+        cout << "angle box: " << current_rectangle.angle << endl;
 
         // Establish rectangle points
         Point2f rectangle_points[4];
         current_rectangle.points(rectangle_points);
+
+        Mat test = Mat::zeros(frame_size,CV_8U);
+        for(int i = 0; i < 4; i++){
+            line(test,rectangle_points[i],rectangle_points[(i+1)%4],WHITE);
+        }
+//        cout << rectangle_points[0].x << ", " << rectangle_points[0].y << " -> " << rectangle_points[1].x << ", " << rectangle_points[1].y << " -> " << rectangle_points[2].x << ", " << rectangle_points[2].y << " -> " << rectangle_points[3].x << ", " << rectangle_points[3].y << endl;
+
+        imshow("test",test);
+        waitKey(0);
 
         // Convert to vector for further usage
         vector<Point> rectangle_points_vector = {rectangle_points[0],rectangle_points[1],rectangle_points[2],rectangle_points[3]};
@@ -721,8 +934,16 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
             vector<Point> contour = obstacles.at(obstacle_index).contour;
             Mat mask = obstacles.at(obstacle_index).mask;
 
+            imshow("THe mask",mask);
+            waitKey(0);
+
+            // What if we use all points?
+            vector<Point> pixel_coords;
+            findNonZero(mask,pixel_coords);
+
             // Draw bounding rectangle
-            Mat bounding_box = get_bounding_rectangle(contour,mask.size());
+//            Mat bounding_box = get_bounding_rectangle(contour,mask.size());
+            Mat bounding_box = get_bounding_rectangle(pixel_coords,mask.size());
 
             // Check if bounding box contains more than threshold percent error (Error being pixel within box that do not belong to mask)
             int error_count = get_symmetric_difference(mask,bounding_box,true);
@@ -768,9 +989,9 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     }
                 }
 
-//                imshow("simply edge", new_edge_mask);
-//                imshow("edge",edge_mask); // Issues probably in bad recognision of edges
-//                waitKey(0);
+                imshow("simply edge", new_edge_mask);
+                imshow("edge",edge_mask); // Issues probably in bad recognision of edges
+                waitKey(0);
 
                 // test
                 edge_mask = new_edge_mask.clone();
@@ -794,6 +1015,15 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
                     // move line until obstacle is lost
                     int direction = get_obstacle_direction(angle,current_line,mask);
+
+
+//                    cout << "Angle: " << angle*180/M_PI << endl;
+//                    cout << "Direction: " << direction << endl;
+//                    Mat test_stuff = Mat::zeros(mask.size(), CV_8U);
+//                    line(test_stuff,Point(current_line[0],current_line[1]),Point(current_line[2], current_line[3]),WHITE);
+
+//                    imshow("test",test_stuff);
+//                    waitKey(0);
 
                     // The issue is here. The lines are simply not moved in the correct direction
                     vector<Vec4i> borders = get_biggest_drop_borders(direction,current_line,mask);
@@ -820,6 +1050,9 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     Mat new_contour_mask = Mat::zeros(mask.size(),CV_8U);
                     drawContours(new_contour_mask,{temp_new_contour},0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
 
+//                    imshow("new mask",new_contour_mask);
+//                    waitKey(0);
+
 //                    // Test stuff
 //                    Mat work_in_progress = new_contour_mask.clone();
 //                    dilate(new_contour_mask,work_in_progress,border_kernel);
@@ -833,7 +1066,15 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
 
                     // Draw bounding rectangle
-                    Mat new_bounding_box = get_bounding_rectangle(new_contour,mask.size());
+                    vector<Point> all_points;
+                    findNonZero(new_contour_mask,all_points);
+
+//                    Mat new_bounding_box = get_bounding_rectangle(new_contour,mask.size());
+                    Mat new_bounding_box = get_bounding_rectangle(all_points,mask.size());
+
+                    imshow("org",new_contour_mask);
+                    imshow("new bound", new_bounding_box);
+                    waitKey(0);
 
                     // Check for error margin
                     int new_error_count = get_symmetric_difference(new_contour_mask,new_bounding_box,true);
@@ -880,74 +1121,100 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
                 cout << "Obstacles remaining: " << temp_obstacles.size() << endl;
 
-                // Play with similarity between obstacles (keep only similar elements)
-                for(int i = 0; i < temp_obstacles.size(); i++){
-                    Mat new_version = temp_obstacles.at(i).mask;
-                    vector<int> remove_these = {};
-//                    cout << "remaining: " << temp_obstacles.size() << endl;
-//                    imshow("obs",temp_obstacles.at(i).mask);
+//                for(int k = 0; k < temp_obstacles.size(); k++){
+//                    string name = to_string(k);
+//                    imshow(name, temp_obstacles.at(k).mask);
 //                    waitKey(0);
-//                    cout << "remove: " << endl;
-//                    Mat full_other_map = Mat::zeros(new_version.size(),CV_8U);
+//                }
+
+                // Good cuts still present here
+
+                // New idea: Keep the obstacle containing most matches if similar
+                for(int i = 0; i < temp_obstacles.size(); i++){
+                    vector<int> to_be_removed = {};
                     for(int j = i+1; j < temp_obstacles.size(); j++){
                         Mat intersection = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
                         int intersection_count = countNonZero(intersection);
-                        if(intersection_count >= (int)countNonZero(temp_obstacles.at(i).mask)*0.95){
-                            new_version = new_version & temp_obstacles.at(j).mask;
-                            remove_these.push_back(j);
-//                            cout << j << endl;
-                        }
-//                        else{
-//                            imshow("not sim",temp_obstacles.at(j).mask);
-//                            waitKey(0);
-////                            full_other_map = full_other_map | temp_obstacles.at(j).mask;
-//                        }
-                    }
-                    if(remove_these.size() > 0){
-                        for(int j = remove_these.size()-1; j >= 0; j--){
-                            temp_obstacles.erase(temp_obstacles.begin()+remove_these.at(j));
+
+                        // If intersection is 75% or more of either obstacle, they are similar
+                        int first_count = countNonZero(temp_obstacles.at(i).mask);
+                        int second_count =  countNonZero(temp_obstacles.at(j).mask);
+                        if(intersection_count >= (int)first_count*0.75 || intersection_count >= (int)second_count*0.75 ){
+                            to_be_removed.push_back(j);
+                            // Update initial obstacle based on which has the most matches with disparity map
+                            if(second_count > first_count){
+                                temp_obstacles.at(i).mask = temp_obstacles.at(j).mask;
+                            }
                         }
                     }
-                    // Keep if not almost completely within all other obstacles
-                    //temp_obstacles.at(i).mask = new_version;
-                    temp_obstacles.at(i).contour = get_biggest_contour(new_version);
+                    // removed used indexes
+                    if(to_be_removed.size() > 0){
+                        for(int j = to_be_removed.size()-1; j >= 0; j--){
+                            temp_obstacles.erase(temp_obstacles.begin()+to_be_removed.at(j));
+                        }
+                    }
+                    // add current obstacle to accepted obstacles
+                    temp_obstacles.at(i).contour = get_biggest_contour(temp_obstacles.at(i).mask);
+
                     vector<vector<Point>> temp_vec = {temp_obstacles.at(i).contour};
-                    Mat new_version_contour_mask = Mat::zeros(new_version.size(),CV_8U);
-                    drawContours(new_version_contour_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
-                    temp_obstacles.at(i).mask = new_version_contour_mask;
+
+                    Mat biggest_contour_mask = Mat::zeros(mask.size(),CV_8U);
+
+                    drawContours(biggest_contour_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+
+                    temp_obstacles.at(i).mask = biggest_contour_mask;
+
                     accepted_obstacles.push_back(temp_obstacles.at(i));
-//                    Mat new_intersection = new_version & full_other_map;
-//                    int new_intersection_count = countNonZero(new_intersection);
-//                    if(new_intersection_count < countNonZero(new_version)*0.95){
-//                        temp_obstacles.at(i).mask = new_version;
-//                        accepted_obstacles.push_back(temp_obstacles.at(i));
-//                    }
-//                    else{
-//                        imshow("oh no",new_version);
-//                        imshow("killer",full_other_map);
-//                        waitKey(0);
-//                    }
                 }
 
-                for(int be = 0; be < accepted_obstacles.size(); be++){
-                    string name = to_string(be);
-                    imshow(name,accepted_obstacles.at(be).mask);
-                }
-                waitKey(0);
+                cout << "Obstacles that survived similarity test: " << accepted_obstacles.size() << endl;;
+//                for(int k = 0; k < accepted_obstacles.size(); k++){
+//                    string name = to_string(k);
+//                    imshow(name,accepted_obstacles.at(k).mask);
+//                    waitKey(0);
+//                }
 
-                cout << "obstacles remaining after similarity test: " << accepted_obstacles.size() << endl;
+                // Play with similarity between obstacles (keep only similar elements) (wird stuff in here maybe just remove)
+//                for(int i = 0; i < temp_obstacles.size(); i++){
 
-                // Maybe if two are similar but not very similar and have similar angles, use average angle to create new line and use that to create cut
-                for(int i = 0; i < accepted_obstacles.size(); i++){
-                    vector<int> to_be_removed = {};
-                    for(int j = i+1; j < accepted_obstacles.size(); j++){
-                        Mat intersection = accepted_obstacles.at(i).mask & accepted_obstacles.at(j).mask;
-                        int intersection_count = countNonZero(intersection);
-                        if(intersection_count >= countNonZero(accepted_obstacles.at(i).mask)*0.75){
+//                    Mat new_version = temp_obstacles.at(i).mask;
+//                    vector<int> remove_these = {};
 
-                            vector<Point> contour, second_contour;
-                            findNonZero(accepted_obstacles.at(i).mask,contour);
-                            findNonZero(accepted_obstacles.at(j).mask,second_contour);
+//                    for(int j = i+1; j < temp_obstacles.size(); j++){
+//                        Mat intersection = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
+//                        int intersection_count = countNonZero(intersection);
+//                        if(intersection_count >= (int)countNonZero(temp_obstacles.at(i).mask)*0.95){
+//                            new_version = new_version & temp_obstacles.at(j).mask;
+//                            remove_these.push_back(j);
+//                        }
+//                    }
+//                    if(remove_these.size() > 0){
+//                        for(int j = remove_these.size()-1; j >= 0; j--){
+//                            temp_obstacles.erase(temp_obstacles.begin()+remove_these.at(j));
+//                        }
+//                    }
+//                    // Keep if not almost completely within all other obstacles
+//                    temp_obstacles.at(i).contour = get_biggest_contour(new_version);
+//                    vector<vector<Point>> temp_vec = {temp_obstacles.at(i).contour};
+//                    Mat new_version_contour_mask = Mat::zeros(new_version.size(),CV_8U);
+//                    drawContours(new_version_contour_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+//                    temp_obstacles.at(i).mask = new_version_contour_mask;
+//                    accepted_obstacles.push_back(temp_obstacles.at(i));
+//                }
+
+//                cout << "obstacles remaining after similarity test: " << accepted_obstacles.size() << endl;
+
+                // Maybe if two are similar but not very similar and have similar angles, use average angle to create new line and use that to create cut (seem to make things worse)
+//                for(int i = 0; i < accepted_obstacles.size(); i++){
+//                    vector<int> to_be_removed = {};
+//                    for(int j = i+1; j < accepted_obstacles.size(); j++){
+//                        Mat intersection = accepted_obstacles.at(i).mask & accepted_obstacles.at(j).mask;
+//                        int intersection_count = countNonZero(intersection);
+//                        if(intersection_count >= countNonZero(accepted_obstacles.at(i).mask)*0.75){
+
+//                            vector<Point> contour, second_contour;
+//                            findNonZero(accepted_obstacles.at(i).mask,contour);
+//                            findNonZero(accepted_obstacles.at(j).mask,second_contour);
 
 //                            // Get best fit lines and angles
 //                            Vec4f fitted_line, second_fitted_line;
@@ -971,76 +1238,82 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
 //                            double angle = calculations.calculate_angle(start,end);
 //                            double second_angle = calculations.calculate_angle(second_start,second_end);
-                            double angle = accepted_obstacles.at(i).original_angle;
-                            double second_angle = accepted_obstacles.at(j).original_angle;
+//                            double angle = accepted_obstacles.at(i).original_angle;
+//                            double second_angle = accepted_obstacles.at(j).original_angle;
 
 
-                            cout << angle*180/M_PI << " | " << second_angle*180/M_PI << endl;
-                            double diff = abs(angle*180/M_PI - abs(second_angle*180/M_PI));
-                            cout << "the diff: " << diff << endl;
-                            if(diff < 10.0){
-                                double average_angle = (angle+second_angle)/2.0;
-                                cout << "average angle: " << average_angle*180/M_PI << endl;
+//                            cout << angle*180/M_PI << " | " << second_angle*180/M_PI << endl;
+//                            double diff = abs(angle*180/M_PI - abs(second_angle*180/M_PI));
+//                            cout << "the diff: " << diff << endl;
+//                            if(diff < 10.0){
+//                                double average_angle = (angle+second_angle)/2.0;
+//                                cout << "average angle: " << average_angle*180/M_PI << endl;
 
-                                Point mask_center = get_contour_center(accepted_obstacles.at(i).mask);
+//                                Point mask_center = get_contour_center(accepted_obstacles.at(i).mask);
 
-                                int range = max(accepted_obstacles.at(i).mask.cols,accepted_obstacles.at(i).mask.rows);
+//                                int range = max(accepted_obstacles.at(i).mask.cols,accepted_obstacles.at(i).mask.rows);
 
-                                Vec4i new_line;
-                                double a = sin(angle);
-                                double b = cos(angle);
+//                                Vec4i new_line;
+//                                double a = sin(angle);
+//                                double b = cos(angle);
 
-                                new_line[0] = (int)cvRound(mask_center.x - range*b);
-                                new_line[1] = (int)cvRound(mask_center.y - range*a);
-                                new_line[2] = (int)cvRound(mask_center.x + range*b);
-                                new_line[3] = (int)cvRound(mask_center.y + range*a);
+//                                new_line[0] = (int)cvRound(mask_center.x - range*b);
+//                                new_line[1] = (int)cvRound(mask_center.y - range*a);
+//                                new_line[2] = (int)cvRound(mask_center.x + range*b);
+//                                new_line[3] = (int)cvRound(mask_center.y + range*a);
 
-                                int direction;
-                                double dist_to_90 = abs(90*M_PI/180-abs(angle));
-                                if(abs(angle*180/M_PI) > dist_to_90*180/M_PI){
-                                    direction = DIRECTION_RIGHT;
-                                }
-                                else{
-                                    direction = DIRECTION_UP;
-                                }
+//                                int direction;
+//                                double dist_to_90 = abs(90*M_PI/180-abs(angle));
+//                                if(abs(angle*180/M_PI) > dist_to_90*180/M_PI){
+//                                    direction = DIRECTION_RIGHT;
+//                                }
+//                                else{
+//                                    direction = DIRECTION_UP;
+//                                }
 
-                                vector<Vec4i> borders = get_best_fit_borders(direction,new_line,mask);
+//                                vector<Vec4i> borders = get_best_fit_borders(direction,new_line,mask);
 
-                                Mat best_fit_mask = Mat::zeros(accepted_obstacles.at(i).mask.size(),CV_8U);
+//                                Mat best_fit_mask = Mat::zeros(accepted_obstacles.at(i).mask.size(),CV_8U);
 
-                                vector<Point> points = {Point(borders.at(0)[0],borders.at(0)[1]),Point(borders.at(1)[0],borders.at(1)[1]),Point(borders.at(1)[2],borders.at(1)[3]), Point(borders.at(0)[2],borders.at(0)[3])};
-                                vector<vector<Point>> temp = {points};
-                                drawContours(best_fit_mask,temp,0,WHITE,DRAW_WIDTH_INFILL);
+//                                vector<Point> points = {Point(borders.at(0)[0],borders.at(0)[1]),Point(borders.at(1)[0],borders.at(1)[1]),Point(borders.at(1)[2],borders.at(1)[3]), Point(borders.at(0)[2],borders.at(0)[3])};
+//                                vector<vector<Point>> temp = {points};
+//                                drawContours(best_fit_mask,temp,0,WHITE,DRAW_WIDTH_INFILL);
 
-                                Mat final_mask = best_fit_mask & mask;
-                                accepted_obstacles.at(i).mask = final_mask;
-                                accepted_obstacles.at(i).contour = get_biggest_contour(final_mask);
+//                                Mat final_mask = best_fit_mask & mask;
+//                                accepted_obstacles.at(i).mask = final_mask;
+//                                accepted_obstacles.at(i).contour = get_biggest_contour(final_mask);
 
-                                final_mask = Mat::zeros(best_fit_mask.size(),CV_8U);
-                                vector<vector<Point>> temp_vec = {accepted_obstacles.at(i).contour};
+//                                final_mask = Mat::zeros(best_fit_mask.size(),CV_8U);
+//                                vector<vector<Point>> temp_vec = {accepted_obstacles.at(i).contour};
 
-                                drawContours(final_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
-                                accepted_obstacles.at(i).mask = final_mask;
+//                                drawContours(final_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+//                                accepted_obstacles.at(i).mask = final_mask;
 
-                                to_be_removed.push_back(j);
-                            }
-                            else{
-                                // keep the one that contains more mask values (seen as better fit)
-                                if(countNonZero(accepted_obstacles.at(i).mask) <  countNonZero(accepted_obstacles.at(j).mask)){
-                                    accepted_obstacles.at(i) = accepted_obstacles.at(j);
-                                }
-                                to_be_removed.push_back(j);
-                                cout << countNonZero(accepted_obstacles.at(i).mask) << " | " << countNonZero(accepted_obstacles.at(j).mask) << endl;
-                            }
-                        }
-                    }
-                    if(to_be_removed.size() > 0){
-                        for(int j = to_be_removed.size()-1; j >= 0; j--){
-                            accepted_obstacles.erase(accepted_obstacles.begin()+to_be_removed.at(j));
-                        }
-                    }
-                }
-                cout << "obstacles remaining after angle test: " << accepted_obstacles.size() << endl;
+//                                to_be_removed.push_back(j);
+//                            }
+//                            else{
+//                                // keep the one that contains more mask values (seen as better fit)
+//                                if(countNonZero(accepted_obstacles.at(i).mask) <  countNonZero(accepted_obstacles.at(j).mask)){
+//                                    accepted_obstacles.at(i) = accepted_obstacles.at(j);
+//                                }
+//                                to_be_removed.push_back(j);
+//                                cout << countNonZero(accepted_obstacles.at(i).mask) << " | " << countNonZero(accepted_obstacles.at(j).mask) << endl;
+//                            }
+//                        }
+//                    }
+//                    if(to_be_removed.size() > 0){
+//                        for(int j = to_be_removed.size()-1; j >= 0; j--){
+//                            accepted_obstacles.erase(accepted_obstacles.begin()+to_be_removed.at(j));
+//                        }
+//                    }
+//                }
+//                cout << "obstacles remaining after angle test: " << accepted_obstacles.size() << endl;
+//                for(int be = 0; be < accepted_obstacles.size(); be++){
+//                    string name = to_string(be);
+//                    imshow(name,accepted_obstacles.at(be).mask);
+//                    waitKey(0);
+//                }
+//                waitKey(0);
 
             }
             else{
@@ -1073,8 +1346,16 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
         //vector<obstacle> remaining_obstacles = split_into_rectangles_corner(obstacles);
         vector<obstacle> remaining_obstacles = split_into_all_rectangles(obstacles);
 
+        cout << "Number of obstacles left after splitting: " << remaining_obstacles.size() << endl;
+
         if(remaining_obstacles.size() == 0){
             throw runtime_error("No obstacles survived splitting.");
+        }
+
+        for(int i = 0; i < remaining_obstacles.size(); i++){
+            string name = to_string(i);
+            imshow(name,remaining_obstacles.at(i).mask);
+            waitKey(0);
         }
 
         // Clean masks if desired
@@ -1084,8 +1365,12 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
             }
         }
 
+        cout << "Number of obstacles left after cleaning: " << remaining_obstacles.size() << endl;
+
         // Step 2: Remove obstacles that fall bellow the desired ratio of 1.5 and above to indicates obstacles longer than wide like a pillar and pertruding edge.
         remaining_obstacles = filter_rectangle_shape(remaining_obstacles,rectangle_size_ratio);
+
+        cout << "Number of obstacles left after rectangle check: " << remaining_obstacles.size() << endl;
 
         if(remaining_obstacles.size() == 0){
             throw runtime_error("No obstacles survived rectangle filter.");
@@ -1094,12 +1379,16 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
         // Step 3: Remove obstacles that do not touch any edge.
         remaining_obstacles = filter_border(remaining_obstacles);
 
+        cout << "Number of obstacles left after edge check: " << remaining_obstacles.size() << endl;
+
         if(remaining_obstacles.size() == 0){
             throw runtime_error("No obstacles survived edge filter.");
         }
 
         // Step 4: Remove tiny obstacles
         remaining_obstacles = filter_size(remaining_obstacles, obstacle_size_limit);
+
+        cout << "Number of obstacles left after size check: " << remaining_obstacles.size() << endl;
 
         if(remaining_obstacles.size() == 0){
             throw runtime_error("No obstacles survived size filter.");
@@ -1132,6 +1421,8 @@ vector<line_data> detecting::get_all_lines(Mat edge_mask,int threshold, double m
             Point end = Point(lines.at(i)[2],lines.at(i)[3]);
 
 //            line(test,start,end,WHITE);
+//            imshow("test",test);
+//            waitKey(0);
 
             // Extent lines (Error due to y being reversed) In opencv cos and sin should be reveresed due to the coordinate system
             double angle = calculations.calculate_angle(start,end);
@@ -1158,6 +1449,8 @@ vector<line_data> detecting::get_all_lines(Mat edge_mask,int threshold, double m
 
 //            test_2 = test.clone();
 //            line(test_2,start,end,150);
+//            imshow("test stuff", test_2);
+//            waitKey(0);
 
             // Limit to border with weird non-math method
             Point best_start = start;
@@ -1258,6 +1551,14 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
     try{
         // determine sign based on direction
         int direction_sign;
+        int increase_limit; // Set to half of current  matched length
+
+        Mat line_frame = Mat::zeros(mask.size(), CV_8U);
+        line(line_frame,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),WHITE, DRAW_WIDTH_1P);
+        line_frame = line_frame & mask;
+        int matches = countNonZero(line_frame);
+        increase_limit = matches*0.5;
+
         if(direction == DIRECTION_LEFT || direction == DIRECTION_UP){
             direction_sign = -1; // Both left and upwards movement are movements in the negative
         }
@@ -1268,33 +1569,74 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
             throw runtime_error("Unknwon direction.");
         }
 
-        // determine max index based on direction (distance from current line to border)
+        // determine max index based on direction (distance from current line to border) and where they intersect border
+        int compare_min_x, compare_max_x, compare_min_y, compare_max_y;
+        if(initial_line[0] >= mask.cols || initial_line[0] < 0 || initial_line[2] >= mask.cols || initial_line[2] < 0 || initial_line[1] >= mask.rows || initial_line[1] < 0 || initial_line[3] >= mask.rows || initial_line[3] < 0){
+            Mat border = Mat::zeros(mask.size(),CV_8U);
+            rectangle(border,Point(0,0),Point(mask.cols-1,mask.rows-1),WHITE);
+            Mat line_frame = Mat::zeros(mask.size(), CV_8U);
+            line(line_frame, Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),WHITE);
+            border = border & line_frame;
+            vector<Point> locations;
+            findNonZero(border,locations);
+            for(int k = 0; k < locations.size(); k++){
+                if(k == 0){
+                    compare_min_x = locations.at(k).x;
+                    compare_max_x = locations.at(k).x;
+                    compare_min_y = locations.at(k).y;
+                    compare_max_y = locations.at(k).y;
+                }
+                else{
+                    if(locations.at(k).x < compare_min_x){
+                        compare_min_x = locations.at(k).x;
+                    }
+                    if(locations.at(k).x > compare_max_x){
+                        compare_max_x = locations.at(k).x;
+                    }
+                    if(locations.at(k).y < compare_min_y){
+                        compare_min_y = locations.at(k).y;
+                    }
+                    if(locations.at(k).y > compare_max_y){
+                        compare_max_y = locations.at(k).y;
+                    }
+                }
+            }
+        }
+        else{
+            compare_min_x = min(initial_line[0],initial_line[2]);
+            compare_max_x = max(initial_line[0],initial_line[2]);
+            compare_min_y = min(initial_line[1],initial_line[3]);
+            compare_max_y = max(initial_line[1],initial_line[3]);
+        }
+
         int max_index;
         if(direction == DIRECTION_LEFT){
             // Max steps to the left is the biggest x-coordinate in the line due to the border being at x = 0 and that the obstacle might extent past the frame edges
-            max_index = max(initial_line[0],initial_line[2]);
+            max_index = compare_max_x;
         }
         else if(direction == DIRECTION_RIGHT){
             // Max steps to the right is difference between number of cols and ,on x-coordinate in line
-            max_index = (mask.cols-1)-min(initial_line[0],initial_line[2]);
+            max_index = (mask.cols-1)-compare_min_x;
         }
         if(direction == DIRECTION_UP){
             // Max step up is the biggest y-coordinate in the line due to the border being at y = 0
-            max_index = max(initial_line[1],initial_line[3]);
+            max_index = compare_max_y;
         }
         else if(direction == DIRECTION_DOWN){
             // Max steps down is difference between number of rows and min y-coordinate in line
-            max_index = (mask.rows-1)-min(initial_line[1],initial_line[3]);
+            max_index = (mask.rows-1)-compare_min_y;
         }
 
         // Prepare variables
         int last_matches = 0;
         int biggest_decrease = 0;
         Vec4i line_prior_to_decrease;
+        Vec4i last_line;
         bool line_found = false;
         bool max_found = false;
         int steps_since_fall = 0;
         int decrease_addon = 0;
+        int increase_addon = 0;
 
         Mat initial_line_mask =  Mat::zeros(mask.size(),CV_8U);
         line(initial_line_mask,Point(initial_line[0],initial_line[1]),Point(initial_line[2],initial_line[3]),WHITE,DRAW_WIDTH_1P,LINE_AA);
@@ -1316,16 +1658,32 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
                 new_line[2] = initial_line[2];
                 new_line[3] = initial_line[3]+(step*direction_sign)+1;
             }
+//            Mat test_again = Mat::zeros(mask.size(),CV_8U);
+//            line(test_again, Point(new_line[0],new_line[1]),Point(new_line[2],new_line[3]),WHITE);
+//            imshow("test stuff all",test_again);
+//            waitKey(0);
+
+            // Correct here
 
             // Get line mask
             Mat line_mask =  Mat::zeros(mask.size(),CV_8U);
             line(line_mask,Point(new_line[0],new_line[1]),Point(new_line[2],new_line[3]),WHITE,DRAW_WIDTH_1P,LINE_AA);
 
-            // Count size of line
+            // Count size of line (This is the issue. If line reaches beyond top (due to wrong indexing) everything just becomes the initial line.)
             int line_size = countNonZero(line_mask);
             if(line_size == 0){
-                if(line_found == false){
-                     line_prior_to_decrease = initial_line;
+                if(line_found == false && step > 0){
+                     line_prior_to_decrease = last_line; // Line before disapearing
+
+//                     cout << "1" << endl;
+//                     Mat test = Mat::zeros(mask.size(),CV_8U);
+//                     line(test,Point(line_prior_to_decrease[0],line_prior_to_decrease[1]),Point(line_prior_to_decrease[2],line_prior_to_decrease[3]),WHITE);
+//                     cout << line_prior_to_decrease[0] << ", " << line_prior_to_decrease[1] << " -> " << line_prior_to_decrease[2] << ", " << line_prior_to_decrease[3] << endl;
+//                     imshow("the final",test);
+//                     waitKey(0);
+                }
+                else if(line_found == false){
+                   throw runtime_error("Invalid initial line.");
                 }
                 break;
             }
@@ -1340,7 +1698,7 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
             Mat match_mask = line_mask & mask;
             int match_count = countNonZero(match_mask);
 
-            // Continue until max is found
+            // Continue until local max is found
             if(match_count > last_matches && max_found == false){
                 last_matches = match_count;
                 continue;
@@ -1350,25 +1708,52 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
             }
 
 
-            // Calculate decrease (Issue if there is only a slight decrease: cuts of parts of obstacle)
+            // Calculate decrease and increase
             int decrease = 0;
+            int increase = 0;
             if(last_matches > 0 && match_count < last_matches){
                 decrease = last_matches-match_count;
             }
+            if(last_matches > 0 && match_count > last_matches){
+                increase = match_count-last_matches;
+            }
 
-            // Weigh decrease based on scale factor
+            // Weigh decrease and increase based on scale factor
             decrease = floor(decrease * (1+(1-scale_factor)));
+            increase = floor(increase * (1+(1-scale_factor)));
+
+            // Stop if sudden increase
+            if(increase+increase_addon > increase_limit){
+                if(line_found == false){
+                    line_prior_to_decrease = last_line; // Line before big increase
+                }
+                break;
+            }
 
             // Check if biggest decrease and if big enough to call a decrease
             if(decrease+decrease_addon > biggest_decrease && decrease > 50){ // temp value
                 biggest_decrease = decrease;
-                line_prior_to_decrease = new_line;
+                line_prior_to_decrease = last_line; // line before decrease is kept
                 line_found = true;
                 steps_since_fall = 0;
                 decrease_addon = 0;
+
+//                cout << "2" << endl;
+//                Mat test = Mat::zeros(mask.size(),CV_8U);
+//                line(test,Point(line_prior_to_decrease[0],line_prior_to_decrease[1]),Point(line_prior_to_decrease[2],line_prior_to_decrease[3]),WHITE);
+//                cout << line_prior_to_decrease[0] << ", " << line_prior_to_decrease[1] << " -> " << line_prior_to_decrease[2] << ", " << line_prior_to_decrease[3] << endl;
+//                imshow("the final",test);
+//                waitKey(0);
             }
             else if(step == max_index && line_found == false){
-                line_prior_to_decrease = new_line;
+                line_prior_to_decrease = new_line; // If last element and no line
+
+//                cout << "3" << endl;
+//                Mat test = Mat::zeros(mask.size(),CV_8U);
+//                line(test,Point(line_prior_to_decrease[0],line_prior_to_decrease[1]),Point(line_prior_to_decrease[2],line_prior_to_decrease[3]),WHITE);
+//                cout << line_prior_to_decrease[0] << ", " << line_prior_to_decrease[1] << " -> " << line_prior_to_decrease[2] << ", " << line_prior_to_decrease[3] << endl;
+//                imshow("the final",test);
+//                waitKey(0);
             }
             else{
                 if(line_found == true){
@@ -1378,18 +1763,27 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
                         break;
                     }
                 }
-                // Ensure no sudden big increase
-                int increase = match_count-last_matches;
-                if(increase > int(increase_stopper*line_size)){
-                    if(line_found == false){
-                         line_prior_to_decrease = initial_line;
-                    }
-                    break;
-                }
+//                // Ensure no sudden big increase
+//                int increase = match_count-last_matches;
+//                if(increase > int(increase_stopper*line_size)){
+//                    if(line_found == false){
+//                         line_prior_to_decrease = initial_line;
+
+////                         cout << "4" << endl;
+////                         Mat test = Mat::zeros(mask.size(),CV_8U);
+////                         line(test,Point(line_prior_to_decrease[0],line_prior_to_decrease[1]),Point(line_prior_to_decrease[2],line_prior_to_decrease[3]),WHITE);
+////                         cout << line_prior_to_decrease[0] << ", " << line_prior_to_decrease[1] << " -> " << line_prior_to_decrease[2] << ", " << line_prior_to_decrease[3] << endl;
+////                         imshow("the final",test);
+////                         waitKey(0);
+//                    }
+//                    break;
+//                }
                 decrease_addon += decrease;
+                increase_addon += increase;
             }
             // Update last values
             last_matches = match_count;
+            last_line = new_line;
         }
 
         // Prepare output
@@ -3149,6 +3543,8 @@ bool detecting::check_rectangle_shape(obstacle obstacle_to_check, float ratio){
         Point2f rectangle_points[4];
         rectangle.points(rectangle_points);
 
+        cout << rectangle_points[0].x << ", " << rectangle_points[0].y << " -> " << rectangle_points[1].x << ", " << rectangle_points[1].y << " -> " << rectangle_points[2].x << ", " << rectangle_points[2].y << " -> " << rectangle_points[3].x << ", " << rectangle_points[3].y << endl;
+
         // Find edge distances
         float first_edge_distance = abs(calculations.calculate_euclidean_distance(rectangle_points[0].x, rectangle_points[0].y, rectangle_points[1].x, rectangle_points[1].y));
         float second_edge_distance = abs(calculations.calculate_euclidean_distance(rectangle_points[1].x, rectangle_points[1].y, rectangle_points[2].x, rectangle_points[2].y));
@@ -3157,6 +3553,7 @@ bool detecting::check_rectangle_shape(obstacle obstacle_to_check, float ratio){
         float biggest_ratio = max(first_edge_distance/second_edge_distance, second_edge_distance/first_edge_distance);
 
         // Check if bigger than min ratio
+//        cout << biggest_ratio << " | " << ratio << endl;
         if(biggest_ratio >= ratio){
             accepted_status = true;
         }
