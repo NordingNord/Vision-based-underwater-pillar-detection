@@ -398,29 +398,57 @@ Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
     Mat bounding_rectangle = Mat::zeros(frame_size,CV_8U);
     try{
 
-        Mat test_1 = Mat::zeros(frame_size,CV_8U);
+        // Prepare contour
+        prepared_contour contour_data = prepare_contour_for_bounding(contour,frame_size);
 
-        for(int i = 0; i < contour.size(); i++){
-            test_1.at<uchar>(contour.at(i)) = 255;
+        // Get rotatedRect element
+        RotatedRect current_rectangle = minAreaRect(contour_data.contour);
+
+        // Establish rectangle points
+        Point2f rectangle_points[4];
+        current_rectangle.points(rectangle_points);
+
+        // Convert to vector for further usage
+        vector<Point> rectangle_points_vector = {rectangle_points[0],rectangle_points[1],rectangle_points[2],rectangle_points[3]};
+
+        // Mimic contour setup
+        vector<vector<Point>> points;
+        points.push_back(rectangle_points_vector);
+
+        // Draw rectangle
+        Mat temp_bounding = Mat::zeros(contour_data.frame_size,CV_8U);
+        drawContours(temp_bounding,points,0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
+
+        // Convert sizes back to normal if needed
+        if(temp_bounding.size() != frame_size){
+            temp_bounding = temp_bounding(Range(contour_data.start_row,contour_data.end_row),Range(contour_data.start_col,contour_data.end_col));
         }
-        dilate(test_1,test_1,border_kernel);
-        dilate(test_1,test_1,border_kernel);
-        dilate(test_1,test_1,border_kernel);
-        dilate(test_1,test_1,border_kernel);
-        dilate(test_1,test_1,border_kernel);
-        dilate(test_1,test_1,border_kernel);
-        dilate(test_1,test_1,border_kernel);
-        dilate(test_1,test_1,border_kernel);
-        dilate(test_1,test_1,border_kernel);
+        if(temp_bounding.size() != frame_size){
+            throw runtime_error("The size of the bounding box frame, does not match the original frame size.");
+        }
 
+        // Prepare output
+        bounding_rectangle = temp_bounding.clone();
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return bounding_rectangle;
+}
 
-//        vector<vector<Point>> temp = {contour};
-//        drawContours(test_1,temp,0,WHITE,DRAW_WIDTH_INFILL);
-        imshow("input contour",test_1);
+prepared_contour detecting::prepare_contour_for_bounding(vector<Point> contour, Size frame_size){
+    prepared_contour new_contour_data;
+    try{
+        Mat drawn_contour = Mat::zeros(frame_size,CV_8U);
 
-        // test flip and stuff
+        // Draw contour
+        vector<vector<Point>> vec_contour = {contour};
+        drawContours(drawn_contour,vec_contour,0,WHITE,DRAW_WIDTH_INFILL);
 
-        // find edge to add to
+        // Dilate to fill gaps close to border
+        dilate(drawn_contour,drawn_contour,border_kernel,Point(-1,-1),dilate_iterations);
+
+        // find intersection between frame border and contour
         Mat left = Mat::zeros(frame_size, CV_8U);
         Mat right = Mat::zeros(frame_size, CV_8U);
         Mat top = Mat::zeros(frame_size, CV_8U);
@@ -431,14 +459,27 @@ Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
         line(bottom, Point(0,frame_size.height-1),Point(frame_size.width-1,frame_size.height-1),WHITE);
         line(top, Point(0,0), Point(frame_size.width-1,0),WHITE);
 
+        Mat left_intersection = left & drawn_contour;
+        Mat right_intersection = right & drawn_contour;
+        Mat top_intersection = top & drawn_contour;
+        Mat bottom_intersection = bottom & drawn_contour;
+
+        // Count number of intersections
         int count_left, count_right, count_top, count_bottom;
-        count_left = countNonZero(left & test_1);
-        count_right = countNonZero(right & test_1);
-        count_top = countNonZero(top & test_1);
-        count_bottom = countNonZero(bottom & test_1);
+        count_left = countNonZero(left_intersection);
+        count_right = countNonZero(right_intersection);
+        count_top = countNonZero(top_intersection);
+        count_bottom = countNonZero(bottom_intersection);
 
-        cout << count_left << ", " << count_right << ", " << count_top << ", " << count_bottom << endl;
+        // Prepare original dimensions
+        Size draw_size = frame_size;
+        vector<Point> new_contour = contour;// No edges means that the entire obstacle is visible and nothing should be done
+        int start_x = 0;
+        int start_y = 0;
+        int end_x = frame_size.width;
+        int end_y = frame_size.height;
 
+        // Detect number of edges with intersections
         int number_edges = 0;
         if(count_left > 0){
             number_edges++;
@@ -452,71 +493,102 @@ Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
         if(count_bottom > 0){
             number_edges++;
         }
-        Mat test_2;
-        vector<Point> big_contour;
-        if(number_edges == 0){
-            big_contour = contour;
-        }
-        else{
-            Mat comb;
-            if(max(count_left,count_right) > max(count_top,count_bottom)){
-                flip(test_1,test_2,1);
-                flip(test_2,test_2,0);
-                if(number_edges == 1){
-                    // Shift down
-                    Mat full = left | right | bottom | top;
+
+
+        if(number_edges > 0){
+            // Prepared a horizontally and vertically flipped frame as well as a combined frame (used to extent the obstacle)
+            Mat flipped_drawing;
+            Mat combined_drawing;
+
+            flip(drawn_contour,flipped_drawing,1);
+            flip(flipped_drawing,flipped_drawing,0);
+
+
+            // If the obstacle hits edges, it must be extended to ensure that minAreaRect does not misinterprit the obstacle
+            if(max(count_left,count_right) > max(count_top,count_bottom)){ // If the obstacle is horizontal
+
+                if(number_edges == 1){ // If only one edge is present, the obstacle should be moved based on its center and the distance from center to horizontal edges
+                    Point center = get_contour_center(drawn_contour);
+                    Point center_flipped = get_contour_center(flipped_drawing);
+
+                    // Calculate distance from eachother in the vertical direction
+                    int dist =  center.y-center_flipped.y;
+
+                    // Get frame of all border intersections
+                    Mat full = left_intersection | right_intersection | top_intersection | bottom_intersection;
+
+                    // Get points of intersection
                     vector<Point> locations;
                     findNonZero(full,locations);
 
-                    int smallest_dist_to_center = floor(temp_1.rows/2);
+                    // Find minimum and maximium row in original contour
+                    int min_y = drawn_contour.rows;
+                    int max_y = 0;
+
                     for(int k = 0; k < locations.size();k++){
-                        if(abs(locations.at(k).y-temp_1.rows/2) < smallest_dist_to_center){
-                            smallest_dist_to_center = floor(locations.at(k).y-temp_1.rows/2);
+                        if(locations.at(k).y < min_y){
+                            min_y = locations.at(k).y;
+                        }
+                        if(locations.at(k).y > max_y){
+                            max_y = locations.at(k).y;
                         }
                     }
-                    // Shift
+
+                    // Add the difference (if one edge is closer to the center than the other)
+                    dist += abs(max_y-center.y)-abs(min_y-center.y);
+
+                    // Shift flipped frame in the vertical direction based on the difference
+                    float translation_array[] = {1.0,0.0,0.0,0.0,1.0,float(dist)};
+                    Mat translation = Mat(2,3,CV_32F,translation_array);
+
+                    warpAffine(flipped_drawing,flipped_drawing,translation,flipped_drawing.size());
                 }
-                cout << "place to right" << endl;
+
+                // concat frame and flipped frame based on direction of obstacle (and update locations of original frame)
                 if(count_left > count_right && count_left > count_top && count_left > count_bottom){
-                    hconcat(test_2,test_1,comb);
+                    start_x = frame_size.width;
+                    end_x = frame_size.width*2;
+                    hconcat(flipped_drawing,drawn_contour,combined_drawing);
                 }
                 else{
-                    hconcat(test_1,test_2,comb);
+                    hconcat(drawn_contour,flipped_drawing,combined_drawing);
                 }
 
-                // add more to top to ensure long enough shape
+                // If there are more than two edges, the obstacle coul look too much like a square, it should therefore be exteneded further
                 if(number_edges > 2){
-                    Mat top_edge = top & test_1;
-                    Mat bottom_edge = bottom & test_1;
 
+                    // Get intersection locations
                     vector<Point> top_locations, bottom_locations;
-                    findNonZero(top_edge,top_locations);
-                    findNonZero(bottom_edge,bottom_locations);
+                    findNonZero(top_intersection,top_locations);
+                    findNonZero(bottom_intersection,bottom_locations);
 
+                    // Find smallest and biggest x value for each intersection
                     int top_biggest_x = 0;
                     int bottom_biggest_x = 0;
-                    int top_smallest_x = test_1.cols;
-                    int bottom_smallest_x = test_1.cols;
+                    int top_smallest_x = drawn_contour.cols;
+                    int bottom_smallest_x = drawn_contour.cols;
 
-                    for(int k = 0; k < top_locations.size(); k++){
-                        if(top_locations.at(k).x > top_biggest_x){
-                            top_biggest_x = top_locations.at(k).x;
+                    for(int k = 0; k < max(top_locations.size(),bottom_locations.size()); k++){
+                        if(k < top_locations.size()){
+                            if(top_locations.at(k).x > top_biggest_x){
+                                top_biggest_x = top_locations.at(k).x;
+                            }
+                            if(top_locations.at(k).x < top_smallest_x){
+                                top_smallest_x = top_locations.at(k).x;
+                            }
                         }
-                        if(top_locations.at(k).x < top_smallest_x){
-                            top_smallest_x = top_locations.at(k).x;
+                        if(k < bottom_locations.size()){
+                            if(bottom_locations.at(k).x > bottom_biggest_x){
+                                bottom_biggest_x = bottom_locations.at(k).x;
+                            }
+                            if(bottom_locations.at(k).x < bottom_smallest_x){
+                                bottom_smallest_x = bottom_locations.at(k).x;
+                            }
                         }
                     }
 
-                    for(int k = 0; k < bottom_locations.size(); k++){
-                        if(bottom_locations.at(k).x > bottom_biggest_x){
-                            bottom_biggest_x = bottom_locations.at(k).x;
-                        }
-                        if(bottom_locations.at(k).x < bottom_smallest_x){
-                            bottom_smallest_x = bottom_locations.at(k).x;
-                        }
-                    }
 
-
+                    // Find biggest difference top and bottom
                     float diff;
                     if(abs(float(top_biggest_x-bottom_biggest_x)) > abs(float(top_smallest_x-bottom_smallest_x))){
                         diff = float(top_biggest_x-bottom_biggest_x);
@@ -525,55 +597,98 @@ Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
                         diff = float(top_smallest_x-bottom_smallest_x);
                     }
 
+                    // Use this to translate obstacle
                     float translation_array[] = {1.0,0.0,diff,0.0,1.0,0.0};
                     Mat translation = Mat(2,3,CV_32F,translation_array);
 
-                    Mat temp_comb;
-                    warpAffine(comb,temp_comb,translation,comb.size());
-                    vconcat(temp_comb,comb,comb);
+                    Mat temp_combined;
+                    warpAffine(combined_drawing,temp_combined,translation,combined_drawing.size());
+
+                    // concat frame once again to extent obstacle and update original frame position
+                    start_y = frame_size.height;
+                    end_y = frame_size.height*2;
+                    vconcat(temp_combined,combined_drawing,combined_drawing);
                 }
             }
-            else{
-                flip(test_1,test_2,0);
-                flip(test_2,test_2,1);
+            else{ // If the obstacle is horizontal
+
+                if(number_edges == 1){
+                    Point center = get_contour_center(drawn_contour);
+                    Point center_flipped = get_contour_center(flipped_drawing);
+
+                    // Calculate distance from eachother in the vertical direction
+                    int dist =  center.x-center_flipped.x;
+
+                    // Get frame of all border intersections
+                    Mat full = left_intersection | right_intersection | top_intersection | bottom_intersection;
+
+                    // Get points of intersection
+                    vector<Point> locations;
+                    findNonZero(full,locations);
+
+                    // Find minimum and maximium row in original contour
+                    int min_x = drawn_contour.cols;
+                    int max_x = 0;
+
+                    for(int k = 0; k < locations.size();k++){
+                        if(locations.at(k).x < min_x){
+                            min_x = locations.at(k).x;
+                        }
+                        if(locations.at(k).x > max_x){
+                            max_x = locations.at(k).x;
+                        }
+                    }
+
+                    // Add the difference (if one edge is closer to the center than the other)
+                    dist += abs(max_x-center.x)-abs(min_x-center.x);
+
+                    // Shift flipped frame in the vertical direction based on the difference
+                    float translation_array[] = {1.0,0.0,float(dist),0.0,1.0,0.0};
+                    Mat translation = Mat(2,3,CV_32F,translation_array);
+
+                    warpAffine(flipped_drawing,flipped_drawing,translation,flipped_drawing.size());
+                }
+                // Combine original and flipped frames and update position of original frame
                 if(count_top > count_right && count_top > count_left && count_top > count_bottom){
-                    vconcat(test_2,test_1,comb);
+                    start_y = frame_size.height;
+                    end_y = frame_size.height*2;
+                    vconcat(flipped_drawing,drawn_contour,combined_drawing);
                 }
                 else{
-                    vconcat(test_1,test_2,comb);
+                    vconcat(drawn_contour,flipped_drawing,combined_drawing);
                 }
-                // add more to left to ensure long enough shape
+                // If number of edges are above 2, the drawing must be concated again
                 if(number_edges > 2){
-                    Mat left_edge = left & test_1;
-                    Mat right_edge = right & test_1;
                     vector<Point> left_locations, right_locations;
-                    findNonZero(left_edge,left_locations);
-                    findNonZero(right_edge,right_locations);
+                    findNonZero(left_intersection,left_locations);
+                    findNonZero(right_intersection,right_locations);
 
+                    // Prepare biggest and smallest y of each edge
                     int left_biggest_y = 0;
                     int right_biggest_y = 0;
-                    int left_smallest_y = test_1.rows;
-                    int right_smallest_y = test_1.rows;
+                    int left_smallest_y = drawn_contour.rows;
+                    int right_smallest_y = drawn_contour.rows;
 
-                    for(int k = 0; k < left_locations.size(); k++){
-                        if(left_locations.at(k).y > left_biggest_y){
-                            left_biggest_y = left_locations.at(k).y;
+                    for(int k = 0; k < max(left_locations.size(),right_locations.size()); k++){
+                        if(k < left_locations.size()){
+                            if(left_locations.at(k).y > left_biggest_y){
+                                left_biggest_y = left_locations.at(k).y;
+                            }
+                            if(left_locations.at(k).y < left_smallest_y){
+                                left_smallest_y = left_locations.at(k).y;
+                            }
                         }
-                        if(left_locations.at(k).y < left_smallest_y){
-                            left_smallest_y = left_locations.at(k).y;
+                        if(k < right_locations.size()){
+                            if(right_locations.at(k).y > right_biggest_y){
+                                right_biggest_y = right_locations.at(k).y;
+                            }
+                            if(right_locations.at(k).y < right_smallest_y){
+                                right_smallest_y = right_locations.at(k).y;
+                            }
                         }
-
                     }
 
-                    for(int k = 0; k < right_locations.size(); k++){
-                        if(right_locations.at(k).y > right_biggest_y){
-                            right_biggest_y = right_locations.at(k).y;
-                        }
-                        if(right_locations.at(k).y < right_smallest_y){
-                            right_smallest_y = right_locations.at(k).y;
-                        }
-                    }
-
+                    // Get biggest difference between min or max rows
                     float diff;
                     if(abs(float(left_biggest_y-right_biggest_y)) > abs(float(left_smallest_y-right_smallest_y))){
                         diff = float(left_biggest_y-right_biggest_y);
@@ -582,55 +697,39 @@ Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
                         diff = float(left_smallest_y-right_smallest_y);
                     }
 
+                    // Use difference to translate combined frame
                     float translation_array[] = {1.0,0.0,0.0,0.0,1.0,diff};
                     Mat translation = Mat(2,3,CV_32F,translation_array);
 
-                    Mat temp_comb;
-                    warpAffine(comb,temp_comb,translation,comb.size());
-                    hconcat(temp_comb,comb,comb);
+                    // Update drawing and update location of original frame
+                    Mat temp_combined;
+                    warpAffine(combined_drawing,temp_combined,translation,combined_drawing.size());
+                    start_x = frame_size.width;
+                    end_x = frame_size.width*2;
+                    hconcat(temp_combined,combined_drawing,combined_drawing);
                 }
             }
-            big_contour = get_biggest_contour(comb);
-            Mat comb_temp;
-            resize(comb,comb_temp,Size(),0.5,0.5,INTER_LINEAR);
+            // Erode shape back to normal
+            erode(combined_drawing,combined_drawing,border_kernel,Point(-1,-1),dilate_iterations);
 
-            imshow("feaf",comb_temp);
-            waitKey(0);
+            // Update draw size
+            draw_size = combined_drawing.size();
+
+            // Retrive contour
+            new_contour = get_biggest_contour(combined_drawing);
         }
-
-        // Get rotatedRect element
-        //RotatedRect current_rectangle = minAreaRect(contour);
-        RotatedRect current_rectangle = minAreaRect(big_contour);
-
-        cout << "angle box: " << current_rectangle.angle << endl;
-
-        // Establish rectangle points
-        Point2f rectangle_points[4];
-        current_rectangle.points(rectangle_points);
-
-        Mat test = Mat::zeros(frame_size,CV_8U);
-        for(int i = 0; i < 4; i++){
-            line(test,rectangle_points[i],rectangle_points[(i+1)%4],WHITE);
-        }
-//        cout << rectangle_points[0].x << ", " << rectangle_points[0].y << " -> " << rectangle_points[1].x << ", " << rectangle_points[1].y << " -> " << rectangle_points[2].x << ", " << rectangle_points[2].y << " -> " << rectangle_points[3].x << ", " << rectangle_points[3].y << endl;
-
-        imshow("test",test);
-        waitKey(0);
-
-        // Convert to vector for further usage
-        vector<Point> rectangle_points_vector = {rectangle_points[0],rectangle_points[1],rectangle_points[2],rectangle_points[3]};
-
-        // Mimic contour setup
-        vector<vector<Point>> points;
-        points.push_back(rectangle_points_vector);
-
-        // Draw rectangle
-        drawContours(bounding_rectangle,points,0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
+        // Prepare output
+        new_contour_data.contour = new_contour;
+        new_contour_data.frame_size = draw_size;
+        new_contour_data.start_col = start_x;
+        new_contour_data.start_row = start_y;
+        new_contour_data.end_col = end_x;
+        new_contour_data.end_row = end_y;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
-    return bounding_rectangle;
+    return new_contour_data;
 }
 
 vector<Point> detecting::get_biggest_contour(Mat mask){
@@ -923,10 +1022,6 @@ int detecting::get_symmetric_difference(cv::Mat original_mask, cv::Mat new_mask,
 vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles){
     vector<obstacle> accepted_obstacles;
     try{
-        // Loop variables
-        vector<Mat> viable_splits;
-        vector<Mat> original_masks;
-
         // Go through each obstacle candidate
         for(int obstacle_index = 0; obstacle_index < obstacles.size(); obstacle_index++){
 
@@ -934,22 +1029,22 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
             vector<Point> contour = obstacles.at(obstacle_index).contour;
             Mat mask = obstacles.at(obstacle_index).mask;
 
-            imshow("THe mask",mask);
-            waitKey(0);
+            imshow("the mask", mask);
 
-            // What if we use all points?
-            vector<Point> pixel_coords;
-            findNonZero(mask,pixel_coords);
+            // Mask size is not the same if frame one has been run
 
             // Draw bounding rectangle
-//            Mat bounding_box = get_bounding_rectangle(contour,mask.size());
-            Mat bounding_box = get_bounding_rectangle(pixel_coords,mask.size());
+            Mat bounding_box = get_bounding_rectangle(contour,mask.size());
+
+            cout << countNonZero(mask) << ", " << countNonZero(mask) << endl;
 
             // Check if bounding box contains more than threshold percent error (Error being pixel within box that do not belong to mask)
             int error_count = get_symmetric_difference(mask,bounding_box,true);
 
             int original_contour_size = countNonZero(mask);
             int max_error = int(original_contour_size*accept_rectangle_threshold);
+
+            // error_count and max error are different
 
             // If big error the obstacle should be split
             if(error_count > max_error){
@@ -989,9 +1084,9 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     }
                 }
 
-                imshow("simply edge", new_edge_mask);
-                imshow("edge",edge_mask); // Issues probably in bad recognision of edges
-                waitKey(0);
+//                imshow("simply edge", new_edge_mask);
+//                imshow("edge",edge_mask); // Issues probably in bad recognision of edges
+//                waitKey(0);
 
                 // test
                 edge_mask = new_edge_mask.clone();
@@ -1025,7 +1120,6 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 //                    imshow("test",test_stuff);
 //                    waitKey(0);
 
-                    // The issue is here. The lines are simply not moved in the correct direction
                     vector<Vec4i> borders = get_biggest_drop_borders(direction,current_line,mask);
                     current_line = borders.at(0);
                     Vec4i end_line = borders.at(1);
@@ -1064,17 +1158,11 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 //                    imshow("mask",new_contour_mask);
 //                    waitKey(0);
 
+                    Mat new_bounding_box = get_bounding_rectangle(new_contour,mask.size());
 
-                    // Draw bounding rectangle
-                    vector<Point> all_points;
-                    findNonZero(new_contour_mask,all_points);
-
-//                    Mat new_bounding_box = get_bounding_rectangle(new_contour,mask.size());
-                    Mat new_bounding_box = get_bounding_rectangle(all_points,mask.size());
-
-                    imshow("org",new_contour_mask);
-                    imshow("new bound", new_bounding_box);
-                    waitKey(0);
+//                    imshow("org",new_contour_mask);
+//                    imshow("new bound", new_bounding_box);
+//                    waitKey(0);
 
                     // Check for error margin
                     int new_error_count = get_symmetric_difference(new_contour_mask,new_bounding_box,true);
@@ -1121,32 +1209,45 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
                 cout << "Obstacles remaining: " << temp_obstacles.size() << endl;
 
+                // Wird before this
 //                for(int k = 0; k < temp_obstacles.size(); k++){
 //                    string name = to_string(k);
 //                    imshow(name, temp_obstacles.at(k).mask);
 //                    waitKey(0);
 //                }
 
-                // Good cuts still present here
-
                 // New idea: Keep the obstacle containing most matches if similar
                 for(int i = 0; i < temp_obstacles.size(); i++){
+//                    imshow("initial mask",temp_obstacles.at(i).mask);
                     vector<int> to_be_removed = {};
                     for(int j = i+1; j < temp_obstacles.size(); j++){
                         Mat intersection = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
                         int intersection_count = countNonZero(intersection);
 
-                        // If intersection is 75% or more of either obstacle, they are similar
+                        // If intersection is 75% or more of either obstacle and similar angle, they are similar
                         int first_count = countNonZero(temp_obstacles.at(i).mask);
                         int second_count =  countNonZero(temp_obstacles.at(j).mask);
-                        if(intersection_count >= (int)first_count*0.75 || intersection_count >= (int)second_count*0.75 ){
+
+                        if((intersection_count >= (int)first_count*0.75 || intersection_count >= (int)second_count*0.75) && is_angle_vertical(temp_obstacles.at(i).original_angle) == is_angle_vertical(temp_obstacles.at(i).original_angle)){
                             to_be_removed.push_back(j);
                             // Update initial obstacle based on which has the most matches with disparity map
                             if(second_count > first_count){
+//                                if(i == 0){
+//                                    imshow("killed",temp_obstacles.at(i).mask);
+//                                    imshow("killer",temp_obstacles.at(j).mask);
+//                                    waitKey(0);
+//                                }
                                 temp_obstacles.at(i).mask = temp_obstacles.at(j).mask;
                             }
+//                            else{
+//                                imshow("killed",temp_obstacles.at(i).mask);
+//                                imshow("killer",temp_obstacles.at(j).mask);
+//                            }
+//                            waitKey(0);
                         }
                     }
+//                    imshow("final mask",temp_obstacles.at(i).mask);
+//                    waitKey(0);
                     // removed used indexes
                     if(to_be_removed.size() > 0){
                         for(int j = to_be_removed.size()-1; j >= 0; j--){
@@ -1344,7 +1445,7 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
         // Step 1: Split current obstacles into rectangles while removing obstacles unable to fit nicely withing
         //vector<obstacle> remaining_obstacles = split_into_rectangles(obstacles);
         //vector<obstacle> remaining_obstacles = split_into_rectangles_corner(obstacles);
-        vector<obstacle> remaining_obstacles = split_into_all_rectangles(obstacles);
+        vector<obstacle> remaining_obstacles = split_into_all_rectangles(obstacles); // It happens in here
 
         cout << "Number of obstacles left after splitting: " << remaining_obstacles.size() << endl;
 
@@ -1352,11 +1453,11 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
             throw runtime_error("No obstacles survived splitting.");
         }
 
-        for(int i = 0; i < remaining_obstacles.size(); i++){
-            string name = to_string(i);
-            imshow(name,remaining_obstacles.at(i).mask);
-            waitKey(0);
-        }
+//        for(int i = 0; i < remaining_obstacles.size(); i++){
+//            string name = to_string(i);
+//            imshow(name,remaining_obstacles.at(i).mask);
+//            waitKey(0);
+//        }
 
         // Clean masks if desired
         if(clean_shapes == true){
@@ -1952,13 +2053,9 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
     int direction = 0;
     try{
         // Check if angle is closer to 90 degrees (Vertical) else it must be horizontal
-//        cout << angle*180/M_PI << endl;
         double distance_to_90 = abs(90-abs(angle*180/M_PI));
-//        cout << distance_to_90 << endl;
+
         if(abs(angle*180/M_PI) > distance_to_90){
-//            cout << "move left or right" << endl;
-
-
             // Create directional line masks
             Mat left_mask = Mat::zeros(mask.size(),CV_8U);
             Mat right_mask = Mat::zeros(mask.size(),CV_8U);
@@ -2007,6 +2104,24 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
         cout << "Error: " << error.what() << endl;
     }
     return direction;
+}
+
+// -- Methods for checking angles --
+bool detecting::is_angle_vertical(double angle){
+    bool vertical = false;
+    try{
+        // Calculate distance to 90 degrees from horizontal line
+        double distance_to_90 = abs(90-abs(angle*180/M_PI));
+
+        // If angle is bigger than the distance to 90 it is a vertical line
+        if(abs(angle*180/M_PI) > distance_to_90){
+            vertical = true;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return vertical;
 }
 
 
@@ -3536,14 +3651,15 @@ bool detecting::check_rectangle_shape(obstacle obstacle_to_check, float ratio){
         // Get data
         vector<Point> contour = obstacle_to_check.contour;
 
+        // Prepare contour
+        prepared_contour contour_data = prepare_contour_for_bounding(contour,obstacle_to_check.mask.size());
+
         // Get bounding rectangle
-        RotatedRect rectangle = minAreaRect(contour);
+        RotatedRect rectangle = minAreaRect(contour_data.contour);
 
         // Get points
         Point2f rectangle_points[4];
         rectangle.points(rectangle_points);
-
-        cout << rectangle_points[0].x << ", " << rectangle_points[0].y << " -> " << rectangle_points[1].x << ", " << rectangle_points[1].y << " -> " << rectangle_points[2].x << ", " << rectangle_points[2].y << " -> " << rectangle_points[3].x << ", " << rectangle_points[3].y << endl;
 
         // Find edge distances
         float first_edge_distance = abs(calculations.calculate_euclidean_distance(rectangle_points[0].x, rectangle_points[0].y, rectangle_points[1].x, rectangle_points[1].y));
@@ -3553,7 +3669,6 @@ bool detecting::check_rectangle_shape(obstacle obstacle_to_check, float ratio){
         float biggest_ratio = max(first_edge_distance/second_edge_distance, second_edge_distance/first_edge_distance);
 
         // Check if bigger than min ratio
-//        cout << biggest_ratio << " | " << ratio << endl;
         if(biggest_ratio >= ratio){
             accepted_status = true;
         }

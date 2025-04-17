@@ -169,4 +169,14 @@ struct contours{
     std::vector<cv::Vec4i> hierarchy;
 };
 
+// Information about prepared contour
+struct prepared_contour{
+    std::vector<cv::Point> contour;
+    cv::Size frame_size;
+    int start_col;
+    int end_col;
+    int start_row;
+    int end_row;
+};
+
 #endif

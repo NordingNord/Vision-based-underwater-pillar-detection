@@ -1174,9 +1174,9 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             frame_index++;
             cout << "Frame: " << frame_index << endl;
 
-            if(frame_index < 4){
-                continue;
-            }
+//            if(frame_index == 1){
+//                continue; // Something weird happens to frame 7 if i dont skip the first frame.
+//            }
 
             // Break if no more frames any of the videos
             if(first_frame.empty() || second_frame.empty()){
@@ -1223,6 +1223,8 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             // Save masks for later visualization
             vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
 
+            cout << "Obstacle size: " << obstacles.at(0).mask.size() << endl;
+
             // Filter obstacles
             start = chrono::high_resolution_clock::now();
 
@@ -1232,52 +1234,52 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Filtered obstacles in  " << duration.count() << " ms." << endl;
 
-            // Identify obstacles
-            start = chrono::high_resolution_clock::now();
+//            // Identify obstacles
+//            start = chrono::high_resolution_clock::now();
 
-            obstacles = detector.detect_type(obstacles,depth);
+//            obstacles = detector.detect_type(obstacles,depth);
 
-            stop = chrono::high_resolution_clock::now();
-            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-            cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
+//            stop = chrono::high_resolution_clock::now();
+//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//            cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
 
-            // If desired. Patch gap
-            if(patch_gaps == true && obstacles.size() < last_obstacles.size()){
-                start = chrono::high_resolution_clock::now();
-                // This might be bad
-                if(last_first_frame.size() != first_frame.size()){
-                    int width = min(last_first_frame.size().width, first_frame.size().width);
-                    int height = min(last_first_frame.size().height, first_frame.size().height);
+//            // If desired. Patch gap
+//            if(patch_gaps == true && obstacles.size() < last_obstacles.size()){
+//                start = chrono::high_resolution_clock::now();
+//                // This might be bad
+//                if(last_first_frame.size() != first_frame.size()){
+//                    int width = min(last_first_frame.size().width, first_frame.size().width);
+//                    int height = min(last_first_frame.size().height, first_frame.size().height);
 
-                    if(last_first_frame.size().width > width || last_first_frame.size().height > height){
-                        converter.crop_image(last_first_frame,Size(width,height),stereo_system.get_crop_status());
-                        last_obstacles = converter.crop_obstacles(last_obstacles,Size(width,height),stereo_system.get_crop_status());
-                    }
-                    else{
-                        converter.crop_image(first_frame,Size(width,height),cropped_last_from_top);
-                        obstacles = converter.crop_obstacles(obstacles,Size(width,height),cropped_last_from_top);
-                    }
-                }
+//                    if(last_first_frame.size().width > width || last_first_frame.size().height > height){
+//                        converter.crop_image(last_first_frame,Size(width,height),stereo_system.get_crop_status());
+//                        last_obstacles = converter.crop_obstacles(last_obstacles,Size(width,height),stereo_system.get_crop_status());
+//                    }
+//                    else{
+//                        converter.crop_image(first_frame,Size(width,height),cropped_last_from_top);
+//                        obstacles = converter.crop_obstacles(obstacles,Size(width,height),cropped_last_from_top);
+//                    }
+//                }
 
-                vector<obstacle> obstacles_temp = patch_obstacle_gap(obstacles,last_obstacles,first_frame,last_first_frame);
+//                vector<obstacle> obstacles_temp = patch_obstacle_gap(obstacles,last_obstacles,first_frame,last_first_frame);
 
-                // Update last info, without keeping the moved obstacles
-                last_first_frame = first_frame;
-                last_obstacles = obstacles;
-                cropped_last_from_top = stereo_system.get_crop_status();
-                obstacles = obstacles_temp;
+//                // Update last info, without keeping the moved obstacles
+//                last_first_frame = first_frame;
+//                last_obstacles = obstacles;
+//                cropped_last_from_top = stereo_system.get_crop_status();
+//                obstacles = obstacles_temp;
 
 
-                stop = chrono::high_resolution_clock::now();
-                duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-                cout << "Gap patched in  " << duration.count() << " ms." << endl;
-            }
-            else{
-                // Update last info
-                last_first_frame = first_frame.clone();
-                last_obstacles = obstacles;
-                cropped_last_from_top = stereo_system.get_crop_status();
-            }
+//                stop = chrono::high_resolution_clock::now();
+//                duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+//                cout << "Gap patched in  " << duration.count() << " ms." << endl;
+//            }
+//            else{
+//                // Update last info
+//                last_first_frame = first_frame.clone();
+//                last_obstacles = obstacles;
+//                cropped_last_from_top = stereo_system.get_crop_status();
+//            }
 
             // JUST TEST VISUALIZATION FROM HERE ON OUT
 

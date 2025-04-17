@@ -77,6 +77,8 @@ public:
 
     cv::Mat get_bounding_rectangle(std::vector<cv::Point> contour, cv::Size frame_size);
 
+    prepared_contour prepare_contour_for_bounding(std::vector<cv::Point> contour, cv::Size frame_size);
+
     std::vector<cv::Point> get_biggest_contour(cv::Mat mask);
 
     cv::Mat get_contour_edge(std::vector<std::vector<cv::Point>> contour, cv::Size mask_size, bool remove_border = false);
@@ -112,6 +114,9 @@ public:
 
     // -- Methods for moving lines --
     int get_obstacle_direction(double angle, cv::Vec4i initial_line, cv::Mat mask);
+
+    // -- Methods for checking angles --
+    bool is_angle_vertical(double angle);
 
     // -- Postprocessing methods --
     obstacle clean_obstacle(obstacle input_obstacle, bool rectangle_shape);
@@ -274,7 +279,8 @@ private:
 
     int max_expansions = 5;
 
-
+    // Bounding variables
+    int dilate_iterations = 10;
 
 };
 

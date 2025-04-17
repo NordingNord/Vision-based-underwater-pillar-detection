@@ -2468,3 +2468,271 @@
 //                    waitKey(0);
 //                    cout << "remove: " << endl;
 //                    Mat full_other_map = Mat::zeros(new_version.size(),CV_8U);
+//cout << "size: " << frame_size << endl;
+
+//Mat test_1 = Mat::zeros(frame_size,CV_8U);
+
+//for(int i = 0; i < contour.size(); i++){
+//    test_1.at<uchar>(contour.at(i)) = 255;
+//}
+
+//dilate(test_1,test_1,border_kernel,Point(-1,-1),10);
+
+////        vector<vector<Point>> temp = {contour};
+////        drawContours(test_1,temp,0,WHITE,DRAW_WIDTH_INFILL);
+////        imshow("input contour",test_1);
+
+//// test flip and stuff
+
+//// find edge to add to
+//Mat left = Mat::zeros(frame_size, CV_8U);
+//Mat right = Mat::zeros(frame_size, CV_8U);
+//Mat top = Mat::zeros(frame_size, CV_8U);
+//Mat bottom = Mat::zeros(frame_size, CV_8U);
+
+//line(left,Point(0,0),Point(0,frame_size.height-1),WHITE);
+//line(right,Point(frame_size.width-1,0),Point(frame_size.width-1,frame_size.height-1),WHITE);
+//line(bottom, Point(0,frame_size.height-1),Point(frame_size.width-1,frame_size.height-1),WHITE);
+//line(top, Point(0,0), Point(frame_size.width-1,0),WHITE);
+
+//int count_left, count_right, count_top, count_bottom;
+//count_left = countNonZero(left & test_1);
+//count_right = countNonZero(right & test_1);
+//count_top = countNonZero(top & test_1);
+//count_bottom = countNonZero(bottom & test_1);
+
+////        cout << count_left << ", " << count_right << ", " << count_top << ", " << count_bottom << endl;
+//Size draw_size = frame_size;
+//int start_x = 0;
+//int start_y = 0;
+//int end_x = frame_size.width;
+//int end_y = frame_size.height;
+
+//int number_edges = 0;
+//if(count_left > 0){
+//    number_edges++;
+//}
+//if(count_right > 0){
+//    number_edges++;
+//}
+//if(count_top > 0){
+//    number_edges++;
+//}
+//if(count_bottom > 0){
+//    number_edges++;
+//}
+//Mat test_2;
+//vector<Point> big_contour;
+//if(number_edges == 0){
+//    big_contour = contour;
+//}
+//else{
+//    Mat comb;
+
+//    Mat testflip = test_1.clone();
+//    Mat testflip2 = test_1.clone();
+//    flip(testflip,testflip,1);
+//    flip(testflip,testflip,0);
+//    flip(testflip2,testflip2,0);
+//    flip(testflip2,testflip2,1);
+//    imshow("flip 1 ", testflip);
+//    imshow("flip 2", testflip2);
+//    waitKey(0);
+//    if(max(count_left,count_right) > max(count_top,count_bottom)){
+//        flip(test_1,test_2,1);
+//        flip(test_2,test_2,0);
+//        if(number_edges == 1){
+//            Point center_1 = get_contour_center(test_1);
+//            Point center_2 = get_contour_center(test_2);
+
+//            int dist =  center_1.y-center_2.y;
+
+//            Mat full = (left & test_1) | (right & test_1) | (bottom & test_1) | (top & test_1);
+
+//            vector<Point> locations;
+//            findNonZero(full,locations);
+
+//            int min_y = test_1.rows;
+//            int max_y = 0;
+
+//            for(int k = 0; k < locations.size();k++){
+//                if(locations.at(k).y < min_y){
+//                    min_y = locations.at(k).y;
+//                }
+//                if(locations.at(k).y > max_y){
+//                    max_y = locations.at(k).y;
+//                }
+//            }
+
+//            dist += abs(max_y-center_1.y)-abs(min_y-center_1.y);
+
+//            // Shift
+//            float translation_array[] = {1.0,0.0,0.0,0.0,1.0,float(dist)};
+//            Mat translation = Mat(2,3,CV_32F,translation_array);
+
+//            warpAffine(test_2,test_2,translation,test_2.size());
+//        }
+
+//        if(count_left > count_right && count_left > count_top && count_left > count_bottom){
+//            start_x = frame_size.width;
+//            end_x = frame_size.width*2;
+//            hconcat(test_2,test_1,comb);
+//        }
+//        else{
+//            hconcat(test_1,test_2,comb);
+//        }
+
+//        // add more to top to ensure long enough shape
+//        if(number_edges > 2){
+//            Mat top_edge = top & test_1;
+//            Mat bottom_edge = bottom & test_1;
+
+//            vector<Point> top_locations, bottom_locations;
+//            findNonZero(top_edge,top_locations);
+//            findNonZero(bottom_edge,bottom_locations);
+
+//            int top_biggest_x = 0;
+//            int bottom_biggest_x = 0;
+//            int top_smallest_x = test_1.cols;
+//            int bottom_smallest_x = test_1.cols;
+
+//            for(int k = 0; k < top_locations.size(); k++){
+//                if(top_locations.at(k).x > top_biggest_x){
+//                    top_biggest_x = top_locations.at(k).x;
+//                }
+//                if(top_locations.at(k).x < top_smallest_x){
+//                    top_smallest_x = top_locations.at(k).x;
+//                }
+//            }
+
+//            for(int k = 0; k < bottom_locations.size(); k++){
+//                if(bottom_locations.at(k).x > bottom_biggest_x){
+//                    bottom_biggest_x = bottom_locations.at(k).x;
+//                }
+//                if(bottom_locations.at(k).x < bottom_smallest_x){
+//                    bottom_smallest_x = bottom_locations.at(k).x;
+//                }
+//            }
+
+
+//            float diff;
+//            if(abs(float(top_biggest_x-bottom_biggest_x)) > abs(float(top_smallest_x-bottom_smallest_x))){
+//                diff = float(top_biggest_x-bottom_biggest_x);
+//            }
+//            else{
+//                diff = float(top_smallest_x-bottom_smallest_x);
+//            }
+
+//            float translation_array[] = {1.0,0.0,diff,0.0,1.0,0.0};
+//            Mat translation = Mat(2,3,CV_32F,translation_array);
+
+//            Mat temp_comb;
+//            warpAffine(comb,temp_comb,translation,comb.size());
+//            start_y = frame_size.height;
+//            end_y = frame_size.height*2;
+//            vconcat(temp_comb,comb,comb);
+//        }
+//    }
+//    else{
+//        flip(test_1,test_2,0);
+//        flip(test_2,test_2,1);
+
+//        if(number_edges == 1){
+//            Point center_1 = get_contour_center(test_1);
+//            Point center_2 = get_contour_center(test_2);
+
+//            int dist =  center_1.x-center_2.x;
+
+//            Mat full = (left & test_1) | (right & test_1) | (bottom & test_1) | (top & test_1);
+
+//            vector<Point> locations;
+//            findNonZero(full,locations);
+
+//            int min_x = test_1.cols;
+//            int max_x = 0;
+
+//            for(int k = 0; k < locations.size();k++){
+//                if(locations.at(k).x < min_x){
+//                    min_x = locations.at(k).x;
+//                }
+//                if(locations.at(k).x > max_x){
+//                    max_x = locations.at(k).x;
+//                }
+//            }
+
+//            dist += abs(max_x-center_1.x)-abs(min_x-center_1.x);
+
+//            // Shift
+//            float translation_array[] = {1.0,0.0,float(dist),0.0,1.0,0.0};
+//            Mat translation = Mat(2,3,CV_32F,translation_array);
+
+//            warpAffine(test_2,test_2,translation,test_2.size());
+//        }
+
+//        if(count_top > count_right && count_top > count_left && count_top > count_bottom){
+//            start_y = frame_size.height;
+//            end_y = frame_size.height*2;
+//            vconcat(test_2,test_1,comb);
+//        }
+//        else{
+//            vconcat(test_1,test_2,comb);
+//        }
+//        // add more to left to ensure long enough shape
+//        if(number_edges > 2){
+//            Mat left_edge = left & test_1;
+//            Mat right_edge = right & test_1;
+//            vector<Point> left_locations, right_locations;
+//            findNonZero(left_edge,left_locations);
+//            findNonZero(right_edge,right_locations);
+
+//            int left_biggest_y = 0;
+//            int right_biggest_y = 0;
+//            int left_smallest_y = test_1.rows;
+//            int right_smallest_y = test_1.rows;
+
+//            for(int k = 0; k < left_locations.size(); k++){
+//                if(left_locations.at(k).y > left_biggest_y){
+//                    left_biggest_y = left_locations.at(k).y;
+//                }
+//                if(left_locations.at(k).y < left_smallest_y){
+//                    left_smallest_y = left_locations.at(k).y;
+//                }
+
+//            }
+
+//            for(int k = 0; k < right_locations.size(); k++){
+//                if(right_locations.at(k).y > right_biggest_y){
+//                    right_biggest_y = right_locations.at(k).y;
+//                }
+//                if(right_locations.at(k).y < right_smallest_y){
+//                    right_smallest_y = right_locations.at(k).y;
+//                }
+//            }
+
+//            float diff;
+//            if(abs(float(left_biggest_y-right_biggest_y)) > abs(float(left_smallest_y-right_smallest_y))){
+//                diff = float(left_biggest_y-right_biggest_y);
+//            }
+//            else{
+//                diff = float(left_smallest_y-right_smallest_y);
+//            }
+
+//            float translation_array[] = {1.0,0.0,0.0,0.0,1.0,diff};
+//            Mat translation = Mat(2,3,CV_32F,translation_array);
+
+//            Mat temp_comb;
+//            warpAffine(comb,temp_comb,translation,comb.size());
+//            start_x = frame_size.width;
+//            end_x = frame_size.width*2;
+//            hconcat(temp_comb,comb,comb);
+//        }
+//    }
+//    erode(comb,comb,border_kernel,Point(-1,-1),10);
+//    draw_size = comb.size();
+//    big_contour = get_biggest_contour(comb);
+////            Mat comb_temp;
+////            resize(comb,comb_temp,Size(),0.5,0.5,INTER_LINEAR);
+
+////            imshow("feaf",comb_temp);
+////            waitKey(0);
+//}
