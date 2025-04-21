@@ -1174,9 +1174,9 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             frame_index++;
             cout << "Frame: " << frame_index << endl;
 
-            if(frame_index < 8){
-                continue;
-            }
+//            if(frame_index < 8){
+//                continue;
+//            }
 
             // Break if no more frames any of the videos
             if(first_frame.empty() || second_frame.empty()){
@@ -1220,11 +1220,15 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
 
             vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
 
-            for(int i = 0; i < obstacles.size(); i++){
-                imshow("MASK",obstacles.at(i).mask);
-                vector<vector<Point>> temp = {obstacles.at(i).contour};
-
-            }
+            // all seems good here now
+//            for(int i = 0; i < obstacles.size(); i++){
+//                imshow("MASK",obstacles.at(i).mask);
+//                vector<vector<Point>> temp = {obstacles.at(i).contour};
+//                Mat tempi = Mat::zeros(obstacles.at(i).mask.size(),CV_8U);
+//                drawContours(tempi,temp,0,WHITE,-1);
+//                imshow("CONTOUR",tempi);
+//                waitKey(0);
+//            }
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);

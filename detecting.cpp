@@ -454,6 +454,7 @@ Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
 prepared_contour detecting::prepare_contour_for_bounding(vector<Point> contour, Size frame_size){
     prepared_contour new_contour_data;
     try{
+        Mat temp;
         Mat drawn_contour = Mat::zeros(frame_size,CV_8U);
 
         // Draw contour
@@ -522,8 +523,14 @@ prepared_contour detecting::prepare_contour_for_bounding(vector<Point> contour, 
             flip(drawn_contour,flipped_drawing,1);
             flip(flipped_drawing,flipped_drawing,0);
 
+            resize(drawn_contour,temp,Size(),0.5,0.5);
+            imshow("original_contour",temp);
+            waitKey(0);
+
             // If the obstacle hits edges, it must be extended to ensure that minAreaRect does not misinterprit the obstacle
-            if(max(count_left,count_right) > max(count_top,count_bottom)){ // If the obstacle is horizontal
+            if(count_left > min(count_top,count_bottom) && count_right > min(count_top,count_bottom)){ // If the obstacle is horizontal
+
+                cout << "HORIZONTAL OBSTACLE" << endl;
 
                 Mat intersection_of_choice;
                 if(count_left > count_right){
@@ -550,32 +557,39 @@ prepared_contour detecting::prepare_contour_for_bounding(vector<Point> contour, 
                     hconcat(drawn_contour,flipped_drawing,combined_drawing);
                 }
 
+                resize(combined_drawing,temp,Size(),0.5,0.5);
+                imshow("work_in_progress",temp);
+                waitKey(0);
+
                 // If there are more than two edges, the obstacle coul look too much like a square, it should therefore be exteneded further
-                if(number_edges > 2){
-                    // Match horizontally
-                    Mat new_intersection;
-                    if(count_top > count_bottom){
-                        new_intersection = top_intersection;
-                    }
-                    else{
-                        new_intersection = bottom_intersection;
-                    }
-                    Mat new_intersection_flip;
-                    flip(new_intersection, new_intersection_flip,1);
-                    flip(new_intersection_flip,new_intersection_flip,0);
+//                if(number_edges > 2){
+//                    // Match horizontally
+//                    Mat new_intersection;
+//                    if(count_top > count_bottom){
+//                        new_intersection = top_intersection;
+//                    }
+//                    else{
+//                        new_intersection = bottom_intersection;
+//                    }
+//                    Mat new_intersection_flip;
+//                    flip(new_intersection, new_intersection_flip,1);
+//                    flip(new_intersection_flip,new_intersection_flip,0);
 
-                    Mat shifted_combined = shift_frame(new_intersection,new_intersection_flip,combined_drawing,false);
+//                    Mat shifted_combined = shift_frame(new_intersection,new_intersection_flip,combined_drawing,false);
 
-                    // Combine based on biggest intersection
-                    if(count_top > count_bottom){
-                        start_y = frame_size.height;
-                        end_y = frame_size.height*2;
-                        vconcat(shifted_combined,combined_drawing,combined_drawing);
-                    }
-                    else{
-                        vconcat(combined_drawing,shifted_combined,combined_drawing);
-                    }
-                }
+//                    // Combine based on biggest intersection
+//                    if(count_top > count_bottom){
+//                        start_y = frame_size.height;
+//                        end_y = frame_size.height*2;
+//                        vconcat(shifted_combined,combined_drawing,combined_drawing);
+//                    }
+//                    else{
+//                        vconcat(combined_drawing,shifted_combined,combined_drawing);
+//                    }
+//                }
+//                resize(combined_drawing,temp,Size(),0.5,0.5);
+//                imshow("work_in_progress",temp);
+//                waitKey(0);
 
 
 //                if(number_edges == 1){
@@ -697,7 +711,7 @@ prepared_contour detecting::prepare_contour_for_bounding(vector<Point> contour, 
 //                }
             }
             else{ // If the obstacle is vertical
-
+                cout << "VERTICAL OBSTACLE" << endl;
                 Mat intersection_of_choice;
                 if(count_top > count_bottom){
                     intersection_of_choice = top_intersection;
@@ -722,33 +736,39 @@ prepared_contour detecting::prepare_contour_for_bounding(vector<Point> contour, 
                 else{
                     vconcat(drawn_contour,flipped_drawing,combined_drawing);
                 }
+                resize(combined_drawing,temp,Size(),0.5,0.5);
+                imshow("work_in_progress",temp);
+                waitKey(0);
 
                 // If there are more than two edges, the obstacle coul look too much like a square, it should therefore be exteneded further
-                if(number_edges > 2){
-                    // Match horizontally
-                    Mat new_intersection;
-                    if(count_left > count_right){
-                        new_intersection = left_intersection;
-                    }
-                    else{
-                        new_intersection = right_intersection;
-                    }
-                    Mat new_intersection_flip;
-                    flip(new_intersection, new_intersection_flip,1);
-                    flip(new_intersection_flip,new_intersection_flip,0);
+//                if(number_edges > 2){
+//                    // Match horizontally
+//                    Mat new_intersection;
+//                    if(count_left > count_right){
+//                        new_intersection = left_intersection;
+//                    }
+//                    else{
+//                        new_intersection = right_intersection;
+//                    }
+//                    Mat new_intersection_flip;
+//                    flip(new_intersection, new_intersection_flip,1);
+//                    flip(new_intersection_flip,new_intersection_flip,0);
 
-                    Mat shifted_combined = shift_frame(new_intersection,new_intersection_flip,combined_drawing,true);
+//                    Mat shifted_combined = shift_frame(new_intersection,new_intersection_flip,combined_drawing,true);
 
-                    // Combine based on biggest intersection
-                    if(count_left > count_right){
-                        start_x = frame_size.width;
-                        end_x = frame_size.width*2;
-                        hconcat(shifted_combined,combined_drawing,combined_drawing);
-                    }
-                    else{
-                        hconcat(combined_drawing,shifted_combined,combined_drawing);
-                    }
-                }
+//                    // Combine based on biggest intersection
+//                    if(count_left > count_right){
+//                        start_x = frame_size.width;
+//                        end_x = frame_size.width*2;
+//                        hconcat(shifted_combined,combined_drawing,combined_drawing);
+//                    }
+//                    else{
+//                        hconcat(combined_drawing,shifted_combined,combined_drawing);
+//                    }
+//                }
+//                resize(combined_drawing,temp,Size(),0.5,0.5);
+//                imshow("work_in_progress",temp);
+//                waitKey(0);
 
 
 
@@ -1220,16 +1240,23 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
             // Draw bounding rectangle
             Mat bounding_box = get_bounding_rectangle(contour,mask.size());
 
+//            imshow("BOUNDING",bounding_box);
+//            waitKey(0);
+
             // Check if bounding box contains more than threshold percent error (Error being pixel within box that do not belong to mask)
             int error_count = get_symmetric_difference(mask,bounding_box,true);
 
             int original_contour_size = countNonZero(mask);
+
+//            cout << error_count << endl;
+//            cout << original_contour_size << endl;
+//            cout << float(error_count)/float(original_contour_size) << endl;
+
             int max_error = int(original_contour_size*accept_rectangle_threshold);
 
 
             // If big error the obstacle should be split
             if(error_count > max_error){
-
                 // Create temp obstacle vector
                 vector<obstacle> temp_obstacles;
 
@@ -1273,7 +1300,7 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
 
                 // Find all valid lines
-                vector<line_data> lines =  get_all_lines(edge_mask,hough_threshold,min_line_length,max_line_gap);
+                vector<line_data> lines = get_all_lines(edge_mask,hough_threshold,min_line_length,max_line_gap);
 
                 // Remove similar lines
                 lines = remove_similar_lines(lines,50.0,15.0,mask.size()); // temp values
@@ -1308,8 +1335,8 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 //                    waitKey(0);
 
                     // Clean borders to be the local maximum
-                    current_line = get_local_maximum_line(direction,current_line,mask);
-                    end_line = get_local_maximum_line(flip_direction(direction),end_line,mask);
+//                    current_line = get_local_maximum_line(direction,current_line,mask);
+//                    end_line = get_local_maximum_line(flip_direction(direction),end_line,mask);
 
 
                     // Create mask
@@ -1317,6 +1344,9 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     vector<vector<Point>> mask_contour = {{Point(current_line[0],current_line[1]), Point(end_line[0], end_line[1]), Point(end_line[2], end_line[3]), Point(current_line[2],current_line[3])}};
                     drawContours(border_mask,mask_contour,0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
                     bitwise_and(border_mask,mask,border_mask);
+
+//                    imshow("BORDER MASK",border_mask);
+//                    waitKey(0);
 
                     // Get contour
                     vector<Point> new_contour = get_biggest_contour(border_mask);
@@ -1326,8 +1356,8 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     Mat new_contour_mask = Mat::zeros(mask.size(),CV_8U);
                     drawContours(new_contour_mask,{temp_new_contour},0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
 
-//                    imshow("new mask",new_contour_mask);
-//                    waitKey(0);
+                    imshow("new mask",new_contour_mask);
+                    waitKey(0);
 
 //                    // Test stuff
 //                    Mat work_in_progress = new_contour_mask.clone();
@@ -1356,10 +1386,13 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     if(new_error_count <= new_max_error){
                         bool accept = true;
                         vector<int> indexes_to_remove = {};
+                        Mat mask_sum = Mat::zeros(new_contour_mask.size(),CV_8U);
                         for(int k = 0; k < temp_obstacles.size(); k++){
 
                             // Check if within another mask (can probably just replace the above method since it should catch both cases)
                             Mat overlap = new_contour_mask & temp_obstacles.at(k).mask;
+                            mask_sum = mask_sum | temp_obstacles.at(k).mask;
+
                             int overlap_count = countNonZero(overlap);
 
                             if(overlap_count == countNonZero(new_contour_mask)){
@@ -1372,6 +1405,12 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                                 cout << "mask " << k << " removed due to it being within mask " << i << endl;
                                 indexes_to_remove.push_back(k);
                             }
+                        }
+                        // Check if almost completely within all chosen obstacles
+                        Mat overlap = mask_sum & new_contour_mask;
+                        int overlap_count = countNonZero(overlap);
+                        if(float(overlap_count) >= float(countNonZero(new_contour_mask))*0.95){
+                            accept = false;
                         }
                         if(accept == true){
                             obstacle new_obstacle;
@@ -1404,6 +1443,7 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 //                    waitKey(0);
 //                }
 
+                cout << "good obstacle dies here" << endl;
                 // New idea: Keep the obstacle containing most matches if similar
                 for(int i = 0; i < temp_obstacles.size(); i++){
 //                    imshow("initial mask",temp_obstacles.at(i).mask);
@@ -1641,11 +1681,11 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
             throw runtime_error("No obstacles survived splitting.");
         }
 
-//        for(int i = 0; i < remaining_obstacles.size(); i++){
-//            string name = to_string(i);
-//            imshow(name,remaining_obstacles.at(i).mask);
-//            waitKey(0);
-//        }
+        for(int i = 0; i < remaining_obstacles.size(); i++){
+            string name = to_string(i);
+            imshow(name,remaining_obstacles.at(i).mask);
+            waitKey(0);
+        }
 
         // Clean masks if desired
         if(clean_shapes == true){
