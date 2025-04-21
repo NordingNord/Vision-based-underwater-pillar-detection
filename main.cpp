@@ -23,6 +23,14 @@ using namespace cv;
 // -- Main --
 int main(){
 
+//    Mat with, without;
+//    imread("post_fill_with.png",with,IMREAD_COLOR_BGR);
+//    imread("post_fill_without.png",without,IMREAD_COLOR_BGR);
+
+//    Mat temp = with == without;
+//    imshow("comp",temp);
+//    waitKey(0);
+
     // -- VIDEO PATHS --
 
     // -- new dataset with varying objects --

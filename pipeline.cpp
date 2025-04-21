@@ -1174,9 +1174,9 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             frame_index++;
             cout << "Frame: " << frame_index << endl;
 
-//            if(frame_index == 1){
-//                continue; // Something weird happens to frame 7 if i dont skip the first frame.
-//            }
+            if(frame_index < 8){
+                continue;
+            }
 
             // Break if no more frames any of the videos
             if(first_frame.empty() || second_frame.empty()){
@@ -1201,9 +1201,11 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Preprocessing completed in " << duration.count() << " ms." << endl;
 
+            // Everything is the same here
+
             // Get disparity and depth maps (Improvements need to be made)
             start = chrono::high_resolution_clock::now();
-            vector<Mat> disparity_and_depth = get_disparity_and_depth(first_frame,second_frame);
+            vector<Mat> disparity_and_depth = get_disparity_and_depth(first_frame,second_frame); // something goes wrong in here
             Mat disparity_map = disparity_and_depth.at(0);
             Mat depth = disparity_and_depth.at(1);
 
@@ -1214,7 +1216,15 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             // Detect possible obstacles (Improvements need to be made)
             start = chrono::high_resolution_clock::now();
 
+            // Disparity map somehow looks different if one skips the first index
+
             vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
+
+            for(int i = 0; i < obstacles.size(); i++){
+                imshow("MASK",obstacles.at(i).mask);
+                vector<vector<Point>> temp = {obstacles.at(i).contour};
+
+            }
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -1223,7 +1233,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             // Save masks for later visualization
             vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
 
-            cout << "Obstacle size: " << obstacles.at(0).mask.size() << endl;
+            // something is different here
 
             // Filter obstacles
             start = chrono::high_resolution_clock::now();
@@ -1673,6 +1683,8 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
             disparity_map = stereo_system.get_disparity(first_i_frame,second_i_frame);
         }
 
+        // Everything is normal here
+
         // Compute left right consistensy check
         if(apply_consistensy_check == true){
             disparity_map = stereo_system.validate_disparity(disparity_map,first_i_frame,second_i_frame);
@@ -1684,10 +1696,20 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
         // Save original
         Mat disparity_map_org = disparity_map.clone();
 
+        Mat temp = disparity_map.clone();
+        if(disparity_map.type() != CV_8UC1){
+            temp = stereo_system.process_disparity(disparity_map);
+        }
+
+        // Everything is good here
+
         // Apply gap filling
         if(fill_gaps == true){
+            // THIS PLACE IS SOMEHOW CONNECTED TO IF FRAME ONE EXISTS OR NOT (Fix)
             disparity_map = stereo_system.apply_weighted_median_filter(first_i_frame,disparity_map); // Here i change the format of disparity map
         }
+
+        // Something is different here
 
         // Apply speckle filter
         if(apply_speckle_filter == true){

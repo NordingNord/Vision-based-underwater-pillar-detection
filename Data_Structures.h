@@ -155,6 +155,7 @@ struct obstacle{
 struct line_data{
     cv::Vec4i line;
     double angle;
+    cv::Point center;
 };
 
 // Information about features

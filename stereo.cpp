@@ -728,15 +728,37 @@ Mat stereo::apply_weighted_median_filter(Mat frame, Mat disparity_map){
             throw runtime_error("Invalid disparity map type. Please use 32F or 16S.");
         }
 
+        // test
+//        Mat tempi;
+//        if(disparity_map.type() == CV_16SC1){
+//            temp_disp.convertTo(tempi,CV_16SC1,1.0/(1.0/16.0));
+//        }
+//        tempi = process_disparity(tempi);
+//        imwrite("pre_fill_without.png",tempi);
+
         // Convert disparity map to CV_8
         //temp_disp = process_disparity(disparity_map);
 
-        ximgproc::weightedMedianFilter(frame,temp_disp,filled_disparity_map,kernel_radius);
+//        Mat tempi = process_disparity(filled_disparity_map);
+//        imwrite("temp_filled_without.png",tempi);
+//        cout << kernel_radius << endl;
+
+        // Everything is the same up until this point
+//        cout << frame.channels() << ", " << temp_disp.channels() << endl;
+
+        // Grayscale frame to match channel count
+        Mat gray_frame;
+        cvtColor(frame,gray_frame,COLOR_BGR2GRAY);
+
+        ximgproc::weightedMedianFilter(gray_frame,temp_disp,filled_disparity_map,kernel_radius,20,cv::ximgproc::WMFWeightType::WMF_EXP);
 
         // Convert back to signed
         if(disparity_map.type() == CV_16SC1){
             filled_disparity_map.convertTo(filled_disparity_map,CV_16SC1,1.0/(1.0/16.0));
         }
+
+//        Mat tempi = process_disparity(filled_disparity_map.clone());
+//        imwrite("post_fill_with.png",tempi);
 
         //filled_disparity_map.convertTo(filled_disparity_map,CV_8U,255/disparity_settings.num_disparities);
     }

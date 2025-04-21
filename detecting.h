@@ -59,7 +59,7 @@ public:
     contours get_big_contours(cv::Mat line_frame);
     contours get_contours(cv::Mat line_frame);
 
-    std::vector<cv::Mat> create_contour_masks(contours input_contours, cv::Size frame_size, bool morph);
+    std::vector<cv::Mat> create_contour_masks(contours input_contours, cv::Size frame_size, bool morph,bool remove_invalid);
 
     cv::Mat combine_masks(std::vector<cv::Mat> masks);
 
@@ -112,11 +112,24 @@ public:
 
     std::vector<cv::Vec4i> get_best_fit_borders(int direction, cv::Vec4i initial_line, cv::Mat mask);
 
+    std::vector<line_data> remove_similar_lines(std::vector<line_data> lines, float dist_thresh,  double angle_thresh,cv::Size frame_size);
+
+    cv::Vec4i get_local_maximum_line(int direction, cv::Vec4i initial_line, cv::Mat mask,int wait_threshold = 20);
+
     // -- Methods for moving lines --
     int get_obstacle_direction(double angle, cv::Vec4i initial_line, cv::Mat mask);
 
     // -- Methods for checking angles --
     bool is_angle_vertical(double angle);
+
+    // -- Other helpfull methods --
+    int get_direction_sign(int direction);
+
+    int get_max_index(cv::Vec4i initial_line, cv::Mat mask, int direction);
+
+    int flip_direction(int direction);
+
+    cv::Mat shift_frame(cv::Mat compare_intersection, cv::Mat intersection, cv::Mat frame, bool vertical);
 
     // -- Postprocessing methods --
     obstacle clean_obstacle(obstacle input_obstacle, bool rectangle_shape);
