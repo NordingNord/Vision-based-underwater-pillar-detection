@@ -1174,9 +1174,9 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             frame_index++;
             cout << "Frame: " << frame_index << endl;
 
-//            if(frame_index < 8){
-//                continue;
-//            }
+            if(frame_index < 9){
+                continue;
+            }
 
             // Break if no more frames any of the videos
             if(first_frame.empty() || second_frame.empty()){
@@ -1221,14 +1221,14 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
 
             // all seems good here now
-//            for(int i = 0; i < obstacles.size(); i++){
-//                imshow("MASK",obstacles.at(i).mask);
-//                vector<vector<Point>> temp = {obstacles.at(i).contour};
-//                Mat tempi = Mat::zeros(obstacles.at(i).mask.size(),CV_8U);
-//                drawContours(tempi,temp,0,WHITE,-1);
-//                imshow("CONTOUR",tempi);
-//                waitKey(0);
-//            }
+            for(int i = 0; i < obstacles.size(); i++){
+                imshow("MASK",obstacles.at(i).mask);
+                vector<vector<Point>> temp = {obstacles.at(i).contour};
+                Mat tempi = Mat::zeros(obstacles.at(i).mask.size(),CV_8U);
+                drawContours(tempi,temp,0,WHITE,-1);
+                imshow("CONTOUR",tempi);
+                waitKey(0);
+            }
 
             stop = chrono::high_resolution_clock::now();
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -1687,7 +1687,9 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
             disparity_map = stereo_system.get_disparity(first_i_frame,second_i_frame);
         }
 
-        // Everything is normal here
+        Mat test = stereo_system.process_disparity(disparity_map);
+        imshow("Initial disparity map",test);
+        waitKey(0);
 
         // Compute left right consistensy check
         if(apply_consistensy_check == true){
@@ -1700,20 +1702,14 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
         // Save original
         Mat disparity_map_org = disparity_map.clone();
 
-        Mat temp = disparity_map.clone();
-        if(disparity_map.type() != CV_8UC1){
-            temp = stereo_system.process_disparity(disparity_map);
-        }
-
-        // Everything is good here
-
         // Apply gap filling
         if(fill_gaps == true){
-            // THIS PLACE IS SOMEHOW CONNECTED TO IF FRAME ONE EXISTS OR NOT (Fix)
             disparity_map = stereo_system.apply_weighted_median_filter(first_i_frame,disparity_map); // Here i change the format of disparity map
         }
 
-        // Something is different here
+        Mat test2 = stereo_system.process_disparity(disparity_map);
+        imshow("post gap filling",test2);
+        waitKey(0);
 
         // Apply speckle filter
         if(apply_speckle_filter == true){
@@ -1723,9 +1719,17 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
             filterSpeckles(disparity_map,INVALID,frame_area*speckle_area_percentage,max_diff);
         }
 
+        Mat test3 = stereo_system.process_disparity(disparity_map);
+        imshow("post speckle filter",test3);
+        waitKey(0);
+
         if(apply_horizontal_fill == true){
             disparity_map = stereo_system.fill_disparity_holes(disparity_map);
         }
+
+        Mat test4 = stereo_system.process_disparity(disparity_map);
+        imshow("post horizontal fill",test4);
+        waitKey(0);
 
         // Get depth map based
         Mat depth_map;

@@ -39,6 +39,9 @@ static const int DRAW_SINGLE_CONTOUR = 0;
 
 static const float MIN_DEPTH = 0.0;
 
+static const int CLEAN_METHOD_MORPH = 0;
+static const int CLEAN_METHOD_LINE = 1;
+
 
 // -- Class --
 class detecting
@@ -74,6 +77,8 @@ public:
     std::vector<cv::Mat> clean_contour_masks(std::vector<cv::Mat> masks);
 
     cv::Mat clean_contour_mask(cv::Mat mask);
+
+    cv::Mat clean_mask_with_lines(cv::Mat mask);
 
     cv::Mat get_bounding_rectangle(std::vector<cv::Point> contour, cv::Size frame_size);
 
@@ -270,6 +275,8 @@ private:
     bool morph_initial_masks = true;
 
     bool clean_final_masks = true;
+
+    int clean_method = CLEAN_METHOD_MORPH;
 
     bool dilate_depth_validation = true;
 

@@ -714,7 +714,7 @@ Mat stereo::fill_disparity_holes(Mat disparity_map){
 Mat stereo::apply_weighted_median_filter(Mat frame, Mat disparity_map){
     Mat filled_disparity_map = disparity_map.clone();
     try{
-        int kernel_radius = 11; // temp
+        int kernel_radius = 31; // temp
 
         // Convert to float
         Mat temp_disp;
@@ -750,7 +750,7 @@ Mat stereo::apply_weighted_median_filter(Mat frame, Mat disparity_map){
         Mat gray_frame;
         cvtColor(frame,gray_frame,COLOR_BGR2GRAY);
 
-        ximgproc::weightedMedianFilter(gray_frame,temp_disp,filled_disparity_map,kernel_radius,20,cv::ximgproc::WMFWeightType::WMF_EXP);
+        ximgproc::weightedMedianFilter(gray_frame,temp_disp,filled_disparity_map,kernel_radius,25.5,cv::ximgproc::WMFWeightType::WMF_EXP);
 
         // Convert back to signed
         if(disparity_map.type() == CV_16SC1){
