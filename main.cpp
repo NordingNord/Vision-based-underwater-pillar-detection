@@ -210,7 +210,7 @@ int main(){
 
     // -- Identify possible obstacles --
     int edge_detection = LINE_MODE_CANNY; // Method used for creating an edge image
-    bool blur = true; // If blur should be applied before edge detection
+    bool blur = false; // If blur should be applied before edge detection
     bool equalize = false; // If histogram equalization should be conducted before edge detection
     int equalize_alg = EQUALIZE_CLAHE; // Algorithm used for histogram equalization
     bool close = true; // If edges should be closed

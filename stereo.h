@@ -148,6 +148,11 @@ private:
     // -- Test gab gab --
     cv::Mat Q_test;
 
+    // -- weighed median --
+    int weighted_median_kernel = 21;
+    double weighted_median_sigma = 25.5;
+    int weight_type = cv::ximgproc::WMFWeightType::WMF_EXP;
+
 };
 
 #endif // STEREO_H

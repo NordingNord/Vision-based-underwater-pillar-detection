@@ -108,3 +108,22 @@ double calculator::calculate_angle(Point start, Point end){
     }
     return angle;
 }
+
+// -- Methods for determining thresholds --
+vector<double> calculator::get_canny_thresholds(Mat frame){
+    vector<double> thresholds;
+    try{
+        // Get otsu threshold
+        Mat temp;
+        double upper_threshold = threshold(frame,temp,0,255,THRESH_BINARY | THRESH_OTSU);
+        double lower_threshold = upper_threshold *0.5;
+
+        thresholds = {lower_threshold,upper_threshold};
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return thresholds;
+}
+

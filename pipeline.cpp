@@ -1174,9 +1174,9 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             frame_index++;
             cout << "Frame: " << frame_index << endl;
 
-            if(frame_index < 9){
-                continue;
-            }
+//            if(frame_index < 6){ // 9
+//                continue;
+//            }
 
             // Break if no more frames any of the videos
             if(first_frame.empty() || second_frame.empty()){
@@ -1201,9 +1201,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Preprocessing completed in " << duration.count() << " ms." << endl;
 
-            // Everything is the same here
-
-            // Get disparity and depth maps (Improvements need to be made)
+            // Get disparity and depth maps
             start = chrono::high_resolution_clock::now();
             vector<Mat> disparity_and_depth = get_disparity_and_depth(first_frame,second_frame); // something goes wrong in here
             Mat disparity_map = disparity_and_depth.at(0);
@@ -1213,10 +1211,13 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Disparity and depth found in " << duration.count() << " ms." << endl;
 
+            imshow("frame", first_frame);
+            imshow("org disparity", disparity_and_depth.at(2));
+            imshow("The disparity map",disparity_map);
+            waitKey(0);
+
             // Detect possible obstacles (Improvements need to be made)
             start = chrono::high_resolution_clock::now();
-
-            // Disparity map somehow looks different if one skips the first index
 
             vector<obstacle> obstacles = detector.get_possible_obstacles(disparity_map,depth);
 
@@ -1237,7 +1238,7 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             // Save masks for later visualization
             vector<Mat> danger_zones = converter.get_obstacle_masks(obstacles);
 
-            // something is different here
+            // ## CHECKED variables until this point ##
 
             // Filter obstacles
             start = chrono::high_resolution_clock::now();
@@ -1248,52 +1249,52 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
             duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
             cout << "Filtered obstacles in  " << duration.count() << " ms." << endl;
 
-//            // Identify obstacles
-//            start = chrono::high_resolution_clock::now();
+            // Identify obstacles
+            start = chrono::high_resolution_clock::now();
 
-//            obstacles = detector.detect_type(obstacles,depth);
+            obstacles = detector.detect_type(obstacles,depth);
 
-//            stop = chrono::high_resolution_clock::now();
-//            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-//            cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
+            stop = chrono::high_resolution_clock::now();
+            duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            cout << "Identified obstacles in  " << duration.count() << " ms." << endl;
 
-//            // If desired. Patch gap
-//            if(patch_gaps == true && obstacles.size() < last_obstacles.size()){
-//                start = chrono::high_resolution_clock::now();
-//                // This might be bad
-//                if(last_first_frame.size() != first_frame.size()){
-//                    int width = min(last_first_frame.size().width, first_frame.size().width);
-//                    int height = min(last_first_frame.size().height, first_frame.size().height);
+            // If desired. Patch gap
+            if(patch_gaps == true && obstacles.size() < last_obstacles.size()){
+                start = chrono::high_resolution_clock::now();
 
-//                    if(last_first_frame.size().width > width || last_first_frame.size().height > height){
-//                        converter.crop_image(last_first_frame,Size(width,height),stereo_system.get_crop_status());
-//                        last_obstacles = converter.crop_obstacles(last_obstacles,Size(width,height),stereo_system.get_crop_status());
-//                    }
-//                    else{
-//                        converter.crop_image(first_frame,Size(width,height),cropped_last_from_top);
-//                        obstacles = converter.crop_obstacles(obstacles,Size(width,height),cropped_last_from_top);
-//                    }
-//                }
+                if(last_first_frame.size() != first_frame.size()){
+                    int width = min(last_first_frame.size().width, first_frame.size().width);
+                    int height = min(last_first_frame.size().height, first_frame.size().height);
 
-//                vector<obstacle> obstacles_temp = patch_obstacle_gap(obstacles,last_obstacles,first_frame,last_first_frame);
+                    if(last_first_frame.size().width > width || last_first_frame.size().height > height){
+                        converter.crop_image(last_first_frame,Size(width,height),stereo_system.get_crop_status());
+                        last_obstacles = converter.crop_obstacles(last_obstacles,Size(width,height),stereo_system.get_crop_status());
+                    }
+                    else{
+                        converter.crop_image(first_frame,Size(width,height),cropped_last_from_top);
+                        obstacles = converter.crop_obstacles(obstacles,Size(width,height),cropped_last_from_top);
+                    }
+                }
 
-//                // Update last info, without keeping the moved obstacles
-//                last_first_frame = first_frame;
-//                last_obstacles = obstacles;
-//                cropped_last_from_top = stereo_system.get_crop_status();
-//                obstacles = obstacles_temp;
+                vector<obstacle> obstacles_temp = patch_obstacle_gap(obstacles,last_obstacles,first_frame,last_first_frame);
+
+                // Update last info, without keeping the moved obstacles
+                last_first_frame = first_frame;
+                last_obstacles = obstacles;
+                cropped_last_from_top = stereo_system.get_crop_status();
+                obstacles = obstacles_temp;
 
 
-//                stop = chrono::high_resolution_clock::now();
-//                duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-//                cout << "Gap patched in  " << duration.count() << " ms." << endl;
-//            }
-//            else{
-//                // Update last info
-//                last_first_frame = first_frame.clone();
-//                last_obstacles = obstacles;
-//                cropped_last_from_top = stereo_system.get_crop_status();
-//            }
+                stop = chrono::high_resolution_clock::now();
+                duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+                cout << "Gap patched in  " << duration.count() << " ms." << endl;
+            }
+            else{
+                // Update last info
+                last_first_frame = first_frame.clone();
+                last_obstacles = obstacles;
+                cropped_last_from_top = stereo_system.get_crop_status();
+            }
 
             // JUST TEST VISUALIZATION FROM HERE ON OUT
 
@@ -1302,7 +1303,13 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
 
             // Convert obstacles to original size
             for(int i = 0; i < obstacles.size(); i++){
-                obstacles.at(i).mask = converter.expand_to_original_size(obstacles.at(i).mask,dimensions,BORDER_REPLICATE);
+                if(mask_mode == true){
+                    obstacles.at(i) = visualizer.expand_mask(obstacles.at(i),dimensions);
+
+                }
+                else{
+                    obstacles.at(i).mask = converter.expand_to_original_size(obstacles.at(i).mask,dimensions,BORDER_REPLICATE);
+                }
             }
 
             // Convert danger zones to original size
@@ -1687,9 +1694,9 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
             disparity_map = stereo_system.get_disparity(first_i_frame,second_i_frame);
         }
 
-        Mat test = stereo_system.process_disparity(disparity_map);
-        imshow("Initial disparity map",test);
-        waitKey(0);
+//        Mat test = stereo_system.process_disparity(disparity_map);
+//        imshow("Initial disparity map",test);
+//        waitKey(0);
 
         // Compute left right consistensy check
         if(apply_consistensy_check == true){
@@ -1707,9 +1714,9 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
             disparity_map = stereo_system.apply_weighted_median_filter(first_i_frame,disparity_map); // Here i change the format of disparity map
         }
 
-        Mat test2 = stereo_system.process_disparity(disparity_map);
-        imshow("post gap filling",test2);
-        waitKey(0);
+//        Mat test2 = stereo_system.process_disparity(disparity_map);
+//        imshow("post gap filling",test2);
+//        waitKey(0);
 
         // Apply speckle filter
         if(apply_speckle_filter == true){
@@ -1719,17 +1726,17 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
             filterSpeckles(disparity_map,INVALID,frame_area*speckle_area_percentage,max_diff);
         }
 
-        Mat test3 = stereo_system.process_disparity(disparity_map);
-        imshow("post speckle filter",test3);
-        waitKey(0);
+//        Mat test3 = stereo_system.process_disparity(disparity_map);
+//        imshow("post speckle filter",test3);
+//        waitKey(0);
 
         if(apply_horizontal_fill == true){
             disparity_map = stereo_system.fill_disparity_holes(disparity_map);
         }
 
-        Mat test4 = stereo_system.process_disparity(disparity_map);
-        imshow("post horizontal fill",test4);
-        waitKey(0);
+//        Mat test4 = stereo_system.process_disparity(disparity_map);
+//        imshow("post horizontal fill",test4);
+//        waitKey(0);
 
         // Get depth map based
         Mat depth_map;
@@ -1744,6 +1751,16 @@ vector<Mat> pipeline::get_disparity_and_depth(Mat first_i_frame, Mat second_i_fr
         if(disparity_map.type() != CV_8UC1){
             disparity_map = stereo_system.process_disparity(disparity_map);
             disparity_map_org = stereo_system.process_disparity(disparity_map_org);
+        }
+
+        // Set background using otzu
+        if(set_background == true){
+
+            vector<double> thresholds = calculations.get_canny_thresholds(disparity_map);
+
+            Mat background = disparity_map <= uchar(floor(thresholds.at(0)));
+
+            disparity_map.setTo(uchar(floor(thresholds.at(0))),background);
         }
 
         // Prepare output
@@ -1780,6 +1797,32 @@ vector<obstacle> pipeline::patch_obstacle_gap(vector<obstacle> current_obstacles
 
             // Use optical flow results to move obstacles
             patched_obstacles = detector.patch_detection_gap(old_obstacles,movement,converter.keypoints_to_points(old_keypoints));
+
+            // If some obstacles was found overwride the ones that have been found
+            vector<obstacle> temp_obstacles = patched_obstacles;
+            if(current_obstacles.size() > 0){
+                for(int i = 0; i < current_obstacles.size(); i++){
+                    Mat current_mask = current_obstacles.at(i).mask;
+                    int best_overlap = 0;
+                    int best_index = -1;
+                    for(int j = 0; j < temp_obstacles.size(); j++){
+                        // Find patched obstacle with most similar overlap
+                        Mat overlap = current_mask & temp_obstacles.at(j).mask;
+                        int overlap_count = countNonZero(overlap);
+                        if(overlap_count > best_overlap){
+                            best_overlap = overlap_count;
+                            best_index = j;
+                        }
+                    } // overwride if close
+                    if(best_overlap > countNonZero(current_mask)*0.5 && best_index >= 0){
+                        patched_obstacles.at(best_index) = current_obstacles.at(i);
+                        temp_obstacles.erase(temp_obstacles.begin()+best_index);
+                    }
+                    else{ // else add so we dont lose the possibly new obstacle
+                        patched_obstacles.push_back(current_obstacles.at(i));
+                    }
+                }
+            }
         }
     }
     catch(const exception& error){

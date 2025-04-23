@@ -31,6 +31,9 @@ public:
     // -- Methods for calculating aspects of lines --
     double calculate_angle(cv::Point start, cv::Point end);
 
+    // -- Methods for determining thresholds --
+    std::vector<double> get_canny_thresholds(cv::Mat frame);
+
 
 private:
 };

@@ -359,3 +359,140 @@ Mat visualization::show_line_borders(vector<Vec4i> horizontal_lines, vector<Vec4
     }
     return image;
 }
+
+// -- Methods for expanding masks --
+obstacle visualization::expand_mask(obstacle input_obstacle, Size original_size){ // only focuses on left and right, due to left being removed while determining disparity map and top being removed if rectification is wrong
+    obstacle expanded_obstacle = input_obstacle;
+    try{
+        // Get padding
+        int pad_up, pad_left;
+        if(input_obstacle.mask.rows <= original_size.height){
+            pad_up = original_size.height-input_obstacle.mask.rows;
+        }
+        else{
+            throw runtime_error("New map height is somehow bigger than original.");
+        }
+
+        if(input_obstacle.mask.cols <= original_size.width){
+            pad_left = original_size.width-input_obstacle.mask.cols;
+        }
+        else{
+            throw runtime_error("New map width is somehow bigger than original.");
+        }
+
+        // Locate edges in need of expanding
+        Mat left = Mat::zeros(input_obstacle.mask.size(),CV_8U);
+        Mat up = Mat::zeros(input_obstacle.mask.size(),CV_8U);
+
+        line(left,Point(0,0),Point(0,input_obstacle.mask.rows-1),255,1);
+        line(up,Point(0,0),Point(input_obstacle.mask.cols-1,0),255,1);
+
+        left = left & input_obstacle.mask;
+        up = up & input_obstacle.mask;
+
+        Mat expanded_frame = input_obstacle.mask.clone();
+
+        // If left expand left
+        if(countNonZero(left) > 0){
+            // Get min and max row
+            vector<Point> locations;
+            findNonZero(left,locations);
+
+            int min_row = 0;
+            int max_row = 0;
+            for(int i = 0; i < locations.size(); i++){
+                if(i == 0 || locations.at(i).y > max_row){
+                    max_row = locations.at(i).y;
+                }
+                if(i == 0 || locations.at(i).y < min_row){
+                    min_row = locations.at(i).y;
+                }
+            }
+
+            Point point_1 = {0,min_row};
+            Point point_2 = {0,max_row};
+
+            // use angle to get new points
+            int new_x_1 = 2*pad_left*-cos(input_obstacle.original_angle);
+            int new_y_1 = min_row + 2*pad_left*-sin(input_obstacle.original_angle);
+
+            int new_x_2 = 2*pad_left*-cos(input_obstacle.original_angle);
+            int new_y_2 = max_row + 2*pad_left*-sin(input_obstacle.original_angle);
+
+            Point point_3 = {new_x_2,new_y_2};
+            Point point_4 = {new_x_1,new_y_1};
+
+            // Expand frame
+            copyMakeBorder(expanded_frame,expanded_frame,0,0,pad_left,0,BORDER_CONSTANT,0);
+
+            // Shift points
+            point_1.x = point_1.x+pad_left;
+            point_2.x = point_2.x+pad_left;
+            point_3.x = point_3.x+pad_left;
+            point_4.x = point_4.x+pad_left;
+
+            // Draw rectangle
+            vector<Point> points = {point_1,point_2,point_3,point_4};
+            fillConvexPoly(expanded_frame,points,255);
+        }
+
+        // If up expand up
+        if(countNonZero(up) > 0){
+            // Get min and max col
+            vector<Point> locations;
+            findNonZero(up,locations);
+
+            int min_col = 0;
+            int max_col = 0;
+            for(int i = 0; i < locations.size(); i++){
+                if(i == 0 || locations.at(i).x > max_col){
+                    max_col = locations.at(i).x;
+                }
+                if(i == 0 || locations.at(i).x < min_col){
+                    min_col = locations.at(i).x;
+                }
+            }
+
+            Point point_1 = {min_col,0};
+            Point point_2 = {max_col,0};
+
+            // use angle to get new points
+            int new_x_1 = min_col + 2*pad_up*-cos(input_obstacle.original_angle);
+            int new_y_1 = 2*pad_up*-sin(input_obstacle.original_angle);
+
+            int new_x_2 = max_col + 2*pad_up*-cos(input_obstacle.original_angle);
+            int new_y_2 = 2*pad_up*-sin(input_obstacle.original_angle);
+
+            Point point_3 = {new_x_2,new_y_2};
+            Point point_4 = {new_x_1,new_y_1};
+
+            // Expand frame
+            copyMakeBorder(expanded_frame,expanded_frame,pad_up,0,0,0,BORDER_CONSTANT,0);
+
+            // Shift points
+            point_1.y = point_1.y+pad_up;
+            point_2.y = point_2.y+pad_up;
+            point_3.y = point_3.y+pad_up;
+            point_4.y = point_4.y+pad_up;
+
+            // Draw rectangle
+            vector<Point> points = {point_1,point_2,point_3,point_4};
+            fillConvexPoly(expanded_frame,points,255);
+        }
+
+        // expand frame is size does not match
+        if(expanded_frame.cols != original_size.width){
+            copyMakeBorder(expanded_frame,expanded_frame,0,0,pad_left,0,BORDER_CONSTANT,0);
+        }
+        if(expanded_frame.rows != original_size.height){
+            copyMakeBorder(expanded_frame,expanded_frame,pad_up,0,0,0,BORDER_CONSTANT,0);
+        }
+
+        expanded_obstacle.mask = expanded_frame;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return expanded_obstacle;
+}

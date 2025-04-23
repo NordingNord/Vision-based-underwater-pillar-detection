@@ -47,6 +47,9 @@ public:
     // -- Methods for visualizing lines --
     cv::Mat show_line_borders(std::vector<cv::Vec4i> horizontal_lines, std::vector<cv::Vec4i> vertical_lines, cv::Mat mask);
 
+    // -- Methods for expanding masks --
+    obstacle expand_mask(obstacle input_obstacle,cv::Size original_size);
+
 private:
 
 };

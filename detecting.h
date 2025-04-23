@@ -40,7 +40,8 @@ static const int DRAW_SINGLE_CONTOUR = 0;
 static const float MIN_DEPTH = 0.0;
 
 static const int CLEAN_METHOD_MORPH = 0;
-static const int CLEAN_METHOD_LINE = 1;
+static const int CLEAN_METHOD_MEDIAN = 1;
+static const int CLEAN_METHOD_CONVEX = 2;
 
 
 // -- Class --
@@ -260,7 +261,7 @@ private:
 
 
     // Pipeline variables
-    int line_mode = LINE_MODE_MORPH;
+    int line_mode = LINE_MODE_CANNY;
 
     bool apply_blur = true;
 
@@ -276,7 +277,7 @@ private:
 
     bool clean_final_masks = true;
 
-    int clean_method = CLEAN_METHOD_MORPH;
+    int clean_method = CLEAN_METHOD_MEDIAN;
 
     bool dilate_depth_validation = true;
 
@@ -301,6 +302,11 @@ private:
 
     // Bounding variables
     int dilate_iterations = 10;
+
+    bool get_threshold = true; // desired true
+
+    int clean_median_size = 31;
+
 
 };
 

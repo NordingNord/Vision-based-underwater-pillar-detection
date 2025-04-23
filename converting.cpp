@@ -287,6 +287,7 @@ cv::Mat converting::expand_to_original_size(cv::Mat frame, cv::Size original_siz
         else{
             throw runtime_error("New map height is somehow bigger than original.");
         }
+
         if(work_frame.cols <= original_size.width){
             pad_left = original_size.width-work_frame.cols;
         }

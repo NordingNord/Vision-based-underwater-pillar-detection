@@ -181,6 +181,8 @@ private:
     bool apply_horizontal_fill = false;
     bool patch_gaps = true;
 
+    bool mask_mode = true;
+    bool set_background = true;
 
 
 };
