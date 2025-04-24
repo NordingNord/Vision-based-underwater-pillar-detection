@@ -20,6 +20,8 @@ public:
     float calculate_euclidean_distance(std::vector<float> first_data, std::vector<float> second_data, std::vector<float> weights = {}); // Using vectors
     float calculate_euclidean_distance(float first_x, float first_y, float second_x, float second_y, std::vector<float> weights = {}); // Using individual x and y values
     float calculate_euclidean_distance(cv::Point2f first_point, cv::Point2f second_point, std::vector<float> weights = {}); // Using point objects
+    double calculate_euclidean_distance(cv::Point first_point, cv::Point second_point); // Using points and returning float
+
 
     // -- Methods for calculating velocity --
     float calculate_velocity(std::vector<cv::Point2f> positions, float fps = 1.0); // With points

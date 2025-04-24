@@ -1229,6 +1229,9 @@ void pipeline::run_disparity_pipeline_test(float resize_ratio){
                 drawContours(tempi,temp,0,WHITE,-1);
                 imshow("CONTOUR",tempi);
                 waitKey(0);
+
+                // test stuff to maybe remove current splitting mechanism
+                vector<Mat> splits = detector.convex_split(tempi);
             }
 
             stop = chrono::high_resolution_clock::now();

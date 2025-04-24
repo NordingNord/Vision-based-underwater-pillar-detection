@@ -147,6 +147,17 @@ public:
 
     std::string rounding_based_type(obstacle obstacle_to_check, cv::Mat depth_map);
 
+    // -- Convex methods --
+    std::vector<cv::Mat> convex_split(cv::Mat mask);
+
+    std::vector<cv::Mat> min_cost_poly_triangulation(cv::Mat mask);
+
+    std::vector<cv::Mat> ear_clipping_triangulation(cv::Mat mask);
+
+    bool check_eartip(std::vector<int> reflex_indexes, std::vector<cv::Point> points, int candidate_index, cv::Mat mask);
+
+
+
 
 
 

@@ -442,7 +442,6 @@ Mat detecting::clean_contour_mask(Mat mask){
 
             // Conntinue removing defects
             while(true){
-                cout << "looping lui" << endl;
                 vector<int> defect_indexes;
                 // Go through all defects
                 for(int i = 0; i < defects.size(); i++){
@@ -3384,13 +3383,427 @@ string detecting::rounding_based_type(obstacle obstacle_to_check, Mat depth_map)
 }
 
 
+// -- Convex methods --
+vector<Mat> detecting::convex_split(Mat mask){
+    vector<Mat> split_masks;
+    try{
+        // Get contour
+        vector<Point> the_contour = get_biggest_contour(mask);
+
+        // Get convex hull indexes
+        vector<int> convex_hull_indexes;
+        convexHull(the_contour,convex_hull_indexes);
+
+        // Get convex hull points
+        vector<Point> convex_hull;
+        convexHull(the_contour,convex_hull, false);
+
+        // Find defects
+        vector<Vec4i> defects;
+        convexityDefects(the_contour,convex_hull_indexes,defects);
+
+        // Find deepest defect
+        float largest_depth = 0.0;
+        int largest_index = 0;
+        for(int i = 0; i < defects.size(); i++){
+            Vec4i current_defect = defects.at(i);
+            // read depth
+            float depth = float(current_defect[3])/256.0;
+            // Check if largest depth
+            if(depth > largest_depth){
+                largest_depth = depth;
+                largest_index = current_defect[2]; // index of farthest point
+            }
+        }
+
+        // Get point
+        Point largest_defect = the_contour.at(largest_index);
+
+        // Drawing for debugging
+        Mat test_image = mask.clone();
+        cvtColor(test_image,test_image,COLOR_GRAY2BGR);
+        vector<vector<Point>> temp_vec = {convex_hull};
+        Scalar color = Scalar(255,0,0);
+        drawContours(test_image,temp_vec,0,color);
+
+        for(int i = 0; i < defects.size(); i++){
+            Vec4i current_defect = defects.at(i);
+            int index = current_defect[2];
+            Point defect = the_contour.at(index);
+            circle(test_image,defect,3,{0,255,0},-1);
+
+            float depth = float(current_defect[3])/256.0;
+
+            if(index == largest_index){
+                cout << "Accepted depth of: " << depth << endl;
+            }
+            else{
+                cout << "Rejected depth of: " << depth << endl;
+            }
+        }
+
+        circle(test_image,largest_defect,3,{0,0,255},-1);
+
+
+        imshow("the split point",test_image);
+        waitKey(0);
+
+        vector<Mat> testo = ear_clipping_triangulation(mask);
+
+        visualization visualizer;
+        vector<Scalar> colors = visualizer.get_colors(testo.size());
+
+        Mat triangles = Mat::zeros(mask.size(), CV_8UC3);
+        for(int i = 0; i < testo.size(); i++){
+            vector<Point> triangle = get_biggest_contour(testo.at(i));
+            vector<vector<Point>> temp = {triangle};
+            drawContours(triangles,temp,0,colors.at(i),DRAW_WIDTH_INFILL);
+        }
+        imshow("triangles", triangles);
+        waitKey(0);
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return split_masks;
+}
+
+vector<Mat> detecting::min_cost_poly_triangulation(Mat mask){
+    vector<Mat> triangles;
+    try{
+        // Get contour points
+        vector<Point> poly = get_biggest_contour(mask);
+
+        // Retrieve number of points
+        int number_of_points = poly.size();
+
+        // Ensure that there are at least three points
+        if(number_of_points < 3){
+            throw runtime_error("Not enough points to perform polygon triangulation.");
+        }
+
+        // Create array to store cost values [i][j][cost and vertix index]
+        double cost_array[number_of_points][number_of_points][2];
+
+        // Find all costs
+        for(int gap = 0; gap < number_of_points; gap++){ // gap between i and j
+            for(int i = 0, j = gap; j < number_of_points; i++, j++){
+                // Ensure that points are not next to eachother
+                if(j < i+2){
+                    cost_array[i][j][0] = 0.0;
+                }
+                else{
+                    // Find min cost
+                    cost_array[i][j][0] = std::numeric_limits<double>::max();
+
+                    for(int k = i+1; k < j; k++){
+                        // Calculate distance sum
+                        double distance_sum = calculations.calculate_euclidean_distance(poly.at(i),poly.at(j)) + calculations.calculate_euclidean_distance(poly.at(j),poly.at(k)) + calculations.calculate_euclidean_distance(poly.at(k),poly.at(i));
+                        // Calculate cost
+                        double cost = cost_array[i][k][0]+cost_array[k][j][0]+distance_sum;
+                        // Check if lower
+                        if(cost_array[i][j][0] > cost){
+                            cost_array[i][j][0] = cost;
+                            cost_array[i][j][1] = double(k);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return triangles;
+}
+
+
+vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
+    vector<Mat> triangles;
+    try{
+        // Get all vertexes (corners so just the contour)
+        vector<Point> poly = get_biggest_contour(mask);
+
+        // Find hull points
+        vector<int> convex_hull_indexes;
+        convexHull(poly,convex_hull_indexes);
+        reverse(convex_hull_indexes.begin(),convex_hull_indexes.end());
+
+
+        // Determine reflex vertexes (all not hull vertexes)
+        vector<int> reflex_indexes;
+        int next_hull_index = 0;
+        int current_hull_index = convex_hull_indexes.at(next_hull_index);
+
+        for(int i = 0; i < poly.size(); i++){
+            cout << poly.at(i) << endl;
+            if(current_hull_index != i){
+                reflex_indexes.push_back(i);
+            }
+            else{
+                if(next_hull_index < convex_hull_indexes.size()-1){
+                    next_hull_index++;
+                    current_hull_index = convex_hull_indexes.at(next_hull_index);
+                }
+            }
+        }
+
+//        cout << poly.size() << ", " << reflex_indexes.size() << ", " << convex_hull_indexes.size() << endl;
+
+//        // draw all hulls and reflexes
+//        Mat drawing = Mat::zeros(mask.size(),CV_8UC3);
+
+//        for(int i = 0; i < reflex_indexes.size(); i++){
+//            circle(drawing,poly.at(reflex_indexes.at(i)),3,{255,0,0},-1);
+//        }
+
+//        for(int i = 0; i < convex_hull_indexes.size(); i++){
+//            circle(drawing,poly.at(convex_hull_indexes.at(i)),3,{0,0,255},-1);
+//        }
+
+//        imshow("The points", drawing);
+//        waitKey(0);
+
+        // Determine ear set
+        vector<int> ear_indexes;
+        for(int i = 0; i < convex_hull_indexes.size(); i++){
+            // get potential ear tip index
+            int index = convex_hull_indexes.at(i);
+
+            bool status = check_eartip(reflex_indexes,poly,index,mask);
+
+            if(status == true){
+                ear_indexes.push_back(index);
+                cout << index << endl;
+            }
+        }
+
+        // Perform n-3 steps
+//        vector<Point> temp_poly = poly;
+        for(int i = 0; i < poly.size()-3; i++){
+            cout << "in the begining with sizes: " << endl;
+            if(ear_indexes.empty()){
+                throw runtime_error("There is no ears in remaining polygon.");
+            }
+
+            // Take first ear tip
+            int ear_index = ear_indexes.at(0);
+
+            // Get prior and next point
+            int prior_index, next_index;
+            if(ear_index == 0){
+                prior_index = poly.size()-1; // take last index if begining of list
+            }
+            else{
+                prior_index = ear_index-1;
+            }
+
+            if(ear_index == poly.size()-1){
+                next_index = 0;
+            }
+            else{
+                next_index = ear_index+1;
+            }
+
+            cout << prior_index << ", " << ear_index << ", " << next_index << endl;
+
+            // Save as triangle
+            Point ear = poly.at(ear_index);
+            Point left = poly.at(prior_index);
+            Point right = poly.at(next_index);
+
+            Mat triangle = Mat::zeros(mask.size(),CV_8U);
+            vector<vector<Point>> temp_vec = {{left,ear,right}};
+            drawContours(triangle,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+            triangles.push_back(triangle);
+
+            // Remove ear from ear and convex indexes
+            ear_indexes.erase(find(ear_indexes.begin(),ear_indexes.end(),ear_index));
+            convex_hull_indexes.erase(find(convex_hull_indexes.begin(), convex_hull_indexes.end(),ear_index));
+//            temp_poly.erase(find(temp_poly.begin(),temp_poly.end(),ear));
+
+            // Check if prior and next are now convex
+//            vector<Point> temp_convex_hull;
+//            convexHull(temp_poly,temp_convex_hull);
+//            cout << "huh" << endl;
+//            if(count(temp_convex_hull.begin(),temp_convex_hull.end(),left) > 0){
+//                // Check if it is an ear tip
+//                cout << "check" << endl;
+//                bool status = check_eartip(reflex_indexes,temp_poly,prior_index,mask);
+//                cout << "check done" << endl;
+
+//                if(status == true){
+//                    cout << "Ear status good" << endl;
+//                    ear_indexes.push_back(prior_index);
+//                }
+
+//            }
+
+//            if(count(temp_convex_hull.begin(),temp_convex_hull.end(),right) > 0){
+//                // Check if it is an ear tip
+//                bool status = check_eartip(reflex_indexes,temp_poly,next_index,mask);
+
+//                if(status == true){
+//                    cout << "Ear status good" << endl;
+//                    ear_indexes.push_back(next_index);
+//                }
+//            }
+
+
+            // Get new neighbors
+            int left_prior_index, right_next_index;
+            if(prior_index == 0){
+                left_prior_index = poly.size()-1; // take last index if begining of list
+            }
+            else{
+                left_prior_index = prior_index-1;
+            }
+
+            if(next_index == poly.size()-1){
+                right_next_index = 0;
+            }
+            else{
+                right_next_index = next_index+1;
+            }
+
+
+            // Calculate angle in the triangle left prior -> prior -> next
+            double angle = atan2(poly.at(next_index).y-poly.at(left_prior_index).y, poly.at(next_index).x-poly.at(left_prior_index).x) - atan2(poly.at(prior_index).y-poly.at(left_prior_index).y, poly.at(prior_index).x-poly.at(left_prior_index).x);
+
+//            cout << poly.at(left_prior_index) << ", " << poly.at(prior_index) << ", " << poly.at(next_index) << endl;
+//            double dist_left_to_prior = calculations.calculate_euclidean_distance(poly.at(left_prior_index),poly.at(prior_index));
+//            double dist_left_to_next = calculations.calculate_euclidean_distance(poly.at(left_prior_index),poly.at(next_index));
+//            double dist_prior_to_next = calculations.calculate_euclidean_distance(poly.at(prior_index),poly.at(next_index));
+//            cout << dist_left_to_prior << ", " << dist_left_to_next << ", " << dist_prior_to_next << endl;
+
+//            // the angle gets weird
+//            double dist_squared_sum = dist_left_to_prior*dist_left_to_prior + dist_left_to_next*dist_left_to_next + dist_prior_to_next*dist_prior_to_next;
+//            double denominator = 2*dist_left_to_prior*dist_left_to_next;
+//            double angle = acos(dist_squared_sum/denominator);
+
+            // If smaller than 180 degrees remove prior point from reflex and add it to convex
+//            cout << "sum: " << dist_squared_sum << endl;
+//            cout << "denom: " << denominator << endl;
+
+            cout << "prior angle: " << angle*180/M_PI << endl;
+            if(angle*180/M_PI <  180.0){
+                cout << "Angle good" << endl;
+                reflex_indexes.erase(find(reflex_indexes.begin(),reflex_indexes.end(),prior_index));
+                if(count(convex_hull_indexes.begin(),convex_hull_indexes.end(),prior_index) == 0){
+                    convex_hull_indexes.push_back(prior_index);
+                }
+                // Check if it is an ear tip
+                bool status = check_eartip(reflex_indexes,poly,prior_index,mask);
+
+                if(status == true){
+                    cout << "Ear status good" << endl;
+                    ear_indexes.push_back(prior_index);
+                }
+            }
+
+//            // Calculate angle from prior -> next -> right next
+//            double dist_prior_to_right = calculations.calculate_euclidean_distance(poly.at(prior_index),poly.at(right_next_index));
+//            double dist_next_to_right = calculations.calculate_euclidean_distance(poly.at(next_index),poly.at(right_next_index));
+
+//            dist_squared_sum = dist_prior_to_next*dist_prior_to_next + dist_prior_to_right*dist_prior_to_right + dist_next_to_right * dist_next_to_right;
+
+//            denominator = 2*dist_prior_to_next*dist_prior_to_right;
+//            angle = acos(dist_squared_sum/denominator);
+            angle = atan2(poly.at(right_next_index).y-poly.at(prior_index).y, poly.at(right_next_index).x-poly.at(prior_index).x) - atan2(poly.at(next_index).y-poly.at(prior_index).y, poly.at(next_index).x-poly.at(prior_index).x);
+
+
+            // If smaller than 180 degrees remove prior point from reflex and add it to convex
+            cout << "next angle: " << angle*180/M_PI << endl;
+            if(angle*180/M_PI <  180.0){
+                cout << "Angle good" << endl;
+                reflex_indexes.erase(find(reflex_indexes.begin(),reflex_indexes.end(),next_index));
+
+                if(count(convex_hull_indexes.begin(),convex_hull_indexes.end(),next_index) == 0){
+                    convex_hull_indexes.push_back(next_index);
+                }
+
+                // Check if it is an ear tip
+                bool status = check_eartip(reflex_indexes,poly,next_index,mask);
+
+                if(status == true){
+                    cout << "Ear status good" << endl;
+                    ear_indexes.push_back(next_index);
+                }
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return triangles;
+}
+
+
+bool detecting::check_eartip(vector<int> reflex_indexes, vector<Point> points, int candidate_index, Mat mask){
+    bool status = true;
+    try{
+        // Get points of possible ears
+        Point candidate = points.at(candidate_index);
+
+        Point prior_point, next_point;
+        if(candidate_index == 0){
+            prior_point = points.at(points.size()-1); // take last index if begining of list
+        }
+        else{
+            prior_point = points.at(candidate_index-1);
+        }
+
+        if(candidate_index == points.size()-1){
+            next_point = points.at(0); // Take first point of we are in the end of the list
+        }
+        else{
+            next_point = points.at(candidate_index+1);
+        }
+
+        // draw triangle
+        Mat triangle_mask = Mat::zeros(mask.size(), CV_8U);
+        vector<vector<Point>> triangle_vector = {{prior_point,candidate,next_point}};
+        drawContours(triangle_mask,triangle_vector,0,WHITE,DRAW_WIDTH_INFILL);
 
 
 
+//        // and for debuggin
+//        cout << prior_point << ", " << hull_point << ", " << next_point << endl;
+//        Mat debug = drawing.clone();
+//        line(debug,prior_point,hull_point,{0,255,0});
+//        line(debug,hull_point,next_point,{0,255,0});
+//        line(debug,next_point,prior_point,{0,255,0});
+//        circle(debug,prior_point,3,{0,255,0},-1);
+//        circle(debug,hull_point,3,{0,255,0},-1);
+//        circle(debug,next_point,3,{0,255,0},-1);
 
+        // Go through reflexes to check if they are within triangle
+        for(int j = 0; j < reflex_indexes.size(); j++){
+            // get reflex index
+            int reflex_index = reflex_indexes.at(j);
 
+            // Check if within
+            Mat reflex = Mat::zeros(mask.size(),CV_8U);
+            reflex.at<uchar>(points.at(reflex_index)) = 255;
 
+            Mat compare = reflex & triangle_mask;
+            int compare_count = countNonZero(compare);
 
+            if(compare_count > 1){
+                throw runtime_error("The reflex should not be more than one pixel.");
+            }
+            else if(compare_count == 1){
+                status = false;
+                break;
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return status;
+}
 
 
 

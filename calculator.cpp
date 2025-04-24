@@ -68,6 +68,28 @@ float calculator::calculate_euclidean_distance(cv::Point2f first_point, cv::Poin
     return distance;
 }
 
+double calculator::calculate_euclidean_distance(Point first_point, Point second_point){
+    float distance = -1.0;
+    try{
+        // Calculate distance
+        double test = first_point.x-second_point.x;
+        double test_2 = first_point.y-second_point.y;
+
+        cout << first_point.x << " - " << second_point.x << " = " << test <<  endl;
+        cout << first_point.y << " - " << second_point.y << " = " << test_2 << endl;
+        double x_diff_squared = (first_point.x - second_point.x)*(first_point.x - second_point.x);
+        double y_diff_squared = (first_point.y - second_point.y)*(first_point.y - second_point.y);
+
+        cout << "x_diff: " << x_diff_squared << ", y_diff: " << y_diff_squared << endl;
+        distance = sqrt(x_diff_squared+y_diff_squared);
+        cout << "distance: " << distance << endl;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return distance;
+}
 
 // -- Methods for calculating velocity --
 float calculator::calculate_velocity(std::vector<cv::Point2f> positions, float fps){
