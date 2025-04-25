@@ -151,6 +151,12 @@ struct obstacle{
     double original_angle;
 };
 
+// Polygon triangulation information
+struct triangle{
+    cv::Mat mask;
+    std::vector<cv::Point> points;
+};
+
 // Information about a line
 struct line_data{
     cv::Vec4i line;

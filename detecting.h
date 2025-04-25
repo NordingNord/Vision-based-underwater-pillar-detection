@@ -156,7 +156,13 @@ public:
 
     bool check_eartip(std::vector<int> reflex_indexes, std::vector<cv::Point> points, int candidate_index, cv::Mat mask);
 
+    std::vector<triangle> delaunay_triangulation(cv::Mat mask);
 
+    std::vector<triangle> combine_convex_triangles(std::vector<triangle> triangles);
+
+    std::vector<cv::Mat> size_filter_triangles(std::vector<cv::Mat> triangles);
+
+    std::vector<triangle> remove_one_pixel_edges(std::vector<triangle> triangles);
 
 
 

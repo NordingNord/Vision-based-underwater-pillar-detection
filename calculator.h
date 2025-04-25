@@ -8,6 +8,9 @@
 #include <opencv2/opencv.hpp>
 
 // -- Defines --
+static const int COLLINEAR = 0;
+static const int CLOCKWISE = 1;
+static const int COUNTER_CLOCKWISE = 0;
 
 // -- Class --
 class calculator
@@ -35,6 +38,17 @@ public:
 
     // -- Methods for determining thresholds --
     std::vector<double> get_canny_thresholds(cv::Mat frame);
+
+    std::vector<int> get_one_dimension_threshold(std::vector<int> data, int clusters, bool sorted = false);
+
+    // -- Methods for determining orientation -- (https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/)
+    int get_orientation(cv::Point first_point, cv::Point second_point, cv::Point third_point);
+
+    // -- Method for checking if point is on line segment -- (https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/)
+    bool is_on_segment(cv::Point start_of_line, cv::Point point, cv::Point end_of_line);
+
+    // -- Method for checking if lines intersect --
+    bool do_intersect(cv::Point p1, cv::Point p2, cv::Point q1, cv::Point q2);
 
 
 private:

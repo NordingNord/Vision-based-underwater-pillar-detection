@@ -72,17 +72,17 @@ double calculator::calculate_euclidean_distance(Point first_point, Point second_
     float distance = -1.0;
     try{
         // Calculate distance
-        double test = first_point.x-second_point.x;
-        double test_2 = first_point.y-second_point.y;
+//        double test = first_point.x-second_point.x;
+//        double test_2 = first_point.y-second_point.y;
 
-        cout << first_point.x << " - " << second_point.x << " = " << test <<  endl;
-        cout << first_point.y << " - " << second_point.y << " = " << test_2 << endl;
+//        cout << first_point.x << " - " << second_point.x << " = " << test <<  endl;
+//        cout << first_point.y << " - " << second_point.y << " = " << test_2 << endl;
         double x_diff_squared = (first_point.x - second_point.x)*(first_point.x - second_point.x);
         double y_diff_squared = (first_point.y - second_point.y)*(first_point.y - second_point.y);
 
-        cout << "x_diff: " << x_diff_squared << ", y_diff: " << y_diff_squared << endl;
+//        cout << "x_diff: " << x_diff_squared << ", y_diff: " << y_diff_squared << endl;
         distance = sqrt(x_diff_squared+y_diff_squared);
-        cout << "distance: " << distance << endl;
+//        cout << "distance: " << distance << endl;
 
     }
     catch(const exception& error){
@@ -149,3 +149,88 @@ vector<double> calculator::get_canny_thresholds(Mat frame){
     return thresholds;
 }
 
+vector<int> calculator::get_one_dimension_threshold(vector<int> data, int clusters, bool sorted){ // uses Jenks natural breaks
+    vector<int> split_values = {};
+    try{
+        cout << "No done" << endl;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return split_values;
+}
+
+// -- Methods for determining orientation --
+int calculator::get_orientation(Point first_point, Point second_point, Point third_point){
+    int orientation = COLLINEAR;
+    try{
+        int value = (second_point.y-first_point.y) * (third_point.x-second_point.x) - (second_point.x-first_point.x) * (third_point.y-second_point.y);
+
+        if(value > 0){
+            orientation = CLOCKWISE;
+        }
+        else if(value < 0){
+            orientation = COUNTER_CLOCKWISE;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return orientation;
+}
+
+
+// -- Method for checking if point is on line segment -- (https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/)
+bool calculator::is_on_segment(Point start_of_line, Point point, Point end_of_line){
+    bool on_segment = false;
+    try{
+        bool first_check = point.x <= max(start_of_line.x,end_of_line.x);
+        bool second_check = point.x >= min(start_of_line.x,end_of_line.x);
+
+        bool third_check = point.y <= max(start_of_line.y,end_of_line.y);
+        bool fourth_check = point.y >= min(start_of_line.y,end_of_line.y);
+
+        if(first_check && second_check && third_check && fourth_check){
+            on_segment = true;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return on_segment;
+}
+
+
+// -- Method for checking if lines intersect --
+bool calculator::do_intersect(cv::Point p1, cv::Point p2, cv::Point q1, cv::Point q2){
+    bool lines_intersect = false;
+    try{
+
+        // Check for intersection by checking orientation of all combinations
+        int first_orientation = get_orientation(p1,q1,p2);
+        int second_orientation = get_orientation(p1,q1,q2);
+        int third_orientation = get_orientation(p2,q2,p1);
+        int fourth_orientation = get_orientation(p2,q2,q1);
+
+        if(first_orientation != second_orientation && third_orientation != fourth_orientation){
+            lines_intersect = true;
+        }
+        else if(first_orientation == COLLINEAR && is_on_segment(p1,p2,q1)){
+            lines_intersect = true;
+        }
+        else if(second_orientation == COLLINEAR && is_on_segment(p1,q2,q1)){
+            lines_intersect = true;
+        }
+        else if(third_orientation == COLLINEAR && is_on_segment(p2,p1,q2)){
+            lines_intersect = true;
+        }
+        else if(fourth_orientation == COLLINEAR && is_on_segment(p2,q1,q2)){
+            lines_intersect = true;
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return lines_intersect;
+}

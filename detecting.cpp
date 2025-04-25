@@ -461,8 +461,8 @@ Mat detecting::clean_contour_mask(Mat mask){
                 // else remove points between them and get new contour
 
                 int min_distance = INT_MAX;
-                int start_index;
-                int end_index;
+                int start_index = 0;
+                int end_index = 0;
 
                 // Find nearest defects
                 for(int i = 0; i < defect_indexes.size(); i++){
@@ -3448,18 +3448,31 @@ vector<Mat> detecting::convex_split(Mat mask){
         imshow("the split point",test_image);
         waitKey(0);
 
-        vector<Mat> testo = ear_clipping_triangulation(mask);
+        //vector<Mat> testo = ear_clipping_triangulation(mask);
+
+        vector<triangle> testo = delaunay_triangulation(mask);
+
+        testo = remove_one_pixel_edges(testo);
+        testo = combine_convex_triangles(testo);
+        //testo = size_filter_triangles(testo);
+
+        cout << "EAR CLIPING DONE" << endl;
 
         visualization visualizer;
         vector<Scalar> colors = visualizer.get_colors(testo.size());
 
         Mat triangles = Mat::zeros(mask.size(), CV_8UC3);
+        Mat triangles_white = Mat::zeros(mask.size(), CV_8U);
+
         for(int i = 0; i < testo.size(); i++){
-            vector<Point> triangle = get_biggest_contour(testo.at(i));
+            vector<Point> triangle = testo.at(i).points;
             vector<vector<Point>> temp = {triangle};
             drawContours(triangles,temp,0,colors.at(i),DRAW_WIDTH_INFILL);
+            triangles_white = triangles_white | testo.at(i).mask;
         }
         imshow("triangles", triangles);
+        Mat no_data = triangles_white == 0;
+        imshow("NO DATA", no_data);
         waitKey(0);
 
     }
@@ -3518,7 +3531,7 @@ vector<Mat> detecting::min_cost_poly_triangulation(Mat mask){
     return triangles;
 }
 
-
+// Does not work yet
 vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
     vector<Mat> triangles;
     try{
@@ -3537,9 +3550,10 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
         int current_hull_index = convex_hull_indexes.at(next_hull_index);
 
         for(int i = 0; i < poly.size(); i++){
-            cout << poly.at(i) << endl;
+//            cout << poly.at(i) << endl;
             if(current_hull_index != i){
                 reflex_indexes.push_back(i);
+                cout << "REFLEX INDEXES: " << i << endl;
             }
             else{
                 if(next_hull_index < convex_hull_indexes.size()-1){
@@ -3570,19 +3584,20 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
         for(int i = 0; i < convex_hull_indexes.size(); i++){
             // get potential ear tip index
             int index = convex_hull_indexes.at(i);
+            cout << "CONVEX INDEX: " <<  index << endl;
 
             bool status = check_eartip(reflex_indexes,poly,index,mask);
 
             if(status == true){
                 ear_indexes.push_back(index);
-                cout << index << endl;
             }
         }
 
         // Perform n-3 steps
 //        vector<Point> temp_poly = poly;
+        cout << "INITIAL SIZES: " << poly.size() << ", " << reflex_indexes.size() << ", " << convex_hull_indexes.size() << ", " <<  ear_indexes.size() << endl;
+
         for(int i = 0; i < poly.size()-3; i++){
-            cout << "in the begining with sizes: " << endl;
             if(ear_indexes.empty()){
                 throw runtime_error("There is no ears in remaining polygon.");
             }
@@ -3605,8 +3620,6 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
             else{
                 next_index = ear_index+1;
             }
-
-            cout << prior_index << ", " << ear_index << ", " << next_index << endl;
 
             // Save as triangle
             Point ear = poly.at(ear_index);
@@ -3670,7 +3683,7 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
 
             // Calculate angle in the triangle left prior -> prior -> next
             double angle = atan2(poly.at(next_index).y-poly.at(left_prior_index).y, poly.at(next_index).x-poly.at(left_prior_index).x) - atan2(poly.at(prior_index).y-poly.at(left_prior_index).y, poly.at(prior_index).x-poly.at(left_prior_index).x);
-
+            cout << "ANGLE LEFT: " << angle*180/M_PI << endl;
 //            cout << poly.at(left_prior_index) << ", " << poly.at(prior_index) << ", " << poly.at(next_index) << endl;
 //            double dist_left_to_prior = calculations.calculate_euclidean_distance(poly.at(left_prior_index),poly.at(prior_index));
 //            double dist_left_to_next = calculations.calculate_euclidean_distance(poly.at(left_prior_index),poly.at(next_index));
@@ -3686,10 +3699,11 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
 //            cout << "sum: " << dist_squared_sum << endl;
 //            cout << "denom: " << denominator << endl;
 
-            cout << "prior angle: " << angle*180/M_PI << endl;
-            if(angle*180/M_PI <  180.0){
-                cout << "Angle good" << endl;
+//            cout << "prior angle: " << angle*180/M_PI << endl;
+            if(fabs(angle)*180/M_PI <  180.0){
+                cout << "LEFT IS CONVEX" << endl;
                 reflex_indexes.erase(find(reflex_indexes.begin(),reflex_indexes.end(),prior_index));
+                cout << prior_index << "REMOVED from reflex" << endl;
                 if(count(convex_hull_indexes.begin(),convex_hull_indexes.end(),prior_index) == 0){
                     convex_hull_indexes.push_back(prior_index);
                 }
@@ -3697,7 +3711,7 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
                 bool status = check_eartip(reflex_indexes,poly,prior_index,mask);
 
                 if(status == true){
-                    cout << "Ear status good" << endl;
+//                    cout << "Ear status good" << endl;
                     ear_indexes.push_back(prior_index);
                 }
             }
@@ -3711,12 +3725,12 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
 //            denominator = 2*dist_prior_to_next*dist_prior_to_right;
 //            angle = acos(dist_squared_sum/denominator);
             angle = atan2(poly.at(right_next_index).y-poly.at(prior_index).y, poly.at(right_next_index).x-poly.at(prior_index).x) - atan2(poly.at(next_index).y-poly.at(prior_index).y, poly.at(next_index).x-poly.at(prior_index).x);
-
+            cout << "ANGLE RIGHT: " << angle*180/M_PI << endl;
 
             // If smaller than 180 degrees remove prior point from reflex and add it to convex
-            cout << "next angle: " << angle*180/M_PI << endl;
-            if(angle*180/M_PI <  180.0){
-                cout << "Angle good" << endl;
+//            cout << "next angle: " << angle*180/M_PI << endl;
+            if(fabs(angle)*180/M_PI <  180.0){
+//                cout << "Angle good" << endl;
                 reflex_indexes.erase(find(reflex_indexes.begin(),reflex_indexes.end(),next_index));
 
                 if(count(convex_hull_indexes.begin(),convex_hull_indexes.end(),next_index) == 0){
@@ -3727,10 +3741,11 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
                 bool status = check_eartip(reflex_indexes,poly,next_index,mask);
 
                 if(status == true){
-                    cout << "Ear status good" << endl;
+//                    cout << "Ear status good" << endl;
                     ear_indexes.push_back(next_index);
                 }
             }
+            cout << "SIZES IN THE END OF LOOP: " << poly.size() << ", " << reflex_indexes.size() << ", " << convex_hull_indexes.size() << ", " <<  ear_indexes.size() << endl;
         }
     }
     catch(const exception& error){
@@ -3805,14 +3820,627 @@ bool detecting::check_eartip(vector<int> reflex_indexes, vector<Point> points, i
     return status;
 }
 
+vector<triangle> detecting::delaunay_triangulation(Mat mask){
+    vector<triangle> triangles = {};
+    try{
+        // Get mask contour
+        vector<Point> the_contour = get_biggest_contour(mask);
+
+        // Convert to float points
+        vector<Point2f> points = {};
+        for(int i = 0; i < the_contour.size(); i++){
+            points.push_back(Point2f(the_contour.at(i).x, the_contour.at(i).y));
+        }
+
+        // Define space (entire image)
+        Size mask_size = mask.size();
+        Rect bounding_space(0,0,mask_size.width, mask_size.height);
+
+        // Prepare subdevider
+        Subdiv2D sub_divider(bounding_space);
+
+        // Insert points into devider
+        sub_divider.insert(points);
+
+        // Get triangle
+        vector<Vec6f> triangle_list; // x1, y1, x2, y2, x3, y3
+        sub_divider.getTriangleList(triangle_list);
+
+        // Create triangle masks and add to final masks if it does not contain invalid space
+        for(int i = 0; i < triangle_list.size(); i++){
+            Vec6f current_triangle = triangle_list.at(i);
+
+            Point first = Point(cvRound(current_triangle[0]),cvRound(current_triangle[1]));
+            Point second = Point(cvRound(current_triangle[2]),cvRound(current_triangle[3]));
+            Point third = Point(cvRound(current_triangle[4]), cvRound(current_triangle[5]));
+
+            vector<vector<Point>> draw_vector = {{first,second,third}};
+
+            Mat current_triangle_mask = Mat::zeros(mask_size,CV_8U);
+            drawContours(current_triangle_mask,draw_vector,0,WHITE,DRAW_WIDTH_INFILL);
+
+            if(countNonZero(mask&current_triangle_mask) >= contourArea(draw_vector.at(0))){
+                triangle new_triangle;
+                new_triangle.mask = current_triangle_mask;
+                new_triangle.points = {first,second,third};
+                triangles.push_back(new_triangle);
+            }
+        }
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return triangles;
+}
+
+
+// Does not work currently
+vector<triangle> detecting::combine_convex_triangles(vector<triangle> triangles){
+    vector<triangle> combined_triangles;
+    try{
+
+        // Go through all triangles and combine with neigbhors that makes it remain approximately convex
+        vector<triangle> temp_triangles = triangles;
+        for(int i = 0; i < temp_triangles.size();i++){
+           vector<int> connected_indexes = {};
+
+            for(int j = i+1; j < temp_triangles.size(); j++){
+
+                // Check if two triangles are touching
+                Mat intersection = temp_triangles.at(i).mask & temp_triangles.at(j).mask;
+
+                if(hasNonZero(intersection) == true){
+                    // Get points of two triangles
+                    vector<Point> first_triangle = temp_triangles.at(i).points;
+                    vector<Point> second_triangle = temp_triangles.at(j).points;
+
+                    // Remove non unique points from second triangle
+                    vector<Point> unique_points = {};
+                    for(int l = 0; l < second_triangle.size(); l++){
+                        bool unique = true;
+                        for(int k = 0; k < first_triangle.size(); k++){
+                            if(second_triangle.at(l) == first_triangle.at(k)){
+                                unique = false;
+                                break;
+                            }
+                        }
+                        if(unique == true){
+                            unique_points.push_back(second_triangle.at(l));
+                        }
+                    }
+
+                    // Find edge of interesection
+                    int insert_index = 0;
+                    int second_insert_index = 0;
+                    for(int k = 0; k < first_triangle.size(); k++){
+
+                        // Define last indexes
+                        int second_index = k+1;
+                        if(k == first_triangle.size()-1){
+                            second_index = 0;
+                        }
+
+                        // define line segment
+                        Point p1 = first_triangle.at(k);
+                        Point p2 = first_triangle.at(second_index);
+
+                        // go through lines in second polygon
+                        bool intersect_found = false;
+                        for(int l = 0; l < second_triangle.size(); l++){
+                            int second_l = l+1;
+                            if(l == second_triangle.size()-1){
+                                second_l = 0;
+                            }
+                            Point q1 = second_triangle.at(l);
+                            Point q2 = second_triangle.at(second_l);
+
+                            // Check for intersection
+                            bool intersects = calculations.do_intersect(p1,p2,q1,q2);
+
+                            if(intersects == true){
+                                // Ensure intersection is includes at least one unique value
+                                if((q1 != p1 && q1 != p2) || (q2 != p1 && q2 != p2)){
+                                    // Set insert index in between the two points
+                                    if(second_index == k+1){
+                                        insert_index = k;
+                                    }
+                                    else{
+                                        insert_index = 0;
+                                    }
+
+                                    // choose connection point in second triangle based on it being unique or the line that intersects least with the original mask
+                                    if((q1 != p1 && q1 != p2) && (q2 == p1 || q2 == p2)){
+                                        second_insert_index = l;
+                                    }
+                                    else if((q2 != p1 && q2 != p2) && (q1 == p1 || q1 == p2)){
+                                        second_insert_index = second_l;
+                                    }
+                                    else{
+                                        Mat line1 = Mat::zeros(triangles.at(0).mask.size(), CV_8U);
+                                        Mat line2 = Mat::zeros(triangles.at(0).mask.size(), CV_8U);
+
+                                        line(line1,p1,q1,WHITE);
+                                        line(line2,p1,q2,WHITE);
+
+                                        Mat intersect1 = line1 & temp_triangles.at(i).mask;
+                                        Mat intersect2 = line2 & temp_triangles.at(i).mask;
+
+                                        if(countNonZero(intersect1) <= countNonZero(intersect2)){
+                                            second_insert_index = l;
+                                        }
+                                        else{
+                                            second_insert_index = second_l;
+                                        }
+                                    }
+
+                                    intersect_found = true;
+                                    break;
+                                }
+
+                            }
+                        }
+                        if(intersect_found == true){
+                            break;
+                        }
+                    }
+
+                    // Combine points
+                    vector<Point> combined_points = {};
+
+                    for(int k = 0; k <= insert_index; k++){
+                        combined_points.push_back(first_triangle.at(k));
+                        cout << first_triangle.at(k) << endl;
+                    }
+                    for(int k = second_insert_index; k < second_triangle.size(); k++){
+                        if(count(unique_points.begin(),unique_points.end(),second_triangle.at(k)) > 0){
+                            combined_points.push_back(second_triangle.at(k));
+                            cout << second_triangle.at(k) << endl;
+                        }
+                    }
+                    for(int k = 0; k < second_insert_index; k++){
+                        if(count(unique_points.begin(),unique_points.end(),second_triangle.at(k)) > 0){
+                            combined_points.push_back(second_triangle.at(k));
+                            cout << second_triangle.at(k) << endl;
+                        }
+                    }
+                    for(int k = insert_index+1; k < first_triangle.size(); k++){
+                        combined_points.push_back(first_triangle.at(k));
+                        cout << first_triangle.at(k) << endl;
+                    }
+
+                    cout << combined_points.size() << " = " << first_triangle.size() << " + " << unique_points.size() << endl;
+                    cout << "second and first index are wrong" << endl;
+                    // Check for convexity
+                    vector<int> convex_hull_indexes;
+                    convexHull(combined_points,convex_hull_indexes);
+
+                    vector<Vec4i> defects;
+                    convexityDefects(combined_points,convex_hull_indexes,defects);
+
+                    // Check individual depths
+                    bool approx_convex = true;
+
+                    for(int defect_index = 0; defect_index < defects.size(); defect_index++){
+                        float depth = float(defects.at(defect_index)[3])/256.0;
+                        if(depth > 2.0){ // If big depth then dont accept connection
+                            approx_convex = false;
+                            break;
+                        }
+                    }
+
+                    if(approx_convex == true){
+                    // Update triangle
+                    temp_triangles.at(i).mask = temp_triangles.at(i).mask | temp_triangles.at(j).mask;
+                    temp_triangles.at(i).points = combined_points;
+                    connected_indexes.push_back(j);
+                    }
+                }
+            }
+            // Remove triangles that have been connected
+            for(int j = connected_indexes.size()-1; j >= 0; j--){
+                temp_triangles.erase(temp_triangles.begin()+connected_indexes.at(j));
+            }
+
+            // Add remaining triangle
+            combined_triangles.push_back(temp_triangles.at(i));
+            vector<vector<Point>> test_vec = {{temp_triangles.at(i).points}};
+            Mat point_draw = Mat::zeros(temp_triangles.at(i).mask.size(), CV_8U);
+            drawContours(point_draw,test_vec,0,WHITE,DRAW_WIDTH_INFILL);
+            imshow("new mask", temp_triangles.at(i).mask);
+            imshow("point contour",point_draw);
+            waitKey(0);
+        }
+
+
+
+//        // Go through all triangles and combine with neigbhors that makes it remain approximately convex
+//        vector<triangle> temp_triangles = triangles;
+
+//        for(int i = 0; i < temp_triangles.size();i++){
+//            vector<int> connected_indexes = {};
+
+//            for(int j = i+1; j < temp_triangles.size(); j++){
+
+//                // Get points of two triangles
+//                vector<Point> first_triangle = temp_triangles.at(i).points;
+//                vector<Point> second_triangle = temp_triangles.at(j).points;
+
+//                // Ensure that triangles are not connected at a single point
+//                int same_count = 0;
+//                int first_same_index = -1;
+//                int last_same_index = -1;
+
+//                for(int k = 0; k < first_triangle.size(); k++){
+//                    for(int l = 0; l < second_triangle.size(); l++){
+//                        if(first_triangle.at(k) == second_triangle.at(l)){
+//                            same_count++;
+//                            if(first_same_index == -1){
+//                                first_same_index = k;
+//                            }
+//                            last_same_index = k;
+//                        }
+//                    }
+//                }
+
+//                // Check if triangles are next to eachother
+//                Mat dilated = temp_triangles.at(i).mask.clone();
+//                dilate(dilated,dilated,border_kernel);
+//                Mat intersect = dilated & temp_triangles.at(j).mask;
+
+//                if(countNonZero(intersect) > 1 && same_count != 1){ // single pixel connections result in intersections
+
+//                    // Get unique points in second triangle
+//                    vector<Point> unique_points = {};
+//                    for(int l = 0; l < second_triangle.size(); l++){
+//                        bool unique = true;
+//                        for(int k = 0; k < first_triangle.size(); k++){
+//                            if(second_triangle.at(l) == first_triangle.at(k)){
+//                                unique = false;
+//                                break;
+//                            }
+//                        }
+//                        if(unique == true){
+//                            unique_points.push_back(second_triangle.at(l));
+//                        }
+
+//                    // Draw all original lines
+//                    Mat line_drawing = Mat::zeros(triangles.at(0).mask.size(), CV_8U);
+//                    for(int k = 0; k < first_triangle.size(); k++){
+
+//                    }
+
+////                    // If two points intersect. Add new point inbetween those
+////                    vector<Point> new_points = {};
+
+////                    if(same_count == 2){
+////                        // add point in between the two identical points
+////                        if(first_same_index == 0 && last_same_index == first_triangle.size()-1){
+////                            for(int l = 0; l < unique_points.size(); l++){
+////                                new_points.push_back(unique_points.at(l));
+////                            }
+////                            new_points.insert(new_points.end(),first_triangle.begin(),first_triangle.end());
+////                        }
+////                        else{
+////                            for(int k = 0; k < first_same_index; k++){
+////                                new_points.push_back(first_triangle.at(k));
+////                            }
+////                            new_points.insert(new_points.end(),unique_points.begin(), unique_points.end());
+////                            for(int k = last_same_index; k < first_triangle.size(); k++){
+////                                new_points.push_back(first_triangle.at(k));
+////                            }
+////                        }
+////                    }
+////                    else{
+////                        // Find closest combination between two triangles
+////                        double min_dist = 0.0;
+////                        int best_first_index = 0;
+////                        int best_second_index = 0;
+////                        for(int k = 0; k < first_triangle.size(); k++){
+////                            for(int l = 0; l < unique_points.size(); l++){
+////                                // calcualte distance
+////                                double dist = calculations.calculate_euclidean_distance(first_triangle.at(k),second_triangle.at(l));
+
+////                                if(dist < min_dist || (k == 0 && l == 0)){
+////                                    min_dist = dist;
+////                                    best_first_index = k;
+////                                    best_second_index = l;
+////                                }
+////                            }
+////                        }
+
+//                        // Combine triangles at this connection;
+////                        for(int k = 0; k < first_triangle.size(); k++){
+////                            new_points.push_back(first_triangle.at(k));
+
+////                            if(k == best_first_index){
+
+////                                for(int l = best_second_index; l < second_triangle.size(); l++){
+////                                    new_points.push_back(second_triangle.at(l));
+////                                }
+////                                for(int l = 0; l < best_second_index; l++){
+////                                    new_points.push_back(second_triangle.at(l));
+////                                }
+////                            }
+////                        }
+////                    }
+
+
+//                    cout << "First triangle" << endl;
+//                    for(int test = 0; test < first_triangle.size(); test++){
+//                        cout << first_triangle.at(test) << endl;
+//                    }
+//                    cout << "Second triangle" << endl;
+//                    for(int test = 0; test < second_triangle.size(); test++){
+//                        cout << second_triangle.at(test) << endl;
+//                    }
+//                    cout << "Combined triangle" << endl;
+//                    for(int test = 0; test < new_points.size(); test++){
+//                        cout << new_points.at(test) << endl;
+//                    }
+
+//                    // Create new mask
+//                    Mat combined_mask = Mat::zeros(triangles.at(0).mask.size(),CV_8U);
+//                    vector<vector<Point>> temp_points = {{new_points}};
+//                    drawContours(combined_mask,temp_points,0,WHITE,DRAW_WIDTH_INFILL);
+
+//                    // Check for convexity
+//                    vector<int> convex_hull_indexes;
+//                    convexHull(new_points,convex_hull_indexes);
+
+//                    vector<Vec4i> defects;
+//                    convexityDefects(new_points,convex_hull_indexes,defects);
+
+//                    // Check individual depths
+//                    bool approx_convex = true;
+
+//                    for(int defect_index = 0; defect_index < defects.size(); defect_index++){
+//                        float depth = float(defects.at(defect_index)[3])/256.0;
+//                        if(depth > 2.0){ // If big depth then dont accept connection
+//                            approx_convex = false;
+//                            break;
+//                        }
+//                    }
+
+//                    if(approx_convex == true){
+//                        temp_triangles.at(i).mask = combined_mask;
+//                        temp_triangles.at(i).points = new_points;
+//                        connected_indexes.push_back(j);
+//                    }
+
+
+//                }
+//            }
+
+//            // Remove triangles that have been connected
+//            for(int j = connected_indexes.size()-1; j >= 0; j--){
+//                temp_triangles.erase(temp_triangles.begin()+connected_indexes.at(j));
+//            }
+
+//            // Add remaining triangle
+//            combined_triangles.push_back(temp_triangles.at(i));
+//        }
 
 
 
 
+////                if(i != j){
+
+
+////                    // Get smallest edge
+////                    double smallest_edge = 0;
+
+////                    vector<Point> first_triangle =  temp_triangles.at(i).points;
+////                    vector<Point> second_triangle = temp_triangles.at(j).points;
+
+////                    vector<vector<Point>> point_combos = {{first_triangle.at(0),first_triangle.at(1)},{first_triangle.at(1),first_triangle.at(2)},{first_triangle.at(2),first_triangle.at(0)},{second_triangle.at(0),second_triangle.at(1)},{second_triangle.at(1),second_triangle.at(2)},{second_triangle.at(2),second_triangle.at(0)}};
+
+////                    for(int k = 0; k < point_combos.size(); k++){
+////                        double edge = fabs(calculations.calculate_euclidean_distance(point_combos.at(k).at(0),point_combos.at(k).at(1)));
+////                        if(edge < smallest_edge || k == 0){
+////                            smallest_edge = edge;
+////                        }
+////                    }
+
+////                    // Check if connected
+////                    Mat dilated = temp_triangles.at(i).mask.clone();
+////                    dilate(dilated,dilated,border_kernel);
+////                    Mat intersect = dilated & temp_triangles.at(j).mask;
+
+////                    if(countNonZero(intersect) >= cvRound(smallest_edge)){ // bigger than smallest size since one pixel connection is bad (intersects with itself)
+////                        // find contour of combined
+////                        Mat combined = temp_triangles.at(i).mask | temp_triangles.at(j).mask;
+////                        vector<vector<Point>> contours;
+////                        findContours(combined,contours,RETR_EXTERNAL,CHAIN_APPROX_SIMPLE);
+
+////                        cout << "Initial points: " << endl;
+////                        for(int test = 0; test < 3; test++){
+////                            cout << first_triangle.at(test) << endl;
+////                        }
+////                        for(int test = 0; test < 3; test++){
+////                            cout << second_triangle.at(test) << endl;
+////                        }
+
+////                        cout << "New points: " << endl;
+////                        for(int test = 0; test < contours.at(0).size(); test++){
+////                            cout << contours.at(0).at(test) << endl;
+////                        }
+
+
+////                        // Check for convexity
+////                        vector<int> convex_hull_indexes;
+////                        convexHull(contours.at(0),convex_hull_indexes);
+
+////                        vector<Vec4i> defects;
+////                        convexityDefects(contours.at(0),convex_hull_indexes,defects);
+
+////                        // Check individual depths
+////                        bool approx_convex = true;
+
+
+//////                        if(i >= 2){
+//////                            Mat test_draw = Mat::zeros(triangles.at(0).size(), CV_8U);
+//////                            cout << "new: " << endl;
+//////                            for(int test = 0; test < contours.at(0).size()-1; test++){
+//////                                line(test_draw,contours.at(0).at(test),contours.at(0).at(test+1),WHITE,1);
+//////                                cout << contours.at(0).at(test) << endl;
+//////                            }
+//////                            cout << contours.at(0).at(contours.at(0).size()-1) << endl;
+//////                            imshow("draw",test_draw);
+//////                            waitKey(0);
+//////                        }
+
+////                        for(int defect_index = 0; defect_index < defects.size(); defect_index++){
+////                            float depth = float(defects.at(defect_index)[3])/256.0;
+////                            if(depth > 2){
+////                                approx_convex = false;
+////                                break;
+////                            }
+////                        }
+
+////                        if(approx_convex == true){
+////                            temp_triangles.at(i).mask = combined;
+////                            connected_indexes.push_back(j);
+////                        }
+////                    }
+////                }
+////            }
+
+////            // Remove triangles that have been connected
+////            for(int j = connected_indexes.size()-1; j >= 0; j--){
+////                temp_triangles.erase(temp_triangles.begin()+connected_indexes.at(j));
+////            }
+
+////            // Add remaining triangle
+////            combined_triangles.push_back(temp_triangles.at(i));
+////        }
 
 
 
+////        // Go through all triangles
+////        for(int i = 0; i < triangles.size(); i++){
+////            // Find neighbors and add if still convex until nothing is added
+////            bool change = true;
+////            cout << "New start" << endl;
+////            while(change == true){
+////                change = false;
+////                vector<int> connected_indexes = {};
+////                for(int j = 0; j < triangles.size(); j++){
+////                    if(i != j){
+////                        // Check if connected
+////                        Mat combined = triangles.at(i) | triangles.at(j);
+////                        vector<vector<Point>> contours;
+////                        findContours(combined,contours,RETR_EXTERNAL,CHAIN_APPROX_SIMPLE);
 
+////                        if(contours.size() == 1){ // If only one contour, they must be connected
+////                            // Check for convexity
+////                            cout << "is connected" << endl;
+
+////                            // Get convex hull
+////                            vector<int> convex_hull_indexes;
+////                            convexHull(contours.at(0),convex_hull_indexes);
+
+////                            // Find defects
+////                            vector<Vec4i> defects;
+////                            convexityDefects(contours.at(0),convex_hull_indexes,defects);
+
+////                            // Check depth individual depths
+////                            bool approx_convex = true;
+////                            for(int defect_index = 0; defect_index < defects.size(); defect_index++){
+////                                float depth = float(defects.at(defect_index)[3])/256.0;
+////                                if(depth > 2){
+////                                    approx_convex = false;
+////                                    break;
+////                                }
+////                            }
+
+////                            if(approx_convex == true){
+////                                cout << "is convex" << endl;
+////                                triangles.at(i) = combined;
+////                                connected_indexes.push_back(j);
+////                                change = true;
+////                            }
+////                        }
+////                        imshow("combined",combined);
+////                        waitKey(0);
+////                    }
+////                }
+////                cout << "am out" << endl;
+////                // Removed used elements
+////                for(int j = connected_indexes.size()-1; j >= 0; j--){
+////                    triangles.erase(triangles.begin()+connected_indexes.at(j));
+////                }
+////            }
+////            combined_triangles.push_back(triangles.at(i));
+////        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return combined_triangles;
+}
+
+
+vector<Mat> detecting::size_filter_triangles(vector<Mat> triangles){
+    vector<Mat> filtered_triangles;
+    try{
+        // Find threshold automatically
+        int threshold = 75;
+
+        // Keep only triangles with area above threshold
+        for(int i = 0; i < triangles.size(); i++){
+            vector<Point> the_contour = get_biggest_contour(triangles.at(i));
+            if(contourArea(the_contour) > threshold){
+                filtered_triangles.push_back(triangles.at(i));
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_triangles;
+}
+
+vector<triangle> detecting::remove_one_pixel_edges(vector<triangle> triangles){
+    vector<triangle> filtered_triangles = {};
+    try{
+        // Go through all triangles
+        for(int i = 0; i < triangles.size(); i++){
+            // Get triangle points
+            vector<Point> points =  triangles.at(i).points;
+
+            if(points.size() != 3){
+                throw runtime_error("Triangle should consists of exactly three points.");
+            }
+
+            // Find edge distances
+            double edge_1 = fabs(calculations.calculate_euclidean_distance(points.at(0), points.at(1)));
+            double edge_2 = fabs(calculations.calculate_euclidean_distance(points.at(1), points.at(2)));
+            double edge_3 = fabs(calculations.calculate_euclidean_distance(points.at(2), points.at(0)));
+
+            // If no edge is single pixel wide, keep triangle
+            if(cvRound(edge_1) > 1 && cvRound(edge_2) > 1 && cvRound(edge_3) > 1){
+                filtered_triangles.push_back(triangles.at(i));
+            }
+//            else{
+//                cout << edge_1 << ", " << edge_2 << ", " << edge_3 << endl;
+//                cout << points.at(0) << ", " << points.at(1) << ", " << points.at(2) << endl;
+//                Mat test = triangles.at(i).mask;
+//                cvtColor(test,test,COLOR_GRAY2BGR);
+//                circle(test,points.at(0),1,{255,0,0});
+//                circle(test,points.at(1),1,{0,255,0});
+//                circle(test,points.at(2),1,{0,0,255});
+
+//                imshow("Killed",test);
+//                waitKey(0);
+//            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_triangles;
+}
 
 
 
