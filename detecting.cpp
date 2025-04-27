@@ -3879,178 +3879,701 @@ vector<triangle> detecting::delaunay_triangulation(Mat mask){
 vector<triangle> detecting::combine_convex_triangles(vector<triangle> triangles){
     vector<triangle> combined_triangles;
     try{
+        // Create temp triangles vector, used for combining polygons
+        vector<triangle> temp_triangles = triangles;
 
         // Go through all triangles and combine with neigbhors that makes it remain approximately convex
-        vector<triangle> temp_triangles = triangles;
-        for(int i = 0; i < temp_triangles.size();i++){
-           vector<int> connected_indexes = {};
+        for(int i = 0; i < temp_triangles.size(); i++){
+            // Prepare index that keep track of triangles already combined successfully
+            vector<int> connected_indexes = {};
+            // Initialize data of first polygon
+            Mat first_mask = temp_triangles.at(i).mask;
+            vector<Point> first_points = temp_triangles.at(i).points;
 
+            // Go through triangles after the current one (since those before have already been evaluated)
             for(int j = i+1; j < temp_triangles.size(); j++){
-
-                // Check if two triangles are touching
-                Mat intersection = temp_triangles.at(i).mask & temp_triangles.at(j).mask;
+                // Prepare mask of second polygon
+                Mat second_mask = temp_triangles.at(j).mask;
+                // Check if any part of triangles are intersecting
+                Mat intersection = first_mask & second_mask; // This is all that is needed since polygons share points and therefore do intersect when drawn
 
                 if(hasNonZero(intersection) == true){
-                    // Get points of two triangles
-                    vector<Point> first_triangle = temp_triangles.at(i).points;
-                    vector<Point> second_triangle = temp_triangles.at(j).points;
+                    // Prepare second points
+                    vector<Point> second_points = temp_triangles.at(j).points;
 
-                    // Remove non unique points from second triangle
-                    vector<Point> unique_points = {};
-                    for(int l = 0; l < second_triangle.size(); l++){
-                        bool unique = true;
-                        for(int k = 0; k < first_triangle.size(); k++){
-                            if(second_triangle.at(l) == first_triangle.at(k)){
-                                unique = false;
+                    // Some test printing
+                    cout << "First points: " << endl;
+                    for(int k = 0; k < first_points.size(); k++){
+                        cout << first_points.at(k) << endl;
+                    }
+                    cout << "Second points: " << endl;
+                    for(int k = 0; k < second_points.size(); k++){
+                        cout << second_points.at(k) << endl;
+                    }
+
+                    // STEP 1: Ensure that atleast two points are common otherwise the combination will never be convex
+                    vector<Point> common_points = {};
+                    for(int f = 0; f < first_points.size(); f++){
+                        for(int s = 0; s < second_points.size(); s++){
+                            if(second_points.at(s) == first_points.at(f)){
+                                common_points.push_back(second_points.at(f));
                                 break;
                             }
                         }
-                        if(unique == true){
-                            unique_points.push_back(second_triangle.at(l));
-                        }
                     }
 
-                    // Find edge of interesection
-                    int insert_index = 0;
-                    int second_insert_index = 0;
-                    for(int k = 0; k < first_triangle.size(); k++){
+                    Point first_connection_point = common_points.at(0);
+                    Point last_connection_point = common_points.back();
 
-                        // Define last indexes
-                        int second_index = k+1;
-                        if(k == first_triangle.size()-1){
-                            second_index = 0;
-                        }
-
-                        // define line segment
-                        Point p1 = first_triangle.at(k);
-                        Point p2 = first_triangle.at(second_index);
-
-                        // go through lines in second polygon
-                        bool intersect_found = false;
-                        for(int l = 0; l < second_triangle.size(); l++){
-                            int second_l = l+1;
-                            if(l == second_triangle.size()-1){
-                                second_l = 0;
-                            }
-                            Point q1 = second_triangle.at(l);
-                            Point q2 = second_triangle.at(second_l);
-
-                            // Check for intersection
-                            bool intersects = calculations.do_intersect(p1,p2,q1,q2);
-
-                            if(intersects == true){
-                                // Ensure intersection is includes at least one unique value
-                                if((q1 != p1 && q1 != p2) || (q2 != p1 && q2 != p2)){
-                                    // Set insert index in between the two points
-                                    if(second_index == k+1){
-                                        insert_index = k;
-                                    }
-                                    else{
-                                        insert_index = 0;
-                                    }
-
-                                    // choose connection point in second triangle based on it being unique or the line that intersects least with the original mask
-                                    if((q1 != p1 && q1 != p2) && (q2 == p1 || q2 == p2)){
-                                        second_insert_index = l;
-                                    }
-                                    else if((q2 != p1 && q2 != p2) && (q1 == p1 || q1 == p2)){
-                                        second_insert_index = second_l;
-                                    }
-                                    else{
-                                        Mat line1 = Mat::zeros(triangles.at(0).mask.size(), CV_8U);
-                                        Mat line2 = Mat::zeros(triangles.at(0).mask.size(), CV_8U);
-
-                                        line(line1,p1,q1,WHITE);
-                                        line(line2,p1,q2,WHITE);
-
-                                        Mat intersect1 = line1 & temp_triangles.at(i).mask;
-                                        Mat intersect2 = line2 & temp_triangles.at(i).mask;
-
-                                        if(countNonZero(intersect1) <= countNonZero(intersect2)){
-                                            second_insert_index = l;
-                                        }
-                                        else{
-                                            second_insert_index = second_l;
-                                        }
-                                    }
-
-                                    intersect_found = true;
-                                    break;
-                                }
-
-                            }
-                        }
-                        if(intersect_found == true){
-                            break;
-                        }
+                    // If less than two points are common, the combination can never be convex so continue
+                    if(common_points.size() < 2){
+                        continue;
                     }
 
-                    // Combine points
-                    vector<Point> combined_points = {};
+                    // STEP 2: Ensure that there are no gaps in connection, since this would lead to lost data.
 
-                    for(int k = 0; k <= insert_index; k++){
-                        combined_points.push_back(first_triangle.at(k));
-                        cout << first_triangle.at(k) << endl;
-                    }
-                    for(int k = second_insert_index; k < second_triangle.size(); k++){
-                        if(count(unique_points.begin(),unique_points.end(),second_triangle.at(k)) > 0){
-                            combined_points.push_back(second_triangle.at(k));
-                            cout << second_triangle.at(k) << endl;
-                        }
-                    }
-                    for(int k = 0; k < second_insert_index; k++){
-                        if(count(unique_points.begin(),unique_points.end(),second_triangle.at(k)) > 0){
-                            combined_points.push_back(second_triangle.at(k));
-                            cout << second_triangle.at(k) << endl;
-                        }
-                    }
-                    for(int k = insert_index+1; k < first_triangle.size(); k++){
-                        combined_points.push_back(first_triangle.at(k));
-                        cout << first_triangle.at(k) << endl;
+
+
+                    // If gaps exist continue to next polygon since these gaps present incomplete connections
+                    if(gaps > 1){
+                        continue;
                     }
 
-                    cout << combined_points.size() << " = " << first_triangle.size() << " + " << unique_points.size() << endl;
-                    cout << "second and first index are wrong" << endl;
-                    // Check for convexity
-                    vector<int> convex_hull_indexes;
-                    convexHull(combined_points,convex_hull_indexes);
+                    // STEP 3: Check if connection from new points to final connection point leads to intersection. if so combination should be made at another location
 
-                    vector<Vec4i> defects;
-                    convexityDefects(combined_points,convex_hull_indexes,defects);
+//                    // Find start and end of connection for first points
+//                    int first_start = 0;
+//                    int first_end = 0;
+//                    for(int f = 0; f < first_points.size(); f++){
+//                        int previous_index = f-1;
+//                        int next_index = f+1;
+//                        if(previous_index < 0){
+//                            previous_index = first_points.size()-1;
+//                        }
+//                        if(next_index >= first_points.size()){
+//                            next_index = 0;
+//                        }
 
-                    // Check individual depths
-                    bool approx_convex = true;
+//                        if(intersection.at<uchar>(first_points.at(f)) == uchar(WHITE) && intersection.at<uchar>(first_points.at(previous_index)) != uchar(WHITE)){
+//                            first_start = f;
+//                        }
+//                        if(intersection.at<uchar>(first_points.at(f)) == uchar(WHITE) && intersection.at<uchar>(first_points.at(next_index)) != uchar(WHITE)){
+//                            first_end = f;
+//                        }
+//                    }
 
-                    for(int defect_index = 0; defect_index < defects.size(); defect_index++){
-                        float depth = float(defects.at(defect_index)[3])/256.0;
-                        if(depth > 2.0){ // If big depth then dont accept connection
-                            approx_convex = false;
-                            break;
-                        }
-                    }
+//                    // do the same for the second points
+//                    int second_start = 0;
+//                    int second_end = 0;
+//                    for(int f = 0; f < second_points.size(); f++){
+//                        int previous_index = f-1;
+//                        int next_index = f+1;
+//                        if(previous_index < 0){
+//                            previous_index = second_points.size()-1;
+//                        }
+//                        if(next_index >= second_points.size()){
+//                            next_index = 0;
+//                        }
 
-                    if(approx_convex == true){
-                    // Update triangle
-                    temp_triangles.at(i).mask = temp_triangles.at(i).mask | temp_triangles.at(j).mask;
-                    temp_triangles.at(i).points = combined_points;
-                    connected_indexes.push_back(j);
-                    }
+//                        if(intersection.at<uchar>(second_points.at(f)) == uchar(WHITE) && intersection.at<uchar>(second_points.at(previous_index)) != uchar(WHITE)){
+//                            second_start = f;
+//                        }
+//                        if(intersection.at<uchar>(second_points.at(f)) == uchar(WHITE) && intersection.at<uchar>(second_points.at(next_index)) != uchar(WHITE)){
+//                            second_end = f;
+//                        }
+//                    }
+
+
+//                    // Do stuff
+
+//                    // With the points to add and the end and start indexes of the connection zone it is time to find the point of connection
+//                    Point point_of_connection = first_points.at(first_end);  // by default end of connection
+
+
+//                    // Draw line from the last new point to point of connection (used to check for possible different point of connection)
+//                    Point last_new_point = points_to_add.back();
+
+//                    if(common_indexes_in_second.back() == first_points.size()-1){ // If last conection point is the last overall point, the line actually goes from that to the begining, so the connection point should be later
+//                        point_of_connection = common_elements.at(common_elements.size()-2);
+//                    }
+
+//                    Mat connection_line = Mat::zeros(first_mask.size(),CV_8U);
+//                    line(connection_line,last_new_point,point_of_connection,WHITE,DRAW_WIDTH_1P);
+
+//                    // Check for intersection with all other lines
+//                    current_common_index = 0;
+//                    vector<Point> possible_connection_points = {};
+//                    vector<int> possible_connection_indexes = {};
+//                    for(int  f = 0; f < first_points.size(); f++){
+//                        if(f != common_indexes.at(current_common_index)){
+//                            Mat current_line = Mat::zeros(first_mask.size(),CV_8U);
+//                            int second_point_index = f+1;
+//                            if(f != first_points.size()-1){
+//                                line(current_line,first_points.at(f),first_points.at(f+1),WHITE,DRAW_WIDTH_1P);
+//                            }
+//                            else{
+//                                line(current_line,first_points.at(f),first_points.at(0),WHITE,DRAW_WIDTH_1P);
+//                                second_point_index = 0;
+//                            }
+//                            // Check for intersection that is not due to being connected to same point
+//                            if(hasNonZero(current_line & connection_line) && point_of_connection != first_points.at(second_point_index)){
+//                                possible_connection_points.push_back(first_points.at(f));
+//                                possible_connection_indexes.push_back(f);
+//                            }
+//                        }
+//                        else{
+//                            if(current_common_index + 1 < first_points.size()){
+//                                current_common_index++;
+//                            }
+//                        }
+//                    }
+
+//                    // Find ideal connection point
+//                    int possible_connection_index = 0;
+//                    bool reversed = false;
+//                    if(possible_connection_points.size() == 1){
+//                        point_of_connection = possible_connection_points.at(0);
+//                        reveresed = true;
+//                    }
+//                    else if(possible_connection_points.size() > 1){
+//                        reversed = true;
+//                        // connect to shortest distance
+//                        double min_dist = 0.0;
+//                        for(int p = 0; p < possible_connection_points.size(); p++){
+//                            double dist = calculations.calculate_euclidean_distance(last_new_point,possible_connection_points.at(p));
+//                            if(p == 0 || dist < min_dist){
+//                                min_dist = dist;
+//                                point_of_connection = possible_connection_points.at(p);
+//                                possible_connection_index = p;
+//                            }
+//                        }
+//                    }
+
+//                    // Make combination vector
+//                    vector<Point> combined = {};
+
+//                    // Add all new points
+//                    for(int r = 0; r < remaining_points.size(); r++){
+//                        combined.push_back(remaining_points.at(r));
+//                    }
+
+//                    // Add points in original polygon based on point of connection
+//                    if(reversed == false){
+//                        bool end_found = false;
+//                        int start_index = common_indexes.back();
+//                        if(common_indexes.back() == first_points.size()-1){ // If last conection point is the last overall point, the line actually goes from that to the begining, so the connection point should be later
+//                            start_index = 0;
+//                        }
+//                        for(int f = start_index; f < first_points.size(); f++){
+//                            combined.push_back(first_points.at(f));
+
+//                            if(intersection.at<uchar>(first_points.at(f)) == uchar(WHITE) && f != start_index){
+//                                end_found = true;
+//                                break;
+//                            }
+//                        }
+
+//                        // add beginning if entire part not found
+//                        if(end_found == false){
+//                            for(int f = 0; f < first_points.size(); f++){
+//                                combined.push_back(first_points.at(f));
+//                                if(intersection.at<uchar>(first_points.at(f)) == uchar(WHITE)){
+//                                    end_found = true;
+//                                    break;
+//                                }
+//                            }
+//                        }
+//                    }
+//                    else{
+//                        // Add points from reverse
+//                        for(int f = poosible_connection_index; f >= 0; f--){
+//                            combined.push_back(first_points.at(f));
+//                            if(intersection.at<uchar>(first_points.at(f)) == uchar(WHITE)){
+//                                break;
+//                            }
+//                        }
+//                        // Include initial connection point
+//                        Point final_point = common_elements.at(0);
+//                        combined.push_back(final_point);
+//                    }
+
+
+
+
+//                    // Check if new points are on the same side of the intersection by splitting frame based on the two common elements
+//                    Point start = Point(0,0);
+//                    Point end = Point(0,0);
+//                    Point p1 = common_elements.at(0);
+//                    Point p2 = common_elements.back();
+//                    double length = calculations.calculate_euclidean_distance(p1,p2);
+
+//                    start.x = p2.x + (p2.x-p1.x)/length*2000;
+//                    start.y = p2.y + (p2.y-p1.y)/length*2000;
+
+//                    end.x = p1.x + (p1.x-p2.x)/length*2000;
+//                    end.y = p1.y + (p1.y-p2.y)/length*2000;
+
+//                    Mat split_frame = Mat::zeros(first_mask.size(), CV_8U);
+//                    vector<vector<Point>> temp_contour = {};
+//                    if(start.x < 0){
+//                        temp_contour.push_back({start,end,Point(first_mask.cols-1,first_mask.rows-1),Point(0,first_mask.rows-1)});
+//                    }
+//                    else{
+//                        temp_contour.push_back({start,end,Point(0,first_mask.rows-1),Point(first_mask.cols-1,first_mask.rows-1)});
+//                    }
+//                    drawContours(split_frame,temp_contour,0,WHITE,DRAW_WIDTH_INFILL);
+
+
+
+
+
+//                    // Try normal connection from first connection point to second
+//                    vector<Point> combined = {};
+//                    // Go through all points in first polygon until intersection is met
+//                    int index_of_return = 0;
+//                    Point point_of_connection = Point(0,0);
+
+//                    for(int f = 0; f < first_points.size(); f++){
+//                        // Prepare point
+//                        Point point = first_points.at(f);
+
+//                        // add point
+//                        combined.push_back(point);
+
+//                        // Check if on intersection.
+//                        if(intersection.at<uchar>(point) == uchar(WHITE)){
+//                            // Continue adding if line is from end -> start since then end is the actually point of connection.
+//                            bool start_found = true;
+//                            if(f == 0){
+//                                Point last_point = first_points.back();
+//                                // If final point is also on line, that is the start and we should thus continue
+//                                if(intersection.at<uchar>(last_point) == uchar(WHITE)){
+//                                    start_found = false;
+//                                }
+//                            }
+//                            //  If start found break and save next index and current point
+//                            if(start_found == true){
+//                                index_of_return = k+1;
+//                                point_of_connection = point;
+//                                break;
+//                            }
+//                        }
+//                    }
+
                 }
             }
-            // Remove triangles that have been connected
-            for(int j = connected_indexes.size()-1; j >= 0; j--){
-                temp_triangles.erase(temp_triangles.begin()+connected_indexes.at(j));
-            }
-
-            // Add remaining triangle
-            combined_triangles.push_back(temp_triangles.at(i));
-            vector<vector<Point>> test_vec = {{temp_triangles.at(i).points}};
-            Mat point_draw = Mat::zeros(temp_triangles.at(i).mask.size(), CV_8U);
-            drawContours(point_draw,test_vec,0,WHITE,DRAW_WIDTH_INFILL);
-            imshow("new mask", temp_triangles.at(i).mask);
-            imshow("point contour",point_draw);
-            waitKey(0);
         }
+
+
+//        // Create temp triangles vector, used for combining polygons
+//        vector<triangle> temp_triangles = triangles;
+
+//        // Go through all triangles and combine with neigbhors that makes it remain approximately convex
+//        for(int i = 0; i < temp_triangles.size(); i++){
+//            // Prepare index that keep track of triangles already combined successfully
+//            vector<int> connected_indexes = {};
+//            // Initialize data of first polygon
+//            Mat first_mask = temp_triangles.at(i).mask;
+//            vector<Point> first_points = temp_triangles.at(i).points;
+//            // Go through triangles after the current one (since those before have already been evaluated)
+//            for(int j = i+1; j < temp_triangles.size(); j++){
+//                // Prepare mask of second polygon
+//                Mat second_mask = temp_triangles.at(j).mask;
+//                // Check if any part of triangles are intersecting
+//                Mat intersection = first_mask & second_mask; // This is all that is needed since polygons share points and therefore do intersect when drawn
+//                if(hasNonZero(intersection) == true){
+//                    // Prepare second points
+//                    vector<Point> second_points = temp_triangles.at(j).points;
+
+//                    // test
+//                    cout << "First points: " << endl;
+//                    for(int k = 0; k < first_points.size(); k++){
+//                        cout << first_points.at(k) << endl;
+//                    }
+
+//                    cout << "Second points: " << endl;
+//                    for(int k = 0; k < second_points.size(); k++){
+//                        cout << second_points.at(k) << endl;
+//                    }
+
+//                    // Initialise combined vector
+//                    vector<Point> combined = {};
+//                    // Go through all points in first polygon until intersection is met
+//                    int index_of_return = 0;
+//                    Point point_of_connection = Point(0,0);
+//                    bool connectable = true;
+//                    for(int k = 0; k < first_points.size(); k++){
+//                        // Prepare point
+//                        Point point = first_points.at(k);
+//                        // add point
+//                        combined.push_back(point);
+//                        // Check if on intersection.
+//                        if(intersection.at<uchar>(point) == uchar(WHITE)){
+//                            // Ensure that previous point is not on line if index is 0
+//                            bool start_found = true;
+//                            if(k == 0){
+//                                Point last_point = first_points.back();
+//                                // If final point is also on line, that is the start and we should thus continue
+//                                if(intersection.at<uchar>(last_point) == uchar(WHITE)){
+//                                    start_found = false;
+//                                }
+//                            }
+//                            //  If start found break and save next index and current point
+//                            if(start_found == true){
+//                                index_of_return = k+1;
+//                                // If there is no other connection return the result would never be convex
+//                                int temp_index = k+1;
+//                                if(temp_index >= first_points.size()){
+//                                    temp_index = 0;
+//                                }
+//                                Point next_point = first_points.at(temp_index);
+//                                if(intersection.at<uchar>(next_point) != uchar(WHITE)){
+//                                    connectable = false;
+//                                }
+//                                point_of_connection = point;
+//                                break;
+//                            }
+//                        }
+//                    }
+//                    // continue if not connectable
+//                    if(connectable == false){
+//                        continue;
+//                    }
+//                    // Find point in second polygon from where to begin connection (point that is the same as the point of connection)
+//                    bool connection_found = false;
+//                    bool clockwise = true; // standard clockwise
+//                    int start_index = 0;
+//                    Point start_point = Point(0,0);
+//                    for(int k = 0; k < second_points.size(); k++){
+//                        Point point = second_points.at(k);
+//                        // Check if point is at connection
+//                        if(point == point_of_connection){
+//                            connection_found = true;
+//                            // Get nex and previous points
+//                            int previous_index = k-1;
+//                            int next_index = k+1;
+//                            if(previous_index < 0){
+//                                previous_index = second_points.size()-1;
+//                            }
+//                            if(next_index >= second_points.size()){
+//                                next_index = 0;
+//                            }
+//                            Point previous_point = second_points.at(previous_index);
+//                            Point next_point = second_points.at(next_index);
+//                            // Find direction by checking if previous or next point is on intersection
+//                            if(intersection.at<uchar>(previous_point) == uchar(BLACK) && intersection.at<uchar>(next_point) == uchar(WHITE)){
+//                                clockwise = false;
+//                                start_index = previous_index;
+//                                start_point = previous_point;
+//                            }
+//                            else{
+//                                start_index = next_index;
+//                                start_point = next_point;
+//                            }
+//                            break;
+//                        }
+//                    }
+//                    // continue if no connection was found or next point is on intersection. Otherwise add second polygons based on direction
+//                    if(connection_found == false || intersection.at<uchar>(start_point) == uchar(WHITE)){
+//                        continue;
+//                    }
+//                    else if(clockwise == true){
+//                        // add points in clockwise order until intersection is met
+//                        int zero_addon = 0;
+//                        for(int k = 0; k < second_points.size(); k++){
+//                            // Current index
+//                            int current_index = start_index+k;
+//                            if(current_index >= second_points.size()){
+//                                current_index = 0+zero_addon;
+//                                zero_addon++;
+//                            }
+//                            // Current point
+//                            Point current_point = second_points.at(current_index);
+//                            // Check if point is on intersection if so stop
+//                            if(intersection.at<uchar>(current_point) == uchar(WHITE)){
+//                                break;
+//                            }
+//                            else{
+//                                combined.push_back(current_point);
+//                            }
+//                        }
+//                    }
+//                    else{
+//                        // add points in counter clockwise order until intersection is met
+//                        bool end_found = false;
+//                        for(int k = start_index; k >= 0; k--){
+//                            // Current point
+//                            Point current_point = second_points.at(k);
+//                            // Check if point is on intersection if so stop
+//                            if(intersection.at<uchar>(current_point) == uchar(WHITE)){
+//                                end_found = true;
+//                                break;
+//                            }
+//                            else{
+//                                combined.push_back(current_point);
+//                            }
+//                        }
+//                        // Add remaining points if end not found yet
+//                        if(end_found == false){
+//                            for(int k = 0; k < start_index; k++){
+//                                // Current point
+//                                Point current_point = second_points.at(k);
+//                                // Check if point is on intersection if so stop
+//                                if(intersection.at<uchar>(current_point) == uchar(WHITE)){
+//                                    break;
+//                                }
+//                                else{
+//                                    combined.push_back(current_point);
+//                                }
+//                            }
+//                        }
+//                    }
+//                    // Add remaining of initial polygon
+//                    for(int k = index_of_return; k < first_points.size(); k++){
+//                        // Prepare point
+//                        Point point = first_points.at(k);
+//                        // add point
+//                        combined.push_back(point);
+//                    }
+
+//                    // test
+//                    cout << "Combined points: " << endl;
+//                    for(int k = 0; k < combined.size(); k++){
+//                        cout << combined.at(k) << endl;
+//                    }
+
+//                    // Check for convexity
+//                    vector<int> convex_hull_indexes;
+//                    convexHull(combined,convex_hull_indexes);
+
+//                    vector<Vec4i> defects;
+//                    convexityDefects(combined,convex_hull_indexes,defects);
+
+//                    // Check individual depths
+//                    bool approx_convex = true;
+
+//                    for(int defect_index = 0; defect_index < defects.size(); defect_index++){
+//                        float depth = float(defects.at(defect_index)[3])/256.0;
+//                        if(depth > 2.0){ // If big depth then dont accept connection
+//                            approx_convex = false;
+//                            continue;
+//                        }
+//                    }
+
+//                    if(approx_convex == true){
+//                        // Update triangle
+//                        temp_triangles.at(i).mask = first_mask | second_mask;
+//                        temp_triangles.at(i).points = combined;
+//                        first_points = combined;
+//                        first_mask = temp_triangles.at(i).mask;
+//                        connected_indexes.push_back(j);
+//                    }
+//                }
+//            }
+//            // Removed conencted polygons
+//            for(int j = connected_indexes.size()-1; j >= 0; j--){
+//                temp_triangles.erase(temp_triangles.begin()+connected_indexes.at(j));
+//            }
+
+//            // Add remaining triangles to output
+//            combined_triangles.push_back(temp_triangles.at(i));
+
+
+//            // Test visualization
+//            vector<vector<Point>> test_vec = {{temp_triangles.at(i).points}};
+//            Mat point_draw = Mat::zeros(temp_triangles.at(i).mask.size(), CV_8U);
+//            drawContours(point_draw,test_vec,0,WHITE,DRAW_WIDTH_INFILL);
+//            imshow("new mask", temp_triangles.at(i).mask);
+//            imshow("point contour",point_draw);
+//            waitKey(0);
+//        }
+
+
+
+//        vector<triangle> temp_triangles = triangles;
+//        for(int i = 0; i < temp_triangles.size();i++){
+//           vector<int> connected_indexes = {};
+
+//            for(int j = i+1; j < temp_triangles.size(); j++){
+
+//                // Check if two triangles are touching
+//                Mat intersection = temp_triangles.at(i).mask & temp_triangles.at(j).mask;
+
+//                if(hasNonZero(intersection) == true){
+//                    // Get points of two triangles
+//                    vector<Point> first_triangle = temp_triangles.at(i).points;
+//                    vector<Point> second_triangle = temp_triangles.at(j).points;
+
+//                    cout << "First triangle: " << endl;
+//                    for(int k = 0; k < first_triangle.size(); k++){
+//                        cout << first_triangle.at(k) << endl;
+//                    }
+
+//                    cout << "Second triangle: " << endl;
+//                    for(int k = 0; k < second_triangle.size(); k++){
+//                        cout << second_triangle.at(k) << endl;
+//                    }
+
+//                    // Remove non unique points from second triangle
+//                    vector<Point> unique_points = {};
+//                    for(int l = 0; l < second_triangle.size(); l++){
+//                        bool unique = true;
+//                        for(int k = 0; k < first_triangle.size(); k++){
+//                            if(second_triangle.at(l) == first_triangle.at(k)){
+//                                unique = false;
+//                                break;
+//                            }
+//                        }
+//                        if(unique == true){
+//                            unique_points.push_back(second_triangle.at(l));
+//                        }
+//                    }
+
+//                    // Find edge of interesection
+//                    int insert_index = 0;
+//                    int second_insert_index = 0;
+//                    for(int k = 0; k < first_triangle.size(); k++){
+
+//                        // Define last indexes
+//                        int second_index = k+1;
+//                        if(k == first_triangle.size()-1){
+//                            second_index = 0;
+//                        }
+
+//                        // define line segment
+//                        Point p1 = first_triangle.at(k);
+//                        Point p2 = first_triangle.at(second_index);
+
+//                        // go through lines in second polygon
+//                        bool intersect_found = false;
+//                        for(int l = 0; l < second_triangle.size(); l++){
+//                            int second_l = l+1;
+//                            if(l == second_triangle.size()-1){
+//                                second_l = 0;
+//                            }
+//                            Point q1 = second_triangle.at(l);
+//                            Point q2 = second_triangle.at(second_l);
+
+//                            // Check for intersection
+//                            bool intersects = calculations.do_intersect(p1,p2,q1,q2);
+
+//                            if(intersects == true){
+//                                // Ensure intersection is includes at least one unique value
+//                                if((q1 != p1 && q1 != p2) || (q2 != p1 && q2 != p2)){
+//                                    // Set insert index in between the two points
+//                                    if(second_index == k+1){
+//                                        insert_index = k;
+//                                    }
+//                                    else{
+//                                        insert_index = 0;
+//                                    }
+
+//                                    // choose connection point in second triangle based on it being unique or the line that intersects least with the original mask
+//                                    if((q1 != p1 && q1 != p2) && (q2 == p1 || q2 == p2)){
+//                                        second_insert_index = l;
+//                                    }
+//                                    else if((q2 != p1 && q2 != p2) && (q1 == p1 || q1 == p2)){
+//                                        second_insert_index = second_l;
+//                                    }
+//                                    else{
+//                                        Mat line1 = Mat::zeros(triangles.at(0).mask.size(), CV_8U);
+//                                        Mat line2 = Mat::zeros(triangles.at(0).mask.size(), CV_8U);
+
+//                                        line(line1,p1,q1,WHITE);
+//                                        line(line2,p1,q2,WHITE);
+
+//                                        Mat intersect1 = line1 & temp_triangles.at(i).mask;
+//                                        Mat intersect2 = line2 & temp_triangles.at(i).mask;
+
+//                                        if(countNonZero(intersect1) <= countNonZero(intersect2)){
+//                                            second_insert_index = l;
+//                                        }
+//                                        else{
+//                                            second_insert_index = second_l;
+//                                        }
+//                                    }
+
+//                                    intersect_found = true;
+//                                    break;
+//                                }
+
+//                            }
+//                        }
+//                        if(intersect_found == true){
+//                            break;
+//                        }
+//                    }
+
+//                    // Combine points
+//                    vector<Point> combined_points = {};
+
+//                    cout << "Insert at: " << first_triangle.at(insert_index);
+//                    cout << "Insert from: " << second_triangle.at(second_insert_index);
+
+//                    cout << "Combined polygon: " << endl;
+//                    for(int k = 0; k <= insert_index; k++){
+//                        combined_points.push_back(first_triangle.at(k));
+//                        cout << first_triangle.at(k) << endl;
+//                    }
+//                    for(int k = second_insert_index; k < second_triangle.size(); k++){
+//                        if(count(unique_points.begin(),unique_points.end(),second_triangle.at(k)) > 0){
+//                            combined_points.push_back(second_triangle.at(k));
+//                            cout << second_triangle.at(k) << endl;
+//                        }
+//                    }
+//                    for(int k = 0; k < second_insert_index; k++){
+//                        if(count(unique_points.begin(),unique_points.end(),second_triangle.at(k)) > 0){
+//                            combined_points.push_back(second_triangle.at(k));
+//                            cout << second_triangle.at(k) << endl;
+//                        }
+//                    }
+//                    for(int k = insert_index+1; k < first_triangle.size(); k++){
+//                        combined_points.push_back(first_triangle.at(k));
+//                        cout << first_triangle.at(k) << endl;
+//                    }
+
+//                    cout << combined_points.size() << " = " << first_triangle.size() << " + " << unique_points.size() << endl;
+//                    cout << "second and first index are wrong" << endl;
+//                    // Check for convexity
+//                    vector<int> convex_hull_indexes;
+//                    convexHull(combined_points,convex_hull_indexes);
+
+//                    vector<Vec4i> defects;
+//                    convexityDefects(combined_points,convex_hull_indexes,defects);
+
+//                    // Check individual depths
+//                    bool approx_convex = true;
+
+//                    for(int defect_index = 0; defect_index < defects.size(); defect_index++){
+//                        float depth = float(defects.at(defect_index)[3])/256.0;
+//                        if(depth > 2.0){ // If big depth then dont accept connection
+//                            approx_convex = false;
+//                            break;
+//                        }
+//                    }
+
+//                    if(approx_convex == true){
+//                    // Update triangle
+//                    temp_triangles.at(i).mask = temp_triangles.at(i).mask | temp_triangles.at(j).mask;
+//                    temp_triangles.at(i).points = combined_points;
+//                    connected_indexes.push_back(j);
+//                    }
+//                }
+//            }
+//            // Remove triangles that have been connected
+//            for(int j = connected_indexes.size()-1; j >= 0; j--){
+//                temp_triangles.erase(temp_triangles.begin()+connected_indexes.at(j));
+//            }
+
+//            // Add remaining triangle
+//            combined_triangles.push_back(temp_triangles.at(i));
+//            vector<vector<Point>> test_vec = {{temp_triangles.at(i).points}};
+//            Mat point_draw = Mat::zeros(temp_triangles.at(i).mask.size(), CV_8U);
+//            drawContours(point_draw,test_vec,0,WHITE,DRAW_WIDTH_INFILL);
+//            imshow("new mask", temp_triangles.at(i).mask);
+//            imshow("point contour",point_draw);
+//            waitKey(0);
+//        }
 
 
 

@@ -2735,4 +2735,62 @@
 
 ////            imshow("feaf",comb_temp);
 ////            waitKey(0);
+///
+//}
+
+// If there is an intersection gather the points of second polygon
+//vector<Point> second_points = temp_triangles.at(j).points;
+//// Find points in first polygon that is on intersection
+//vector<Point> first_intersections = {};
+//for(int k = 0; k < first_points.size(); k++){
+//    if(intersection.at<uchar>(first_points.at(k)) == uchar(WHITE)){
+//        first_intersections.push_back(first_points.at(k));
+//    }
+//}
+//// Find points in second polygon that is on intersection
+//vector<Point> second_intersections = {};
+//for(int k = 0; k < second_points.size(); k++){
+//    if(intersection.at<uchar>(second_points.at(k)) == uchar(WHITE)){
+//        second_intersections
+//    }
+//}
+
+
+//// Find points in second polygon to be added
+//vector<Point> points_to_add = {};
+//int current_common_index = 0;
+//bool finding_unique = false;
+//int gaps = 0;
+
+//for(int s = common_indexes_in_second.at(0); s < second_points.size(); s++){ // from first connection point to end
+//    if(s != common_indexes.at(current_common_index)){
+//        if(finding_unique == false){
+//            gaps++;
+//        }
+//        points_to_add.push_back(second_points.at(s));
+//        finding_unique = true;
+//    }
+//    else{
+//        current_common_index++;
+//        finding_unique = false;
+//    }
+//}
+
+//for(int s = 0; s < common_indexes_in_second.at(0); s++){ // from start to first connection point
+//    if(s != common_indexes.at(current_common_index)){
+//        if(finding_unique == false){
+//            gaps++;
+//        }
+//        finding_unique = true;
+//        points_to_add.push_back(second_points.at(s));
+//    }
+//    else{
+//        current_common_index++;
+//        finding_unique = false;
+//    }
+//}
+
+//// If gaps exist continue to next polygon since these gaps present incomplete connections
+//if(gaps > 1){
+//    continue;
 //}
