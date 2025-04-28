@@ -202,7 +202,7 @@ bool calculator::is_on_segment(Point start_of_line, Point point, Point end_of_li
 
 
 // -- Method for checking if lines intersect --
-bool calculator::do_intersect(cv::Point p1, cv::Point p2, cv::Point q1, cv::Point q2){
+bool calculator::do_intersect(cv::Point p1, cv::Point q1, cv::Point p2, cv::Point q2){
     bool lines_intersect = false;
     try{
 
@@ -212,19 +212,25 @@ bool calculator::do_intersect(cv::Point p1, cv::Point p2, cv::Point q1, cv::Poin
         int third_orientation = get_orientation(p2,q2,p1);
         int fourth_orientation = get_orientation(p2,q2,q1);
 
+
         if(first_orientation != second_orientation && third_orientation != fourth_orientation){
+            cout << "first place" << endl;
             lines_intersect = true;
         }
         else if(first_orientation == COLLINEAR && is_on_segment(p1,p2,q1)){
+            cout << "p2 is on segment" << endl;
             lines_intersect = true;
         }
         else if(second_orientation == COLLINEAR && is_on_segment(p1,q2,q1)){
+            cout << "q2 is on segment" << endl;
             lines_intersect = true;
         }
         else if(third_orientation == COLLINEAR && is_on_segment(p2,p1,q2)){
+            cout << "p1 is on segment" << endl;
             lines_intersect = true;
         }
         else if(fourth_orientation == COLLINEAR && is_on_segment(p2,q1,q2)){
+            cout << "q1 is on segment" << endl;
             lines_intersect = true;
         }
 

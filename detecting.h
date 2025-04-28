@@ -164,7 +164,9 @@ public:
 
     std::vector<triangle> remove_one_pixel_edges(std::vector<triangle> triangles);
 
+    std::vector<triangle> fully_combine_convex_triangles(std::vector<triangle> triangles);
 
+    std::vector<triangle> combine_and_fix(std::vector<triangle> triangles);
 
 
 

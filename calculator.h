@@ -10,7 +10,7 @@
 // -- Defines --
 static const int COLLINEAR = 0;
 static const int CLOCKWISE = 1;
-static const int COUNTER_CLOCKWISE = 0;
+static const int COUNTER_CLOCKWISE = 2;
 
 // -- Class --
 class calculator
@@ -48,7 +48,7 @@ public:
     bool is_on_segment(cv::Point start_of_line, cv::Point point, cv::Point end_of_line);
 
     // -- Method for checking if lines intersect --
-    bool do_intersect(cv::Point p1, cv::Point p2, cv::Point q1, cv::Point q2);
+    bool do_intersect(cv::Point p1, cv::Point q1, cv::Point p2, cv::Point q2);
 
 
 private:
