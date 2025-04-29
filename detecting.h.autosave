@@ -184,7 +184,8 @@ public:
     int get_common_point_count(triangle first_polygon, triangle second_polygon);
 
     std::vector<triangle> combine_and_fix_polygons(std::vector<triangle> polygons);
-
+    
+    std::vector<triangle> combine_until_concave(std::vector<triangle> combine_unti)
 
 
 

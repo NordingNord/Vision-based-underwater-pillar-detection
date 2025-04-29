@@ -1281,7 +1281,7 @@ prepared_contour detecting::prepare_contour_for_bounding(vector<Point> contour, 
     return new_contour_data;
 }
 
-vector<Point> detecting::get_biggest_contour(Mat mask){
+vector<Point> detecting::get_biggest_contour(Mat mask, int mode){
     vector<Point> biggest_contour;
     try{
         vector<vector<Point>> contours;
@@ -3405,10 +3405,12 @@ vector<Mat> detecting::convex_split(Mat mask){
         // Find deepest defect
         float largest_depth = 0.0;
         int largest_index = 0;
+        vector<float> depths = {};
         for(int i = 0; i < defects.size(); i++){
             Vec4i current_defect = defects.at(i);
             // read depth
             float depth = float(current_defect[3])/256.0;
+            depths.push_back(depth);
             // Check if largest depth
             if(depth > largest_depth){
                 largest_depth = depth;
@@ -3448,14 +3450,40 @@ vector<Mat> detecting::convex_split(Mat mask){
         imshow("the split point",test_image);
         waitKey(0);
 
+        // Trianglulate polygon
         //vector<Mat> testo = ear_clipping_triangulation(mask);
-
         vector<triangle> testo = delaunay_triangulation(mask);
 
+        // Remove triangles that are a single line
         testo = remove_one_pixel_edges(testo);
-        testo = fully_combine_convex_triangles(testo);
-        //testo = combine_and_fix(testo);
         //testo = size_filter_triangles(testo);
+
+        // Find depth threshold
+        float depth_threshold = 0.0;
+        if(depths.size() > 1){
+            clustering clusters;
+            vector<float> thresholds = clusters.jenks_natural_breaks(depths);
+            depth_threshold = thresholds.at(0);
+        }
+        cout << "Depth threshold: " << depth_threshold << endl;
+
+        // Combine polygons based on depth
+        //testo = combine_and_fix(testo);
+        testo = fully_combine_convex_triangles(testo,depth_threshold);
+
+        // Remove uncombined and small polygons
+        testo = combine_filter_triangles(testo, depth_threshold);
+
+        // Make remaining polygons convex
+        for(int i = 0; i < testo.size(); i++){
+            if(testo.at(i).points.size() > 3){ // No need to do it on triangles since they are allways convex
+                testo.at(i) = fix_concave_polygon(testo.at(i));
+            }
+        }
+
+        // Combine and clean contours
+        testo = combine_and_fix_polygons(testo);
+
 
         cout << "EAR CLIPING DONE" << endl;
 
@@ -3864,6 +3892,8 @@ vector<triangle> detecting::delaunay_triangulation(Mat mask){
                 triangle new_triangle;
                 new_triangle.mask = current_triangle_mask;
                 new_triangle.points = {first,second,third};
+                new_triangle.original_points = {first,second,third};
+                new_triangle.combined = false;
                 triangles.push_back(new_triangle);
             }
         }
@@ -3877,7 +3907,7 @@ vector<triangle> detecting::delaunay_triangulation(Mat mask){
 
 
 // Does not work currently
-vector<triangle> detecting::combine_convex_triangles(vector<triangle> triangles){
+vector<triangle> detecting::combine_convex_triangles(vector<triangle> triangles, float concave_threshold){
     vector<triangle> combined_triangles;
     try{
         // Create temp triangles vector, used for combining polygons
@@ -4213,7 +4243,7 @@ vector<triangle> detecting::combine_convex_triangles(vector<triangle> triangles)
 
                     for(int defect_index = 0; defect_index < defects.size(); defect_index++){
                         float depth = float(defects.at(defect_index)[3])/256.0;
-                        if(depth > 39.0){ // If big depth then dont accept connection (usually 2.0)
+                        if(depth > concave_threshold){ // If big depth then dont accept connection (usually 2.0)
                             approx_convex = false;
                             continue;
                         }
@@ -4223,6 +4253,8 @@ vector<triangle> detecting::combine_convex_triangles(vector<triangle> triangles)
                         // Update triangle
                         temp_triangles.at(i).mask = first_mask | second_mask;
                         temp_triangles.at(i).points = combined_points;
+                        temp_triangles.at(i).original_points = combined_points;
+                        temp_triangles.at(i).combined = true;
                         first_points = combined_points;
                         first_mask = temp_triangles.at(i).mask;
                         connected_indexes.push_back(j);
@@ -4314,14 +4346,14 @@ vector<triangle> detecting::remove_one_pixel_edges(vector<triangle> triangles){
     return filtered_triangles;
 }
 
-vector<triangle> detecting::fully_combine_convex_triangles(vector<triangle> triangles){
+vector<triangle> detecting::fully_combine_convex_triangles(vector<triangle> triangles, float concave_threshold){
     vector<triangle> combined_triangles = triangles;
     try{
         int last_size = 0;
         while(last_size != combined_triangles.size()){
             last_size = combined_triangles.size();
             cout << "last size: " << last_size << endl;
-            combined_triangles = combine_convex_triangles(combined_triangles);
+            combined_triangles = combine_convex_triangles(combined_triangles, concave_threshold);
             // Reverse vector to ensure all combinations are tested
             reverse(combined_triangles.begin(),combined_triangles.end());
         }
@@ -4492,18 +4524,425 @@ vector<triangle> detecting::combine_and_fix(vector<triangle> triangles){
     return combined_triangles;
 }
 
+float detecting::get_concave_threshold(vector<float> depths){
+    float threshold = 0.0;
+    try{
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return threshold;
+}
+
+triangle detecting::fix_concave_polygon(triangle polygon){
+    triangle cleaned_polygon = polygon;
+    try{
+        if(polygon.points.size() < 4){
+            throw runtime_error("Cannot fix polygons of size below four, due to intersections being common.");
+        }
+//        for(int i = 0; i < polygon.points.size(); i++){
+//            cout << polygon.points.at(i) << endl;
+//        }
+        // Get all polygon points
+        vector<Point> points = polygon.points;
+        //vector<Point> points = get_biggest_contour(polygon.mask,CHAIN_APPROX_NONE);
+
+        // Get convex hull
+        vector<int> convex_hull_indexes;
+        convexHull(points,convex_hull_indexes);
+
+        // Find defects
+        vector<Vec4i> defects;
+        convexityDefects(points,convex_hull_indexes,defects);
+
+        // Conntinue removing defects
+        while(true){
+            vector<int> defect_indexes;
+            // Go through all defects
+            for(int i = 0; i < defects.size(); i++){
+                Vec4i current_defect = defects.at(i);
+                // read depth
+                float depth = float(current_defect[3])/256.0;
+                // Filter defects based on depth (high depth -> actual defect)
+                if(depth > 0.0){ // Maybe change to 0.0
+                    defect_indexes.push_back(current_defect[2]); // index of farthest point
+                }
+            }
+
+            // If less than two defects found stop loop
+            if(defect_indexes.size() < 2){
+                break;
+            }
+            // else remove points between them and get new contour
+
+            int min_distance = INT_MAX;
+            int start_index = 0;
+            int end_index = 0;
+
+            // Find nearest defects
+            for(int i = 0; i < defect_indexes.size(); i++){
+                for(int j = i+1; j < defect_indexes.size(); j++){
+                    // calculate distance
+                    Point point_i = points.at(defect_indexes.at(i));
+                    Point point_j = points.at(defect_indexes.at(j));
+
+                    float distance = (point_i.x-point_j.x)*(point_i.x-point_j.x)+(point_i.y-point_j.y)*(point_i.y-point_j.y);
+                    if(distance < min_distance){
+                        min_distance = distance;
+                        start_index = defect_indexes.at(i);
+                        end_index = defect_indexes.at(j);
+                    }
+                }
+            }
+
+            // Break if start and end are on opposite quarters of frame compared to polygon center
+            Mat center_mask = Mat::zeros(polygon.mask.size(),CV_8U);
+            vector<vector<Point>> temp_vec = {points};
+            drawContours(center_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+            Point center = get_contour_center(center_mask);
+
+            bool start_right = false;
+            bool start_down = false;
+
+            bool end_right = false;
+            bool end_down = false;
+            if(points.at(start_index).x > center.x){
+                start_right = true;
+            }
+            if(points.at(start_index).y > center.y){
+                start_down = true;
+            }
+            if(points.at(end_index).x > center.x){
+                end_right = true;
+            }
+            if(points.at(end_index).y > center.y){
+                end_down = true;
+            }
+
+            if(start_down != end_down && start_right != end_right){ // Opposite quadrant
+                break;
+            }
+
+
+//            if(start_index == end_index){
+//                cout << "same start and end" << endl;
+//            }
+//            cout << start_index << ", " << end_index << ", " << points.size() << endl;
+//            Mat test = polygon.mask.clone();
+//            cvtColor(test,test, COLOR_GRAY2BGR);
+//            circle(test,points.at(start_index),2,{255,0,0},DRAW_WIDTH_INFILL);
+//            circle(test,points.at(end_index),2,{0,0,255},DRAW_WIDTH_INFILL);
+
+
+            // Check if intervals are swapped
+            if(start_index <= end_index){
+                vector<Point> inside(points.begin()+start_index,points.begin()+end_index);
+                int length_1 = 0;
+                if(inside.empty() == false){
+                    length_1 = arcLength(inside,false);
+                }
+
+                vector<Point> outside_1(points.begin(), points.begin()+start_index);
+                vector<Point> outside_2(points.begin()+end_index,points.end());
+
+                int length_2 = 0;
+                if(outside_1.empty() == false){
+                    length_2 = arcLength(outside_1,false);
+                }
+                if(outside_2.empty() == false){
+                    length_2 += arcLength(outside_2,false);
+                }
+//                cout << "Lengths: " << length_1 << ", " << length_2 << ", " << length_1+length_2 << endl;
+//                cout << "Dist between points: " << calculations.calculate_euclidean_distance(points.at(start_index),points.at(end_index)) << endl;
+//                cout << "Points: " << inside.size() << ", " << outside_1.size() + outside_2.size() << endl;
+
+                if(length_2 < length_1){
+                    swap(start_index,end_index);
+                }
+            }
+            else{
+                vector<Point> inside(points.begin()+end_index,points.begin()+start_index);
+                int length_1 = 0;
+                if(inside.empty() == false){
+                    length_1 = arcLength(inside,false);
+                }
+
+                vector<Point> outside_1(points.begin(), points.begin()+end_index);
+                vector<Point> outside_2(points.begin()+start_index,points.end());
+                int length_2 = 0;
+                if(outside_1.empty() == false){
+                    length_2 = arcLength(outside_1,false);
+                }
+                if(outside_2.empty() == false){
+                    length_2 += arcLength(outside_2,false);
+                }
+
+                if(length_1 < length_2){
+                    swap(start_index,end_index);
+                }
+            }
+
+            // Remove unwanted points
+            vector<Point> new_points;
+            if(start_index <= end_index){
+                new_points.insert(new_points.end(),points.begin(),points.begin()+start_index+1);
+                new_points.insert(new_points.end(),points.begin()+ end_index,points.end());
+            }
+            else{
+                new_points.insert(new_points.end(),points.begin()+end_index,points.begin()+start_index+1);
+            }
+
+            points = new_points;
+
+//            // Cleaned points
+//            Mat test_2 = test.clone();
+//            for(int i = 0; i < points.size(); i++){
+//                circle(test_2,points.at(i),2,{0,255,0},DRAW_WIDTH_INFILL);
+//            }
+//            circle(test,center,2,{0,255,0},DRAW_WIDTH_INFILL);
+//            imshow("test 2",test_2);
+//            imshow("test",test);
+//            waitKey(0);
+
+            // Recalculate convex hull
+            convexHull(points,convex_hull_indexes);
+
+            // Refind defects
+            convexityDefects(points,convex_hull_indexes,defects);
+        }
+
+        // Update cleaned polygon
+        cleaned_polygon.points = points;
+        Mat new_mask = Mat::zeros(cleaned_polygon.mask.size(), CV_8U);
+        vector<vector<Point>> temp_vec = {points};
+        drawContours(new_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+        cleaned_polygon.mask = new_mask;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return cleaned_polygon;
+}
+
+Point detecting::get_polygon_center(vector<Point> points){
+    Point center = Point{0,0};
+    try{
+        // Get x and y sum
+        int x_sum = 0;
+        int y_sum = 0;
+        for(int i = 0; i < points.size();i++){
+            x_sum += points.at(i).x;
+            y_sum += points.at(i).y;
+        }
+        // Divide with size to get center
+        x_sum = cvRound(float(x_sum)/float(points.size()));
+        y_sum = cvRound(float(y_sum)/float(points.size()));
+
+        // Set output
+        center.x = x_sum;
+        center.y = y_sum;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return center;
+}
+
+vector<triangle> detecting::combine_filter_triangles(vector<triangle> polygons, float concave_threshold){
+    vector<triangle> remaining_polygons = polygons;
+    try{
+        vector<triangle> temp_polygons = {};
+
+        // Remove contours that have not been connected, likely due to being small noise
+        for(int i = 0; i < polygons.size(); i++){
+            if(polygons.at(i).combined == true && contourArea(polygons.at(i).points,true) > concave_threshold){ // optional concave size threshold (concave since polygons smaller than indents are most likely not usefull)
+                temp_polygons.push_back(polygons.at(i));
+            }
+        }
+
+        remaining_polygons = temp_polygons;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return remaining_polygons;
+}
+
+
+vector<triangle> detecting::concave_filter_triangles(vector<triangle> polygons, float concave_threshold){
+    vector<triangle> remaining_polygons = polygons;
+    try{
+        vector<triangle> temp_polygons = {};
+
+        // Remove contours that have area smaller tha deppest concave
+        for(int i = 0; i < polygons.size(); i++){
+            if(contourArea(polygons.at(i).points,true) > concave_threshold){ // optional concave size threshold (concave since polygons smaller than indents are most likely not usefull)
+                temp_polygons.push_back(polygons.at(i));
+            }
+        }
+
+        remaining_polygons = temp_polygons;
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return remaining_polygons;
+}
+
+triangle detecting::combine_and_fix_polygon(vector<triangle> polygons, int index){
+    triangle fixed_polygon = polygons.at(index);
+    try{
+        // Combine polygon with all connected to it
+        bool change = true;
+        vector<triangle> temp_polygons = polygons;
+        vector<int> indexes_to_remove = {};
+        while(change == true){
+            change = false;
+            for(int i = 0; i < temp_polygons.size(); i++){
+                //Check if index already used
+                int index_count = count(indexes_to_remove.begin(), indexes_to_remove.end(), i);
+                if(i != index && index_count == 0){
+    //                // Check for common points
+    //                int common_count = get_common_point_count(polygons.at(index),polygons.at(i));
+                    // Check for intersection
+                    Mat intersection = fixed_polygon.mask & temp_polygons.at(i).mask;
+                    if(hasNonZero(intersection) == true){//common_count > 0){
+                        // combine
+                        fixed_polygon.mask = fixed_polygon.mask | temp_polygons.at(i).mask;
+                        change = true;
+                        indexes_to_remove.push_back(i);
+                    }
+                }
+            }
+        }
+
+        imshow("masky",fixed_polygon.mask);
+        waitKey(0);
+
+        // Find new points
+        vector<Point> new_points = get_biggest_contour(fixed_polygon.mask,CHAIN_APPROX_NONE);
+        fixed_polygon.points = new_points;
+
+        // Clean contour
+        fixed_polygon = fix_concave_polygon(fixed_polygon);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return fixed_polygon;
+}
 
 
 
+int detecting::get_common_point_count(triangle first_polygon, triangle second_polygon){
+    int common_points = 0;
+    try{
+        for(int i = 0; i < first_polygon.original_points.size(); i++){
+            for(int j = 0; j < second_polygon.original_points.size(); j++){
+                if(first_polygon.original_points.at(i) == second_polygon.original_points.at(j)){
+                    common_points++;
+                    break;
+                }
+            }
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return common_points;
+}
 
+vector<triangle> detecting::combine_and_fix_polygons(vector<triangle> polygons){
+    vector<triangle> new_polygons = polygons;
+    try{
+        vector<triangle> temp_polygons = polygons;
+        vector<triangle> temp_new_polygons = {};
+        while(temp_polygons.size() > 0){
 
+            // Find biggest polygon
+            int biggest_polygon = 0;
+            double biggest_area = 0.0;
+            for(int i = 0; i < temp_polygons.size(); i++){
+                // Get biggest contour
+                vector<Point> points = get_biggest_contour(temp_polygons.at(i).mask);
+                // Get area
+                double area = contourArea(points);
+                // Compare
+                if(area > biggest_area){
+                    biggest_polygon = i;
+                    biggest_area = area;
+                }
+            }
 
+            // Clean biggest polygon
+            Mat old_mask = temp_polygons.at(biggest_polygon).mask;
+            temp_polygons.at(biggest_polygon) = combine_and_fix_polygon(temp_polygons,biggest_polygon);
+            Mat remainder = old_mask - temp_polygons.at(biggest_polygon).mask;
 
+            // Add to final
+            temp_new_polygons.push_back(temp_polygons.at(biggest_polygon));
 
+            // Remove elements in all other contours that are within the biggest contour
+            vector<int> polygons_to_remove = {};
+            for(int i = 0; i < temp_polygons.size(); i++){
+                if(i != biggest_polygon){
+                    Mat temp_mask = temp_polygons.at(i).mask - temp_polygons.at(biggest_polygon).mask;
 
+                    if(hasNonZero(temp_mask) == false){
+                        polygons_to_remove.push_back(i);
+                    }
+                }
+                else{
+                    polygons_to_remove.push_back(i);
+                }
+            }
 
+            // Remove polygons with no more data or that have been fixed
+            for(int i = polygons_to_remove.size()-1; i >= 0; i--){
+                temp_polygons.erase(temp_polygons.begin()+polygons_to_remove.at(i));
+            }
 
+            // add new polygons that are a result of cleaning
+            vector<vector<Point>> contours;
+            vector<Vec4i> hierarchy;
 
+            findContours(remainder,contours,hierarchy,RETR_TREE,CHAIN_APPROX_NONE);
+
+            // Add new polygons to temp polygons
+            for(int i = 0; i < contours.size(); i++){
+                triangle new_polygon;
+                new_polygon.points = contours.at(i);
+                Mat new_mask = Mat::zeros(remainder.size(), CV_8U);
+                drawContours(new_mask,contours,i,WHITE,DRAW_WIDTH_INFILL);
+                new_polygon.mask = new_mask;
+                new_polygon.combined = false;
+                new_polygon.original_points = contours.at(i);
+                temp_polygons.push_back(new_polygon);
+            }
+        }
+
+        // Prepare output
+        new_polygons = temp_new_polygons;
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return new_polygons;
+}
+
+vector<triangle> detecting::combine_until_concave(vector<triangle> polygons, float concave_threshold){
+    vector<triangle> combined_polygons = polygons;
+    try{
+
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return combined_polygons;
+}
 
 
 
