@@ -47,9 +47,12 @@ public:
     // -- Method for checking if point is on line segment -- (https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/)
     bool is_on_segment(cv::Point start_of_line, cv::Point point, cv::Point end_of_line);
 
+    bool is_on_segment_non_collinear(cv::Point start_of_line, cv::Point point, cv::Point end_of_line);
+
     // -- Method for checking if lines intersect --
     bool do_intersect(cv::Point p1, cv::Point q1, cv::Point p2, cv::Point q2);
 
+    bool do_intersect(std::vector<cv::Point> points);
 
 private:
 };

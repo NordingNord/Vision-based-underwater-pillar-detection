@@ -86,7 +86,7 @@ public:
 
     prepared_contour prepare_contour_for_bounding(std::vector<cv::Point> contour, cv::Size frame_size);
 
-    std::vector<cv::Point> get_biggest_contour(cv::Mat mask, int mode = cv::CHAIN_APPROX_SIMPLE);
+    std::vector<cv::Point> get_biggest_contour(cv::Mat mask, int mode = cv::CHAIN_APPROX_SIMPLE, int return_mode = cv::RETR_TREE);
 
     cv::Mat get_contour_edge(std::vector<std::vector<cv::Point>> contour, cv::Size mask_size, bool remove_border = false);
 
@@ -185,6 +185,17 @@ public:
 
     std::vector<triangle> combine_and_fix_polygons(std::vector<triangle> polygons);
 
+    std::vector<triangle> combine_until_concave(std::vector<triangle> polygons, float concave_threshold);
+
+    int find_biggest_polygon(std::vector<triangle> polygons, std::vector<int> constraint = {});
+
+    bool check_convexity(std::vector<cv::Point> points, float concave_threshold);
+
+    bool check_polygon_for_holes(cv::Mat mask);
+
+    std::vector<triangle> filter_self_intersect_polygons(std::vector<triangle> polygons);
+
+    std::vector<triangle> filter_small_edge_polygons(std::vector<triangle> polygons, float concave_threshold);
 
 
 

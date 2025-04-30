@@ -158,14 +158,12 @@ vector<float> clustering::jenks_natural_breaks(vector<float> one_dimensional_dat
 
         // Calculate goodness of variance fit on the ranges
         vector<float> goodness_of_fits = {};
-        cout << sum_of_squared_results.size() << endl;
         for(int i = 0; i < sum_of_squared_results.size(); i++){
             float goodness_of_fit = (sum_of_squares-sum_of_squared_results.at(i));
             goodness_of_fits.push_back(goodness_of_fit);
         }
 
         // Take clustering that have the highest goodness of fit
-        cout << goodness_of_fits.size() << endl;
         float best_goodness_of_fit = *max_element(goodness_of_fits.begin(),goodness_of_fits.end());
         int best_cluster_index =  find(goodness_of_fits.begin(), goodness_of_fits.end(), best_goodness_of_fit)-goodness_of_fits.begin();
         vector<vector<float>> best_clusters = kept_results.at(best_cluster_index);
@@ -204,6 +202,124 @@ vector<float> clustering::jenks_natural_breaks(vector<float> one_dimensional_dat
     return thresholds;
 }
 
+vector<double> clustering::jenks_natural_breaks(vector<double> one_dimensional_data, int cluster_count){
+    vector<double> thresholds = {};
+    try{
+        if(cluster_count == 1){
+            throw runtime_error("Only one cluster selected. Returning input points as cluster.");
+        }
+        if(cluster_count > one_dimensional_data.size()){
+            throw runtime_error("Cannot return more clusters than there are keypoints. Returning input points as cluster.");
+        }
+
+        // Sort data
+        vector<double> sorted_data = one_dimensional_data;
+        sort(sorted_data.begin(),sorted_data.end());
+
+        // Calculate mean
+        double data_sum = accumulate(sorted_data.begin(), sorted_data.end(),0);
+        double data_mean = data_sum/sorted_data.size();
+
+        // Determining the sum of squared devians for the vector mean
+        double sum_of_squares = 0;
+        for(int i = 0; i < sorted_data.size(); i++){
+            sum_of_squares += powf((sorted_data.at(i)-data_mean),2);
+        }
+
+        // Find all subsets
+        vector<vector<double>> subsets(cluster_count);
+        vector<vector<vector<double>>> results = {};
+        partition_vector(sorted_data,0,cluster_count,0,subsets,results);
+
+        // Remove all combinations that include gaps
+        bool result_good = true;
+        vector<vector<vector<double>>> kept_results;
+//        cout << results.size() << endl;
+        for(int i = 0; i < results.size(); i++){ // Results
+            double min_value = 0.0;
+            for(int j = 0; j < results.at(i).size(); j++){ // Different ranges in that result
+                for(int k = 0; k < results.at(i).at(j).size();k++){ // Values in that range
+                    if(results.at(i).at(j).at(k) < min_value){
+                        result_good = false;
+                    }
+                    else{
+                        min_value = results.at(i).at(j).at(k);
+                    }
+                }
+            }
+            if(result_good == true){
+                kept_results.push_back(results.at(i));
+            }
+            result_good = true;
+        }
+
+        // Calculate sum of squared deviations for range means and deviations
+        vector<double> sum_of_squared_results = {};
+        for(int i = 0; i < kept_results.size(); i++){
+            double sum_of_squared = 0;
+            for(int j = 0; j < kept_results.at(i).size(); j++){
+                // Calculate mean
+                double mean = 0;
+                for(int k = 0; k < kept_results.at(i).at(j).size(); k++){
+                    mean += kept_results.at(i).at(j).at(k);
+                }
+                mean = mean/kept_results.at(i).at(j).size();
+
+                // Now find differences squared
+                for(int k = 0; k < kept_results.at(i).at(j).size();k++){
+                    sum_of_squared += pow(kept_results.at(i).at(j).at(k)-mean,2);
+                }
+            }
+            sum_of_squared_results.push_back(sum_of_squared);
+        }
+        // Lowest result -> minimum variance
+
+        // Calculate goodness of variance fit on the ranges
+        vector<double> goodness_of_fits = {};
+        cout << sum_of_squared_results.size() << endl;
+        for(int i = 0; i < sum_of_squared_results.size(); i++){
+            double goodness_of_fit = (sum_of_squares-sum_of_squared_results.at(i));
+            goodness_of_fits.push_back(goodness_of_fit);
+        }
+
+        // Take clustering that have the highest goodness of fit
+        double best_goodness_of_fit = *max_element(goodness_of_fits.begin(),goodness_of_fits.end());
+        int best_cluster_index =  find(goodness_of_fits.begin(), goodness_of_fits.end(), best_goodness_of_fit)-goodness_of_fits.begin();
+        vector<vector<double>> best_clusters = kept_results.at(best_cluster_index);
+
+        // Find thresholds
+        for(int i = 0; i < best_clusters.size()-1; i++){ // Go through all clusters except the last
+            // Calculate maximum difference within cluster
+            double max_value = *max_element(best_clusters.at(i).begin(), best_clusters.at(i).end());
+            double min_value = *min_element(best_clusters.at(i).begin(), best_clusters.at(i).end());
+            double difference = max_value - min_value;
+
+            // Take half the difference and add it tot the max value. This is the threshold
+            double threshold = max_value + difference*0.5;
+
+            // Ensure that threshold is not larger than the next min value
+            double next_min = *min_element(best_clusters.at(i+1).begin(), best_clusters.at(i+1).end());
+            if(threshold > next_min){
+                // in this case take the value inbetween the max and next min as the threshold
+                if(jenks_enforcement == ENFORCE_JENKS_THRESHOLD){
+                    threshold = max_value + (max_value-next_min)*0.5;
+                }
+                // or interprit it as the two clusters being too close to
+                else{
+                    threshold = 0.0;
+                }
+
+            }
+
+            // Prepare output
+            thresholds.push_back(threshold);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return thresholds;
+}
 
 Mat clustering::remove_inter_superpixel_noise(Mat frame, super_pixel_frame superpixels){
     Mat cleaned_frame = frame.clone();
@@ -309,6 +425,57 @@ void clustering::partition_vector(vector<float> data, int index, int subset_coun
                     // Count elements in other subsets smaller than this element
                     for(int x_other = x+1; x_other < subsets.size(); x_other++){
                         int smaller_elements = count_if(subsets.at(x_other).begin(), subsets.at(x_other).end(), [&](float data_point){return data_point < subsets.at(x).at(y);});
+                        // Stop if not ascending
+                        if(smaller_elements > 0){
+                            return;
+                        }
+                    }
+                    current_subset.push_back(subsets.at(x).at(y));
+                }
+                current_combination.push_back(current_subset);
+            }
+            results.push_back(current_combination);
+//            cout << "stuff added" << endl;
+        }
+        return;
+    }
+    // Else continue going down
+    for(int i = 0; i < subset_count; i++){
+        if(subsets[i].size() > 0){ // if there is already something in the subset, push data to it
+            subsets[i].push_back(data[index]);
+
+            // Continue with remaining elements using recursion
+            partition_vector(data,index+1,subset_count, subset_num, subsets, results);
+
+            // Backtrack
+            subsets[i].pop_back();
+        }
+        // If empty push and icnrease subset count
+        else{
+            subsets[i].push_back(data[index]);
+            partition_vector(data,index+1,subset_count, subset_num+1,subsets,results);
+
+            // Backtrack
+            subsets[i].pop_back();
+
+            // Break to ensure that we do not go into other empty subsets
+            break;
+        }
+    }
+}
+
+// -- Recurrence algorithm for partioning a one dimensional vector --
+void clustering::partition_vector(vector<double> data, int index, int subset_count, int subset_num, vector<vector<double>>& subsets, vector<vector<vector<double>>>& results){
+    if(index >= data.size()){ // index bigger than size so we should return
+        if(subset_num == subset_count){
+            vector<vector<double>> current_combination;
+            for(int x = 0; x < subsets.size(); x++){
+                vector<double> current_subset;
+                //cout << "{ ";
+                for(int y = 0; y < subsets[x].size();y++){
+                    // Count elements in other subsets smaller than this element
+                    for(int x_other = x+1; x_other < subsets.size(); x_other++){
+                        int smaller_elements = count_if(subsets.at(x_other).begin(), subsets.at(x_other).end(), [&](double data_point){return data_point < subsets.at(x).at(y);});
                         // Stop if not ascending
                         if(smaller_elements > 0){
                             return;

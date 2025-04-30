@@ -137,7 +137,7 @@ vector<double> calculator::get_canny_thresholds(Mat frame){
     try{
         // Get otsu threshold
         Mat temp;
-        double upper_threshold = threshold(frame,temp,0,255,THRESH_BINARY | THRESH_OTSU);
+        double upper_threshold = threshold(frame,temp,0,255,THRESH_BINARY | THRESH_OTSU); // double upper_threshold = threshold(frame,temp,0,255,THRESH_BINARY | THRESH_OTSU);
         double lower_threshold = upper_threshold *0.5;
 
         thresholds = {lower_threshold,upper_threshold};
@@ -180,7 +180,7 @@ int calculator::get_orientation(Point first_point, Point second_point, Point thi
 }
 
 
-// -- Method for checking if point is on line segment -- (https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/)
+// -- Method for checking if point is on line segment (if collinear)-- (https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/)
 bool calculator::is_on_segment(Point start_of_line, Point point, Point end_of_line){
     bool on_segment = false;
     try{
@@ -192,6 +192,33 @@ bool calculator::is_on_segment(Point start_of_line, Point point, Point end_of_li
 
         if(first_check && second_check && third_check && fourth_check){
             on_segment = true;
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return on_segment;
+}
+
+bool calculator::is_on_segment_non_collinear(cv::Point start_of_line, cv::Point point, cv::Point end_of_line){
+    bool on_segment = false;
+    try{
+        // Get cross produxt
+        int cross_product = (point.y-start_of_line.y) * (end_of_line.x - start_of_line.x) - (point.x - start_of_line.x) * (end_of_line.y - start_of_line.y);
+
+        // If cross product is zero it might intersect
+        if(cross_product == 0){
+            // check dot product
+            int dot_product = (point.x - start_of_line.x) * (end_of_line.x - start_of_line.x) + (point.y - start_of_line.y) * (end_of_line.y - start_of_line.y);
+
+            // If dot product is 0 or more we might have an intersection
+            if(dot_product >= 0){
+                // Test for squared length
+                int squared_lenght = (end_of_line.x-start_of_line.x)*(end_of_line.x - start_of_line.x) + (end_of_line.y - start_of_line.y)*(end_of_line.y - start_of_line.y);
+                if(dot_product <= squared_lenght){
+                    on_segment = true;
+                }
+            }
         }
     }
     catch(const exception& error){
@@ -214,26 +241,71 @@ bool calculator::do_intersect(cv::Point p1, cv::Point q1, cv::Point p2, cv::Poin
 
 
         if(first_orientation != second_orientation && third_orientation != fourth_orientation){
-            cout << "first place" << endl;
-            lines_intersect = true;
+//            cout << "first place" << endl;
+            lines_intersect = true; // Temp (Must be true normally)
         }
         else if(first_orientation == COLLINEAR && is_on_segment(p1,p2,q1)){
-            cout << "p2 is on segment" << endl;
-            lines_intersect = true;
+//            cout << "p2 is on segment" << endl;
+            lines_intersect = true; // Temp (Must be true normally)
         }
         else if(second_orientation == COLLINEAR && is_on_segment(p1,q2,q1)){
-            cout << "q2 is on segment" << endl;
-            lines_intersect = true;
+//            cout << "q2 is on segment" << endl;
+            lines_intersect = true; // Temp (Must be true normally)
         }
         else if(third_orientation == COLLINEAR && is_on_segment(p2,p1,q2)){
-            cout << "p1 is on segment" << endl;
-            lines_intersect = true;
+//            cout << "p1 is on segment" << endl;
+            lines_intersect = true; // Temp (Must be true normally)
         }
         else if(fourth_orientation == COLLINEAR && is_on_segment(p2,q1,q2)){
-            cout << "q1 is on segment" << endl;
-            lines_intersect = true;
+//            cout << "q1 is on segment" << endl;
+            lines_intersect = true; // Temp (Must be true normally)
         }
 
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return lines_intersect;
+}
+
+bool calculator::do_intersect(vector<Point> points){
+    bool lines_intersect = false;
+    try{
+        // For each line
+        for(int i = 0; i < points.size(); i++){
+            // Get next index
+            int next_i = i+1;
+            if(i == points.size()-1){
+                next_i = 0;
+            }
+
+            // Line
+            Point p1 = points.at(i);
+            Point q1 = points.at(next_i);
+
+            // Check if it intersect with any other line, not containing the same points
+            for(int j = 0; j < points.size(); j++){
+                // Find next index
+                int next_j = j+1;
+                if(j == points.size()-1){
+                    next_j = 0;
+                }
+                    // Define line
+                    Point p2 = points.at(j);
+                    Point q2 = points.at(next_j);
+
+                    // Check for intersection
+                    bool status = do_intersect(p1,q1,p2,q2);
+
+                    if(status == true){
+                        lines_intersect = true;
+                        break;
+                    }
+            }
+            if(lines_intersect == true){
+                break;
+            }
+        }
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

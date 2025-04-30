@@ -33,9 +33,11 @@ public:
 
     // -- Methods for 1D clustering --
     std::vector<float> jenks_natural_breaks(std::vector<float> one_dimensional_data, int cluster_count = 2);
+    std::vector<double> jenks_natural_breaks(std::vector<double> one_dimensional_data, int cluster_count = 2);
 
     // -- Recurrence algorithm for partioning a one dimensional vector --
     void partition_vector(std::vector<float> data, int index, int subset_count, int subset_num, std::vector<std::vector<float>>& subsets, std::vector<std::vector<std::vector<float>>>& results);
+    void partition_vector(std::vector<double> data, int index, int subset_count, int subset_num, std::vector<std::vector<double>>& subsets, std::vector<std::vector<std::vector<double>>>& results);
 
 private:
     // -- SLIC settings --

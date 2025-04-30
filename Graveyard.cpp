@@ -3809,3 +3809,47 @@
 ////            }
 ////            combined_triangles.push_back(triangles.at(i));
 ////        }
+
+//                        // Find common elements
+//                        int common_count = 0;
+//                        vector<Point> unique_points = {};
+//                        for(int j = 0; j < uncombined_polygons.at(i).original_points.size(); j++){
+//                            bool common_found = false;
+//                            for(int k = 0; k < unused_polygons.at(index).original_points.size(); k++){
+//                                if(unused_polygons.at(index).original_points.at(k) == uncombined_polygons.at(i).original_points.at(j)){
+//                                    common_found = true;
+//                                }
+//                            }
+//                            if(common_found == true){
+//                                common_count++;
+//                            }
+//                            else{
+//                                unique_points.push_back(uncombined_polygons.at(i).points.at(j));
+//                            }
+//                        }
+
+//                        // Continue if less than two common points
+//                        if(common_count < 2){
+//                            continue;
+//                        }
+
+//                        // Close mask to avoid intersections
+//                        morphologyEx(combined,combined,MORPH_CLOSE,border_kernel);
+
+//                        cout << "New combination: " << endl;
+//                        for(int o = 0; o < points.size(); o++){
+//                            cout << points.at(o) << endl;
+//                        }
+
+//                        // Ensure that polygon does not self intersect
+//                        bool intersects = calculations.do_intersect(points);
+//                        //bool intersects = check_polygon_for_holes(combined);
+
+//                        if(intersects == true){
+//                            continue;
+//                        }
+
+//waitKey(0);
+//                        cout << "Intersection count: " << countNonZero(intersection) << endl;
+//                        imshow("combi",combined);
+//                        waitKey(0);
