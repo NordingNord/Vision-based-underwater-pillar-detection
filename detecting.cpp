@@ -3491,6 +3491,7 @@ vector<Mat> detecting::convex_split(Mat mask){
         // Combine polygons based on depth
         //testo = combine_and_fix(testo);
         //testo = fully_combine_convex_triangles(testo,depth_threshold); // best one currently
+
         testo = combine_until_concave(testo,depth_threshold);
         cout << "polygons: " << testo.size() << endl;
 
@@ -5255,7 +5256,7 @@ vector<triangle> detecting::combine_until_concave(vector<triangle> polygons, flo
                             unused_polygons.at(index).combined = true;
 
                             // Break in order to allways connect with biggest
-                            break; // Without break 3.5 seconds with 40 seconds
+                            //break; // Without break 3.5 seconds with 40 seconds
                         }
                     }
                 }

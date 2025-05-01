@@ -183,8 +183,6 @@ private:
 
     bool mask_mode = true;
     bool set_background = true;
-
-
 };
 
 #endif // PIPELINE_H

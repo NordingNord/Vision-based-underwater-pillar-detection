@@ -540,6 +540,7 @@ vector<DMatch> feature_handling::match_features_brute_force(Mat first_descriptor
         // Find matches
         vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
         brute_matcher->knnMatch(first_descriptors,second_descriptors,all_matches,best_match_count);
+
         // Prepare shortest distance
         vector<DMatch> best_matches;
         vector<bool> accepted_matches;
@@ -554,6 +555,10 @@ vector<DMatch> feature_handling::match_features_brute_force(Mat first_descriptor
         matches.matches = best_matches;
         matches.all_matches = all_matches;
         matches.good_matches = accepted_matches;
+
+        // vector<DMatch> temp_matches;
+        // brute_matcher->match(first_descriptors,second_descriptors,temp_matches); Uncomment this when running feature test since this is the method used in those olden times
+        // matches.matches = temp_matches;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
