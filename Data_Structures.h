@@ -188,4 +188,10 @@ struct prepared_contour{
     int end_row;
 };
 
+//// Keypoints and descriptors
+//struct feature_data{
+//    cv::Mat descriptors;
+//    std::vector<cv::KeyPoint> keypoints;
+//};
+
 #endif

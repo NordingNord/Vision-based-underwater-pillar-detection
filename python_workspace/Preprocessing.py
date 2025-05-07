@@ -450,7 +450,7 @@ y_dim = 0.5
 cap = cv.VideoCapture('../../Data/Video_Data/Wall_Indents_Top.mkv')
 frame_size = (int(cap.get(3)),int(cap.get(4)))
 fps = 30
-writer = cv.VideoWriter( "../../Data/Video_Data/Preprocessed_Wall_Indents_Top.mkv", cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
+writer = cv.VideoWriter( "../../Data/Video_Data/Preprocessed_Wall_Indents_Toptt.mkv", cv.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
 preprocessor = preprocessing()
 while(True):
     ret,frame = cap.read()
@@ -501,7 +501,8 @@ while(True):
 
     # Step 4:
     # start = time.time()
-    homomorphic_frame = preprocessor.homomorphic_filter(lum_frame_Y,0.5,2.5,1.0)
+    # -- homomorphic_frame = preprocessor.homomorphic_filter(lum_frame_Y,0.5,2.5,1.0)
+    homomorphic_frame = lum_frame_Y
     # end = time.time()
     # time_spent = (end-start) * 10**3
     # print("Step 4: " + str(time_spent) + " ms")
@@ -533,7 +534,9 @@ while(True):
     # Step 5:
     # start = time.time()
     #denoised_frame = preprocessor.sci_wavelet_denoising(homomorphic_frame)
-    denoised_frame = preprocessor.wavelet_denoising(homomorphic_frame,3,81)
+    # -- denoised_frame = preprocessor.wavelet_denoising(homomorphic_frame,3,81)
+    # -- denoised_frame = homomorphic_frame
+    denoised_frame = homomorphic_frame
     # end = time.time()
     # time_spent = (end-start) * 10**3
     # print("Step 5: " + str(time_spent) + " ms")
@@ -545,7 +548,8 @@ while(True):
 
     # Step 6:
     # start = time.time()
-    filtered_frame = aniso.anisodiff(denoised_frame, 3, 0.1, 0.25)
+    # -- filtered_frame = aniso.anisodiff(denoised_frame, 3, 0.1, 0.25)
+    filtered_frame = denoised_frame
     #filtered_frame = preprocessor.anisotropic_filter(denoised_frame,5,0.1,0.25) # Something is different in mine :'(
     # end = time.time()
     # time_spent = (end-start) * 10**3
@@ -557,7 +561,9 @@ while(True):
 
     # Step 7:
     # start = time.time()
+    print("time to stretch")
     streched_frame = preprocessor.strech_contrast(filtered_frame)
+    print("done streching")
     # end = time.time()
     # time_spent = (end-start) * 10**3
     # print("Step 7: " + str(time_spent) + " ms")

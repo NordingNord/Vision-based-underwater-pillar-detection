@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <valarray>
+#include <chrono>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
@@ -36,9 +37,9 @@ public:
     // -- Method for testing AKAZE feature detection --
     void test_akaze();
 
-    void akaze_annotation_test(akaze_settings current_settings, fstream writer, std::string video_path, std::string annotation_path, std::string setting_name);
+    void akaze_annotation_test(akaze_settings current_settings, std::string file_name, std::string video_path, std::string annotation_path, std::string setting_name);
 
-    void akaze_matching_test(akaze_settings current_settings, fstream writer, std::string video_path, std::string setting_name);
+    void akaze_matching_test(akaze_settings current_settings, std::string file_name, std::string video_path, std::string setting_name, int frame_limit);
 
     // -- Method for testing disparity settings --
     void test_disparity_map_alone();

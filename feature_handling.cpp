@@ -340,72 +340,102 @@ Mat feature_handling::get_brief_descriptors(Mat frame,vector<KeyPoint> keypoints
 
 
 // -- Methods for computing features (both keypoints and descriptors) --
-//feature_data feature_handling::compute_features(Mat frame){
-//    feature_data computed_features;
-//    try{
-//        // Run feature detector based on base method
-//        if(detector_type == DETECTOR_ORB){
-//            computed_features = compute_features(frame,settings_orb);
-//        }
-//        else if(detector_type == DETECTOR_SIFT){
-//            computed_features = compute_features(frame,settings_sift);
-//        }
-//        else if(detector_type == DETECTOR_AKAZE){
-//            computed_features = compute_features(frame,settings_akaze);
-//        }
-//        else{
-//            string error_message = "Invalid detector type " + to_string(detector_type) + ".";
-//            throw runtime_error(error_message);
-//        }
-//    }
-//    catch(const exception& error){
-//        cout << "Error: " << error.what() << endl;
-//    }
-//    return computed_features;
-//}
+feature_data feature_handling::compute_features(Mat frame){
+    feature_data computed_features;
+    try{
+        // Run feature detector based on base method
+        if(detector_type == DETECTOR_ORB){
+            computed_features = compute_features(frame,settings_orb);
+        }
+        else if(detector_type == DETECTOR_SIFT){
+            computed_features = compute_features(frame,settings_sift);
+        }
+        else if(detector_type == DETECTOR_AKAZE){
+            computed_features = compute_features(frame,settings_akaze);
+        }
+        else{
+            string error_message = "Invalid detector type " + to_string(detector_type) + ".";
+            throw runtime_error(error_message);
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return computed_features;
+}
 
-//feature_data feature_handling::compute_features(Mat frame, orb_settings settings){
-//    feature_data computed_features;
-//    try{
-//        // Initialize detector
-//        Ptr<ORB> orb_detector = ORB::create(settings.max_features, settings.scale_factor, settings.levels, settings.edge_threshold, settings.first_level, settings.wta_k, ORB::HARRIS_SCORE, settings.patch_size, settings.fast_threshold);
-//        // Grayscale frame
-//        Mat grayscale_frame;
-//        cvtColor(frame,grayscale_frame,COLOR_BGR2GRAY);
-//        // Find features
-//        orb_detector->detectAndCompute(grayscale_frame,keypoints);
-//        if(keypoints.size() == 0){
-//            throw runtime_error("No features was found using ORB.");
-//        }
+feature_data feature_handling::compute_features(Mat frame, orb_settings settings){
+    feature_data computed_features;
+    try{
+        // Initialize detector
+        Ptr<ORB> orb_detector = ORB::create(settings.max_features, settings.scale_factor, settings.levels, settings.edge_threshold, settings.first_level, settings.wta_k, ORB::HARRIS_SCORE, settings.patch_size, settings.fast_threshold);
+        // Grayscale frame
+        Mat grayscale_frame;
+        cvtColor(frame,grayscale_frame,COLOR_BGR2GRAY);
+        // Find features
+        vector<KeyPoint> keypoints;
+        Mat descriptors;
+        orb_detector->detectAndCompute(grayscale_frame,noArray(),keypoints,descriptors);
+        computed_features.keypoints = keypoints;
+        computed_features.descriptors = descriptors;
+        if(keypoints.size() == 0){
+            throw runtime_error("No features was found using ORB.");
+        }
 
-//    }
-//    catch(const exception& error){
-//        cout << "Error: " << error.what() << endl;
-//    }
-//    return computed_features;
-//}
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return computed_features;
+}
 
-//feature_data feature_handling::compute_features(Mat frame, sift_settings settings){
-//    feature_data computed_features;
-//    try{
+feature_data feature_handling::compute_features(Mat frame, sift_settings settings){
+    feature_data computed_features;
+    try{
+        // Initialize detector
+        Ptr<SIFT> sift_detector = SIFT::create(settings.max_features, settings.layers, settings.contrast_threshold, settings.edge_threshold, settings.sigma, settings.descriptor_type, settings.enable_precise_upscale);
+        // Grayscale frame
+        Mat grayscale_frame;
+        cvtColor(frame,grayscale_frame,COLOR_BGR2GRAY);
+        // Find features
+        vector<KeyPoint> keypoints;
+        Mat descriptors;
+        sift_detector->detectAndCompute(grayscale_frame,noArray(),keypoints,descriptors);
+        computed_features.keypoints = keypoints;
+        computed_features.descriptors = descriptors;
+        if(keypoints.size() == 0){
+            throw runtime_error("No features was found using ORB.");
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return computed_features;
+}
 
-//    }
-//    catch(const exception& error){
-//        cout << "Error: " << error.what() << endl;
-//    }
-//    return computed_features;
-//}
-
-//feature_data feature_handling::compute_features(Mat frame, akaze_settings settings){
-//    feature_data computed_features;
-//    try{
-
-//    }
-//    catch(const exception& error){
-//        cout << "Error: " << error.what() << endl;
-//    }
-//    return computed_features;
-//}
+feature_data feature_handling::compute_features(Mat frame, akaze_settings settings){
+    feature_data computed_features;
+    try{
+        // Initialize detector
+        Ptr<AKAZE> akaze_detector = AKAZE::create(settings.descriptor_type, settings.descriptor_size, settings.descriptor_channels, settings.threshold, settings.octaves, settings.octave_layers, settings.diffusivity);
+        // Grayscale frame
+        Mat grayscale_frame;
+        cvtColor(frame,grayscale_frame,COLOR_BGR2GRAY);
+        // Find features
+        vector<KeyPoint> keypoints;
+        Mat descriptors;
+        akaze_detector->detectAndCompute(grayscale_frame,noArray(),keypoints,descriptors);
+        computed_features.keypoints = keypoints;
+        computed_features.descriptors = descriptors;
+        if(keypoints.size() == 0){
+            throw runtime_error("No features was found using ORB.");
+        }
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return computed_features;
+}
 
 
 // -- Methods for setting paramters --
@@ -537,28 +567,29 @@ vector<DMatch> feature_handling::match_features_brute_force(Mat first_descriptor
         else if(detector_type == DETECTOR_SIFT){
             brute_matcher = BFMatcher::create(NORM_L2,crosscheck_status);
         }
-        // Find matches
-        vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
-        brute_matcher->knnMatch(first_descriptors,second_descriptors,all_matches,best_match_count);
+        // Uncommont before going back to normal
+//        // Find matches
+//        vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
+//        brute_matcher->knnMatch(first_descriptors,second_descriptors,all_matches,best_match_count);
 
-        // Prepare shortest distance
-        vector<DMatch> best_matches;
-        vector<bool> accepted_matches;
-        for(size_t i = 0; i < all_matches.size();i++){
-            // check if empty
-            if(all_matches[i].empty() == false){
-                best_matches.push_back(all_matches[i][0]);
-                accepted_matches.push_back(true);
-            }
-        }
-        // Prepare return data
-        matches.matches = best_matches;
-        matches.all_matches = all_matches;
-        matches.good_matches = accepted_matches;
+//        // Prepare shortest distance
+//        vector<DMatch> best_matches;
+//        vector<bool> accepted_matches;
+//        for(size_t i = 0; i < all_matches.size();i++){
+//            // check if empty
+//            if(all_matches[i].empty() == false){
+//                best_matches.push_back(all_matches[i][0]);
+//                accepted_matches.push_back(true);
+//            }
+//        }
+//        // Prepare return data
+//        matches.matches = best_matches;
+//        matches.all_matches = all_matches;
+//        matches.good_matches = accepted_matches;
 
-        // vector<DMatch> temp_matches;
-        // brute_matcher->match(first_descriptors,second_descriptors,temp_matches); Uncomment this when running feature test since this is the method used in those olden times
-        // matches.matches = temp_matches;
+         vector<DMatch> temp_matches;
+         brute_matcher->match(first_descriptors,second_descriptors,temp_matches);// Uncomment this when running feature test since this is the method used in those olden times
+         matches.matches = temp_matches;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

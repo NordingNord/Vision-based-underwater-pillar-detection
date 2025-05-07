@@ -4,6 +4,7 @@
 #include "pipeline.h"
 #include "feature_handling.h"
 #include "Data_Structures.h"
+#include "tests.h"
 //#include "Test_Methods.h"
 //#include "Obstacle_Detection.h"
 //#include "Data_Collector.h"
@@ -244,7 +245,12 @@ int main(){
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
-    detection_triangulation.run_disparity_pipeline_test(ratio);
+
+    //    detection_triangulation.run_disparity_pipeline_test(ratio);
+
+    // Run tests
+    tests test_runner;
+    test_runner.test_akaze();
 
 
 }
