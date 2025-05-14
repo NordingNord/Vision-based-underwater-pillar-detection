@@ -34,6 +34,11 @@ public:
     // -- Constructor --
     tests();
 
+    // -- Methods for inserting data into file --
+    void replace_in_file(std::string path, std::string new_path, std::string to_replace, std::string replacement, int interval, int segment, std::string interval_replacement);
+
+    void replace_in_file_from_to(std::string path, std::string new_path, std::string to_replace, std::string replacement, int start, int end);
+
     // -- Method for testing AKAZE feature detection --
     void test_akaze();
 
@@ -41,10 +46,30 @@ public:
 
     void akaze_matching_test(akaze_settings current_settings, std::string file_name, std::string video_path, std::string setting_name, int frame_limit);
 
+    void test_best_akaze();
+
+    // -- Method for testing ORB feature detection --
+    void test_orb();
+
+    void test_best_orb();
+
+    void orb_annotation_test(orb_settings current_settings, std::string file_name, std::string video_path, std::string annotation_path, std::string setting_val);
+
+    void orb_matching_test(orb_settings current_settings, std::string file_name, std::string video_path, std::string setting_val, int frame_limit);
+
+    // -- Method for testing SIFT feature detection --
+    void test_best_sift();
+
+    void sift_annotation_test(sift_settings current_settings, std::string file_name, std::string video_path, std::string annotation_path, std::string setting_val);
+
+    void sift_matching_test(sift_settings current_settings, std::string file_name, std::string video_path, std::string setting_val, int frame_limit);
+
     // -- Method for testing disparity settings --
     void test_disparity_map_alone();
 
-    void disparity_quality_test(fstream writer, disparity_parameters settings, std::string bottom_path, std::string top_path, std::string bottom_parameters, std::string top_parameters, std::string setting_val);
+    void test_best_disparity_map();
+
+    void disparity_quality_test(std::string writer_path, disparity_parameters settings, std::string bottom_path, std::string top_path, std::string bottom_parameters, std::string top_parameters, std::string setting_val, int frame_limit, std::string image_path);
 
     // -- Method for testing preprocessing methods --
     void test_preprocessing();

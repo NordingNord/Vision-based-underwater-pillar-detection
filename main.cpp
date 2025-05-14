@@ -250,7 +250,14 @@ int main(){
 
     // Run tests
     tests test_runner;
-    test_runner.test_akaze();
+    //test_runner.test_akaze();
+    //test_runner.test_best_akaze();
+    //test_runner.test_orb();
+    //test_runner.test_best_orb();
+    //test_runner.test_best_sift();
+    //test_runner.test_disparity_map_alone();
+    //test_runner.test_best_disparity_map();
 
-
+    test_runner.replace_in_file("../Data/test_results/disparity_settings_test/best.csv", "../Data/test_results/disparity_settings_test/best_new.csv", "?", "0", 5, 50, "1");
+    //test_runner.replace_in_file_from_to("../Data/test_results/disparity_settings_test/speckleRange.csv", "../Data/test_results/disparity_settings_test/speckleRange_new.csv","?","1",0,51);
 }

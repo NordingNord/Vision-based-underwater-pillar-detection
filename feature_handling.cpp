@@ -345,6 +345,7 @@ feature_data feature_handling::compute_features(Mat frame){
     try{
         // Run feature detector based on base method
         if(detector_type == DETECTOR_ORB){
+            cout << "orb" << endl;
             computed_features = compute_features(frame,settings_orb);
         }
         else if(detector_type == DETECTOR_SIFT){
@@ -428,7 +429,7 @@ feature_data feature_handling::compute_features(Mat frame, akaze_settings settin
         computed_features.keypoints = keypoints;
         computed_features.descriptors = descriptors;
         if(keypoints.size() == 0){
-            throw runtime_error("No features was found using ORB.");
+            throw runtime_error("No features was found using AKAZE.");
         }
     }
     catch(const exception& error){
@@ -561,35 +562,40 @@ vector<DMatch> feature_handling::match_features_brute_force(Mat first_descriptor
         }
         // ORB
         else if(detector_type == DETECTOR_ORB){
-            brute_matcher = BFMatcher::create(NORM_HAMMING2,crosscheck_status);
+            if(settings_orb.wta_k == 2){
+                brute_matcher = BFMatcher::create(NORM_HAMMING,crosscheck_status);
+            }
+            else{
+                brute_matcher = BFMatcher::create(NORM_HAMMING2,crosscheck_status);
+            }
         }
         // SIFT
         else if(detector_type == DETECTOR_SIFT){
             brute_matcher = BFMatcher::create(NORM_L2,crosscheck_status);
         }
-        // Uncommont before going back to normal
-//        // Find matches
-//        vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
-//        brute_matcher->knnMatch(first_descriptors,second_descriptors,all_matches,best_match_count);
 
-//        // Prepare shortest distance
-//        vector<DMatch> best_matches;
-//        vector<bool> accepted_matches;
-//        for(size_t i = 0; i < all_matches.size();i++){
-//            // check if empty
-//            if(all_matches[i].empty() == false){
-//                best_matches.push_back(all_matches[i][0]);
-//                accepted_matches.push_back(true);
-//            }
-//        }
-//        // Prepare return data
-//        matches.matches = best_matches;
-//        matches.all_matches = all_matches;
-//        matches.good_matches = accepted_matches;
+        // Find matches
+        vector<vector<DMatch>> all_matches; // First index represents query, while second index determines which of the found matches we are looking at
+        brute_matcher->knnMatch(first_descriptors,second_descriptors,all_matches,best_match_count);
 
-         vector<DMatch> temp_matches;
-         brute_matcher->match(first_descriptors,second_descriptors,temp_matches);// Uncomment this when running feature test since this is the method used in those olden times
-         matches.matches = temp_matches;
+        // Prepare shortest distance
+        vector<DMatch> best_matches;
+        vector<bool> accepted_matches;
+        for(size_t i = 0; i < all_matches.size();i++){
+            // check if empty
+            if(all_matches[i].empty() == false){
+                best_matches.push_back(all_matches[i][0]);
+                accepted_matches.push_back(true);
+            }
+        }
+        // Prepare return data
+        matches.matches = best_matches;
+        matches.all_matches = all_matches;
+        matches.good_matches = accepted_matches;
+
+//         vector<DMatch> temp_matches;
+//         brute_matcher->match(first_descriptors,second_descriptors,temp_matches);// Uncomment this when running feature test since this is the method used in those olden times
+//         matches.matches = temp_matches;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
