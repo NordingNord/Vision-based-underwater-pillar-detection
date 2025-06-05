@@ -45,7 +45,7 @@ public:
     void set_disparity_settings(int min_disp, int num_disp, int block_size, int p1, int p2, int disp_12_max_diff, int prefilter_cap, int uniqueness_ratio, int speckle_window_size, int speckle_range, int mode);
     void set_disparity_settings(disparity_parameters settings);
 
-    void set_wsl_filter_settings(double new_lamda, double new_sigma);
+    void set_wsl_filter_settings(double new_lamda, double new_sigma, int new_lrc);
 
     void set_bilateral_settings(int new_diameter, double new_sigma_color, double new_sigma_space);
 
@@ -54,9 +54,12 @@ public:
 
     cv::Mat filter_disparity(cv::Mat disparity_map, cv::Mat first_frame, cv::Mat second_disparity_map, cv::Mat second_frame); // Uses wls filtering
 
+    cv::Mat filter_wls(cv::Mat disparity_map, cv::Mat first_frame, cv::Mat second_frame, bool return_confidence = false);
+
     cv::Mat validate_disparity(cv::Mat disparity_map, cv::Mat first_frame, cv::Mat second_frame);
 
     cv::Mat fill_disparity_holes(cv::Mat disparity_map);
+    cv::Mat fill_disparity_holes_new(cv::Mat disparity_map, int gap_limit);
 
     cv::Mat apply_weighted_median_filter(cv::Mat frame, cv::Mat disparity_map);
 
@@ -141,6 +144,7 @@ private:
     // -- WLS Filter parameters --
     double lamda;
     double sigma;
+    int lrc;
 
     // -- Parameter for what direction cropping took place
     bool cropped_top;

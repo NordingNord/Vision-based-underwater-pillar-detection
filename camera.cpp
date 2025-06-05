@@ -167,7 +167,7 @@ Mat camera::get_next_frame(){
     try{
         // Read next frame
         camera_capturer >> frame;
-        //camera_capturer.read(frame);
+        //bool status = camera_capturer.read(frame);
 
         // Validate frame
         if(frame.empty()){

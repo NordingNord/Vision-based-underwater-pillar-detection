@@ -14,11 +14,9 @@ detecting::detecting(){}
 vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_map){
     vector<obstacle> possible_obstacles;
     try{
+        test_img = disparity_map.clone(); // remove after test
         // Get lines in disparity map
         Mat disparity_lines = get_line_frame(disparity_map);
-
-        imshow("lines", disparity_lines);
-        waitKey(0);
 
         // Get initial contours
         contours big_contours = get_big_contours(disparity_lines);
@@ -42,8 +40,6 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
         // Ensure no overlap
         vector<int> good_indexes = test_for_overlap(combined_mask,missing_contour_masks,missing_contours);
 
-//        cout << missing_contour_masks.size() << endl;
-//        cout << missing_contours.contour_vector.size() << endl;
         missing_contour_masks = extract_masks(missing_contour_masks,good_indexes);
         missing_contours = extract_contours(missing_contours,good_indexes);
 
@@ -72,15 +68,6 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
         combined_contours.contour_vector = contour_shapes;
         combined_contours.hierarchy = hierarchies;
 
-//        cout << masks.size() << ", " << contour_shapes.size() << endl;
-//        for(int i = 0; i < masks.size(); i++){
-//            imshow("MASK",masks.at(i));
-//            Mat cont = Mat::zeros(masks.at(i).size(),CV_8U);
-//            drawContours(cont,contour_shapes,i,WHITE,-1);
-//            imshow("CONTOUR",cont);
-//            waitKey(0);
-//        }
-
         // Get depth channel
         Mat channels[3];
         split(depth_map,channels);
@@ -91,7 +78,6 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
 
         // Dilate masks if desired
         if(dilate_depth_validation == true){
-//            cout << "DILATE" << endl;
             Mat kernel = getStructuringElement(MORPH_ELLIPSE, Size(3,3));
             for(int i = 0; i < masks.size();i++){
                 dilate(masks.at(i),masks.at(i),kernel);
@@ -103,13 +89,6 @@ vector<obstacle> detecting::get_possible_obstacles(Mat disparity_map, Mat depth_
 
         // Convert to obstacle struct
         possible_obstacles = create_obstacles(masks,combined_contours,valid_indexes);
-
-//        // View all mask
-//        for(int i = 0; i < possible_obstacles.size(); i++){
-//            string title = "mask " + to_string(i);
-//            imshow(title,possible_obstacles.at(i).mask);
-//        }
-//        waitKey(0);
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -775,10 +754,180 @@ Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
     try{
 
         // Prepare contour
-        prepared_contour contour_data = prepare_contour_for_bounding(contour,frame_size);
+        //prepared_contour contour_data = prepare_contour_for_bounding(contour,frame_size);
+
+//        // new square method
+//        Mat left = Mat::zeros(frame_size,CV_8U);
+//        Mat right = Mat::zeros(frame_size,CV_8U);
+//        Mat up = Mat::zeros(frame_size,CV_8U);
+//        Mat down = Mat::zeros(frame_size,CV_8U);
+
+//        line(left,Point(0,0),Point(0,frame_size.height-1),WHITE,1);
+//        line(right,Point(frame_size.width-1,0),Point(frame_size.width-1,frame_size.height-1),WHITE,1);
+
+//        line(up,Point(0,0),Point(frame_size.width-1,0),WHITE,1);
+//        line(down,Point(0,frame_size.height-1),Point(frame_size.width-1,frame_size.height-1),WHITE,1);
+
+//        Mat obstacle = Mat::zeros(frame_size,CV_8U);
+//        vector<vector<Point>> temp_obs_vec = {contour};
+//        drawContours(obstacle,temp_obs_vec,0,WHITE,DRAW_WIDTH_INFILL);
+
+//        left = left & obstacle;
+//        right = right & obstacle;
+//        up = up & obstacle;
+//        down = down & obstacle;
+
+//        imshow("left",left);
+//        imshow("right",right);
+//        imshow("up",up);
+//        imshow("down",down);
+
+//        vector<Point> left_points;
+//        vector<Point> right_points;
+//        vector<Point> up_points;
+//        vector<Point> down_points;
+
+//        findNonZero(left,left_points);
+//        findNonZero(right,right_points);
+//        findNonZero(up,up_points);
+//        findNonZero(down,down_points);
+//        cout << left_points.size() << ", " << right_points.size() << ", " << up_points.size() << ", " << down_points.size() << endl;
+
+//        int max_row_left = -1;
+//        int min_row_left = -1;
+//        for(int i = 0; i < left_points.size(); i++){
+//            if(max_row_left == -1 || left_points.at(i).x > max_row_left){
+//                max_row_left = left_points.at(i).x;
+//            }
+//            if(min_row_left == -1 || left_points.at(i).x < min_row_left){
+//                min_row_left = left_points.at(i).x;
+//            }
+//        }
+
+//        int max_row_right = -1;
+//        int min_row_right = -1;
+//        for(int i = 0; i < right_points.size(); i++){
+//            if(max_row_right == -1 || right_points.at(i).x > max_row_right){
+//                max_row_right = right_points.at(i).x;
+//            }
+//            if(min_row_right == -1 || right_points.at(i).x < min_row_right){
+//                min_row_right = right_points.at(i).x;
+//            }
+//        }
+
+//        int max_col_up = -1;
+//        int min_col_up = -1;
+//        for(int i = 0; i < up_points.size(); i++){
+//            if(max_col_up == -1 || up_points.at(i).y > max_col_up){
+//                max_col_up = up_points.at(i).y;
+//            }
+//            if(min_col_up == -1 || up_points.at(i).y < min_col_up){
+//                min_col_up = up_points.at(i).y;
+//            }
+//        }
+
+//        int max_col_down = -1;
+//        int min_col_down = -1;
+//        for(int i = 0; i < down_points.size(); i++){
+//            if(max_col_down == -1 || down_points.at(i).y > max_col_down){
+//                max_col_down = down_points.at(i).y;
+//            }
+//            if(min_col_down == -1 || down_points.at(i).y < min_col_down){
+//                min_col_down = down_points.at(i).y;
+//            }
+//        }
+//        if(hasNonZero(left) == false && (hasNonZero(up) || hasNonZero(down))){
+//            max_row_left = frame_size.height-1;
+//            min_row_left = 0;
+//        }
+//        if(hasNonZero(right) == false && (hasNonZero(up) || hasNonZero(down))){
+//            max_row_right = frame_size.height-1;
+//            min_row_right = 0;
+//        }
+//        if(hasNonZero(up) == false && (hasNonZero(left) || hasNonZero(right))){
+//            max_col_up = frame_size.width-1;
+//            min_col_up = 0;
+//        }
+//        if(hasNonZero(down) == false && (hasNonZero(left) || hasNonZero(right))){
+//            max_col_down = frame_size.width-1;
+//            min_col_down = 0;
+//        }
+
+//        vector<Point> edge_square = {Point(min_col_up,min_row_left), Point(max_col_up,min_row_right),Point(max_col_up,max_row_right), Point(max_col_down,max_row_right), Point(min_col_down,max_row_left), Point(min_col_up,max_row_left)};
+//        vector<Point> final_edge = {};
+//        for(int i = 0; i < edge_square.size(); i++){
+//            if(edge_square.at(i).x != -1 && edge_square.at(i).y != -1){
+//                cout << edge_square.at(i) << endl;
+//                final_edge.push_back(edge_square.at(i));
+//            }
+//        }
+//        vector<vector<Point>> temp = {final_edge};
+//        Mat test_img = Mat::zeros(frame_size,CV_8U);
+//        drawContours(test_img,temp,0,WHITE,DRAW_WIDTH_INFILL);
+//        imshow("weird",test_img);
+
+//        // Get convex hull indexes
+//        vector<int> convex_hull_indexes;
+//        convexHull(contour,convex_hull_indexes);
+
+//        // Get convex hull points
+//        vector<Point> new_points;
+//        convexHull(contour,new_points, false);
+
+//        // Triangle
+//        vector<Point> triangle_points;
+//        minEnclosingTriangle(contour,triangle_points);
+//        Mat triangle_mask = Mat::zeros(frame_size,CV_8U);
+//        vector<vector<Point>> triangle_vec = {triangle_points};
+//        drawContours(triangle_mask,triangle_vec,0,WHITE,DRAW_WIDTH_INFILL);
+//        imshow("Tri",triangle_mask);
+
+        //approxPolyN(new_points,new_points,4);
+
+        // IDEA 1: USE MIN RECT AND MIN TRIANGLE, choosing the best
+        // IDEA 2: JUST USE CONVEX HULL
+        // IDEA 3: PLAY WITH GETTING FOUR EDGES OR MAYBE THREE
+
+//        // Find external corners
+//        int min_x = -1;
+//        int min_y = -1;
+//        int max_y = -1;
+//        int max_x = -1;
+
+//        for(int i = 0; i < contour.size(); i++){
+//            if(min_x == -1 || contour.at(i).x < min_x){
+//                min_x = contour.at(i).x;
+//            }
+//            if(min_y == -1 || contour.at(i).y < min_y){
+//                min_y = contour.at(i).y;
+//            }
+//            if(max_x == -1 || contour.at(i).x > max_x){
+//                max_x = contour.at(i).x;
+//            }
+//            if(max_y == -1 || contour.at(i).y > max_y){
+//                max_y = contour.at(i).y;
+//            }
+//        }
+
+//        // Draw bounds
+//        vector<Point> new_points = {Point(min_x,min_y),Point(max_x,min_y),Point(max_x,max_y), Point(min_x,max_y)};
+//        for(int i = 0; i < new_points.size(); i++){
+//            cout << new_points.at(i) << endl;
+//        }
+//        Mat bounds = Mat::zeros(frame_size,CV_8U);
+//        vector<vector<Point>> temp_vec = {new_points};
+//        drawContours(bounds,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
+//        imshow("My border",bounds);
+
+//        Mat test = Mat::zeros(frame_size,CV_8U);
+//        vector<vector<Point>> testo = {contour_data.contour};
+//        drawContours(test,testo,0,WHITE,DRAW_WIDTH_INFILL);
+////        imshow("the 'fixed contour'",test);
+
 
         // Get rotatedRect element
-        RotatedRect current_rectangle = minAreaRect(contour_data.contour);
+        //RotatedRect current_rectangle = minAreaRect(contour_data.contour);
+        RotatedRect current_rectangle = minAreaRect(contour);
 
         // Establish rectangle points
         Point2f rectangle_points[4];
@@ -792,19 +941,79 @@ Mat detecting::get_bounding_rectangle(vector<Point> contour, Size frame_size){
         points.push_back(rectangle_points_vector);
 
         // Draw rectangle
-        Mat temp_bounding = Mat::zeros(contour_data.frame_size,CV_8U);
+        //Mat temp_bounding = Mat::zeros(contour_data.frame_size,CV_8U);
+        Mat temp_bounding = Mat::zeros(frame_size,CV_8U);
         drawContours(temp_bounding,points,0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
 
         // Convert sizes back to normal if needed
-        if(temp_bounding.size() != frame_size){
-            temp_bounding = temp_bounding(Range(contour_data.start_row,contour_data.end_row),Range(contour_data.start_col,contour_data.end_col));
+//        if(temp_bounding.size() != frame_size){
+//            temp_bounding = temp_bounding(Range(contour_data.start_row,contour_data.end_row),Range(contour_data.start_col,contour_data.end_col));
+//        }
+//        if(temp_bounding.size() != frame_size){
+//            throw runtime_error("The size of the bounding box frame, does not match the original frame size.");
+//        }
+        // Check if three edges touched
+        Mat left = Mat::zeros(frame_size,CV_8U);
+        Mat right = Mat::zeros(frame_size,CV_8U);
+        Mat up = Mat::zeros(frame_size,CV_8U);
+        Mat down = Mat::zeros(frame_size,CV_8U);
+
+        line(left,Point(0,0),Point(0,frame_size.height-1),WHITE,1);
+        line(right,Point(frame_size.width-1,0),Point(frame_size.width-1,frame_size.height-1),WHITE,1);
+
+        line(up,Point(0,0),Point(frame_size.width-1,0),WHITE,1);
+        line(down,Point(0,frame_size.height-1),Point(frame_size.width-1,frame_size.height-1),WHITE,1);
+
+        Mat obstacle = Mat::zeros(frame_size,CV_8U);
+        vector<vector<Point>> temp_obs_vec = {contour};
+        drawContours(obstacle,temp_obs_vec,0,WHITE,DRAW_WIDTH_INFILL);
+        Mat not_obstacle;
+        bitwise_not(obstacle,not_obstacle);
+
+        left = left & obstacle;
+        right = right & obstacle;
+        up = up & obstacle;
+        down = down & obstacle;
+
+        vector<bool> status = {hasNonZero(left),hasNonZero(right), hasNonZero(up), hasNonZero(down)};
+        int count = 0;
+        for(int i = 0; i < status.size(); i++){
+            if(status.at(i) == true){
+                count++;
+            }
         }
-        if(temp_bounding.size() != frame_size){
-            throw runtime_error("The size of the bounding box frame, does not match the original frame size.");
+
+        if(count >= 3){
+            // Triangle
+            vector<Point> triangle_points;
+            minEnclosingTriangle(contour,triangle_points);
+            Mat triangle_mask = Mat::zeros(frame_size,CV_8U);
+            vector<vector<Point>> triangle_vec = {triangle_points};
+            drawContours(triangle_mask,triangle_vec,0,WHITE,DRAW_WIDTH_INFILL);
+            Mat rectangle_error = temp_bounding & not_obstacle;
+            Mat triangle_error = triangle_mask & not_obstacle;
+            if(countNonZero(triangle_error) < countNonZero(rectangle_error)){
+                temp_bounding = triangle_mask.clone();
+            }
         }
 
         // Prepare output
         bounding_rectangle = temp_bounding.clone();
+
+        // Test
+//        // Get convex hull indexes
+//        vector<int> convex_hull_indexes;
+//        convexHull(contour,convex_hull_indexes);
+
+//        // Get convex hull points
+//        vector<Point> new_points;
+//        convexHull(contour,new_points, false);
+//        vector<vector<Point>> tempi = {new_points};
+//        Mat new_bounding = Mat::zeros(frame_size,CV_8U);
+//        drawContours(new_bounding,tempi,0,WHITE,DRAW_WIDTH_INFILL);
+
+//        bounding_rectangle = new_bounding.clone();
+
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -1360,9 +1569,59 @@ vector<int> detecting::depth_validate_contours(vector<Mat> masks, Mat depth_map,
                 // subtract original mask
                 Mat border = dilated_mask-current_mask;
 
+                // Test stuff
+//                Mat drawing = current_mask.clone();
+//                cvtColor(drawing,drawing,COLOR_GRAY2BGR);
+//                Mat temp = current_mask.clone();
+//                Mat temp_2;
+//                Mat temp_3;
+//                Mat temp_4;
+//                for(int o = 0; o < 40; o++){
+//                    dilate(temp,temp,border_kernel);
+//                    if(o == 34){
+//                        temp_2 = temp.clone();
+//                    }
+//                    if(o == 14){
+//                        temp_3 = temp.clone();
+//                    }
+//                    if(o == 19){
+//                        temp_4 = temp.clone();
+//                    }
+
+//                }
+//                temp = temp-temp_2;
+
+//                temp_4 = temp_4-temp_3;
+
+//                vector<Point> points;
+//                findNonZero(temp_4,points);
+//                for(int o = 0; o < points.size(); o++){
+//                    if()
+//                }
+
+
+                // test stuff done
+
                 // Ensure invalid points are not counted
                 Mat valid = depth_map >= MIN_DEPTH;
                 border = valid & border;
+
+
+//                Mat temp_4_valid = valid & temp_4;
+//                temp_4 = temp_4-temp_4_valid;
+//                drawing.setTo(Scalar(0,0,255),temp);
+//                drawing.setTo(Scalar(155,0,155),temp_4);
+//                drawing.setTo(Scalar(0,255,0),temp_4_valid);
+
+//                Mat drawing_2 = test_img.clone();
+//                cvtColor(drawing_2,drawing_2,COLOR_GRAY2BGR);
+//                add(drawing,drawing_2,drawing);
+//                rectangle(drawing,Point(0,0),Point(drawing.cols-1,drawing.rows-1),0,4);
+
+//                imshow("drawing",drawing);
+//                waitKey(0);
+//                imwrite("drawing.png",drawing);
+
 
                 // Get indexes of border
                 Mat border_indexes;
@@ -1403,10 +1662,15 @@ vector<int> detecting::depth_validate_contours(vector<Mat> masks, Mat depth_map,
 //                waitKey(0);
 
                 if(bigger_depth_count >= limit){
+//                    imshow("survived",current_mask);
+//                    waitKey(0);
                     valid_indexes.push_back(mask_index);
                     break;
                 }
                 else{
+//                    cout << limit << ", " << bigger_depth_count << ", " << average_depths.at(mask_index)[0] << endl;
+//                    imshow("killed",current_mask);
+//                    waitKey(0);
                     current_mask = dilated_mask.clone();
                 }
             }
@@ -1518,9 +1782,21 @@ vector<obstacle> detecting::create_obstacles(vector<Mat> masks, contours input_c
             int current_index = valid_indexes.at(i);
 
             obstacle new_obstacle;
-            new_obstacle.contour = input_contours.contour_vector.at(current_index);
+            //new_obstacle.contour = input_contours.contour_vector.at(current_index);
             new_obstacle.mask = masks.at(current_index);
             new_obstacle.original_mask = new_obstacle.mask;
+
+            // Some issue with indexes. Here is a tempoary workaround
+            vector<vector<Point>> contours;
+            vector<Vec4i> hierarchy;
+            findContours(new_obstacle.mask,contours, hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+            new_obstacle.contour = contours.at(0);
+
+//            Mat test = Mat::zeros(new_obstacle.mask.size(),CV_8U);
+//            drawContours(test,contours,0,WHITE,DRAW_WIDTH_INFILL);
+//            imshow("test",test);
+//            imshow("org",new_obstacle.mask);
+//            waitKey(0);
 
 //            imshow("MASK", new_obstacle.mask);
 //            imshow("ORG MASK", new_obstacle.original_mask);
@@ -1586,46 +1862,39 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
             vector<Point> contour = obstacles.at(obstacle_index).contour;
             Mat mask = obstacles.at(obstacle_index).mask;
 
-//            imshow("THE MASK",mask);
-//            waitKey(0);
-
-//            vector<vector<Point>> temp = {contour};
-//            Mat tempi = Mat::zeros(mask.size(),CV_8U);
-//            drawContours(tempi,temp,0,255,-1);
-
-//            imshow("THE CONTOUR",tempi);
-//            waitKey(0);
-
-            // The contour and mask seem to be very differnet sometimes, in not overlapping at all
-
             // Draw bounding rectangle
             Mat bounding_box = get_bounding_rectangle(contour,mask.size());
-
-//            imshow("BOUNDING",bounding_box);
-//            waitKey(0);
 
             // Check if bounding box contains more than threshold percent error (Error being pixel within box that do not belong to mask)
             int error_count = get_symmetric_difference(mask,bounding_box,true);
 
             int original_contour_size = countNonZero(mask);
 
-//            cout << error_count << endl;
-//            cout << original_contour_size << endl;
-//            cout << float(error_count)/float(original_contour_size) << endl;
-
             int max_error = int(original_contour_size*accept_rectangle_threshold);
-
 
             // If big error the obstacle should be split
             if(error_count > max_error){
                 // Create temp obstacle vector
                 vector<obstacle> temp_obstacles;
 
+                // Simplify contour
+                double epsilon = arcLength(obstacles.at(obstacle_index).contour,true)*0.01;
+                vector<Point> temp_approx;
+                approxPolyDP(obstacles.at(obstacle_index).contour,temp_approx,epsilon,true);
+                vector<vector<Point>> tempi = {temp_approx};
+                Mat temp_mask = Mat::zeros(mask.size(),CV_8U);
+                drawContours(temp_mask,tempi,0,WHITE,DRAW_WIDTH_INFILL);
+//                imshow("",temp_mask);
+//                imshow("org", mask);
+//                waitKey(0);
+
+
                 // Get edge map
                 Mat eroded_mask;
-                erode(mask,eroded_mask,border_kernel,Point(-1,-1),1);
-                Mat edge_mask = mask-eroded_mask;
-
+                erode(temp_mask,eroded_mask,border_kernel,Point(-1,-1),1);
+                //erode(mask,eroded_mask,border_kernel,Point(-1,-1),1);
+                //Mat edge_mask = mask-eroded_mask;
+                Mat edge_mask = temp_mask-eroded_mask;
                 // remove clean border from edge mask
                 if(remove_border == true){
                     Mat border = Mat::zeros(mask.size(),CV_8U);
@@ -1634,73 +1903,46 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     edge_mask.setTo(BLACK,intersections);
                 }
 
-//                imshow("the mask used for edges", mask);
+//                // Simplify all contours
+//                contours all_contours = get_contours(edge_mask);
+//                Mat new_edge_mask = Mat::zeros(edge_mask.size(),CV_8U);
 
-//                imshow("the edge pre simplify",edge_mask);
-//                waitKey(0);
+//                for(int i = 0; i < all_contours.contour_vector.size(); i++){
+//                    vector<Point> temp_approx;
+//                    Mat temp = Mat::zeros(edge_mask.size(),CV_8U);
+//                    drawContours(temp,all_contours.contour_vector,i,WHITE,DRAW_WIDTH_1P);
+//                    temp = temp & edge_mask;
+//                    vector<Point> locations;
+//                    findNonZero(temp,locations);
+//                    approxPolyDP(locations,temp_approx,10,false);
+//                    for(int j = 1; j < temp_approx.size(); j++){
+//                        line(new_edge_mask,temp_approx.at(j-1),temp_approx.at(j),WHITE);
+//                    }
+//                }
 
-                // Simplify all contours
-                contours all_contours = get_contours(edge_mask);
-                Mat new_edge_mask = Mat::zeros(edge_mask.size(),CV_8U);
-
-                for(int i = 0; i < all_contours.contour_vector.size(); i++){
-                    vector<Point> temp_approx;
-                    Mat temp = Mat::zeros(edge_mask.size(),CV_8U);
-                    drawContours(temp,all_contours.contour_vector,i,WHITE,DRAW_WIDTH_1P);
-                    temp = temp & edge_mask;
-                    vector<Point> locations;
-                    findNonZero(temp,locations);
-
-                    approxPolyDP(locations,temp_approx,25,false);
-                    for(int j = 1; j < temp_approx.size(); j++){
-                        line(new_edge_mask,temp_approx.at(j-1),temp_approx.at(j),WHITE);
-                    }
-                }
-
-//                imshow("the edge pre dilate",new_edge_mask);
-//                waitKey(0);
-
-                // Dilate edges
-                edge_mask = new_edge_mask.clone();
+//                // Dilate edges
+//                edge_mask = new_edge_mask.clone();
                 dilate(edge_mask,edge_mask,border_kernel,Point(-1,-1),2);
-
-
-//                imshow("the edge",edge_mask);
+//                imshow("masky",edge_mask);
+//                imshow("mask",mask);
 //                waitKey(0);
-
-
                 // Find all valid lines
                 vector<line_data> lines = get_all_lines(edge_mask,hough_threshold,min_line_length,max_line_gap);
 
                 // Remove similar lines
                 lines = remove_similar_lines(lines,50.0,15.0,mask.size()); // temp values
-
-//                cout << "Lines remaining: " << lines.size() << endl;
-
                 // Go through all lines to get mask
                 for(int i = 0; i < lines.size(); i++){
-//                    cout << i << endl;
                     // Get current line data
                     Vec4i current_line = lines.at(i).line;
                     double angle = lines.at(i).angle;
-//                    cout << abs(angle*180/M_PI) << endl;
 
                     // move line until obstacle is lost
                     int direction = get_obstacle_direction(angle,current_line,mask);
 
-
-//                    cout << "Angle: " << angle*180/M_PI << endl;
-//                    cout << "Direction: " << direction << endl;
-//                    Mat test_stuff = Mat::zeros(mask.size(), CV_8U);
-//                    line(test_stuff,Point(current_line[0],current_line[1]),Point(current_line[2], current_line[3]),WHITE);
-
-//                    imshow("test",test_stuff);
-//                    waitKey(0);
-
                     vector<Vec4i> borders = get_biggest_drop_borders(direction,current_line,mask);
                     current_line = borders.at(0);
                     Vec4i end_line = borders.at(1);
-
 //                    Mat test = Mat::zeros(mask.size(),CV_8U);
 //                    line(test,Point(current_line[0],current_line[1]),Point(current_line[2],current_line[3]),WHITE);
 //                    line(test,Point(end_line[0],end_line[1]),Point(end_line[2],end_line[3]),WHITE);
@@ -1717,43 +1959,36 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     vector<vector<Point>> mask_contour = {{Point(current_line[0],current_line[1]), Point(end_line[0], end_line[1]), Point(end_line[2], end_line[3]), Point(current_line[2],current_line[3])}};
                     drawContours(border_mask,mask_contour,0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
                     bitwise_and(border_mask,mask,border_mask);
-
-//                    imshow("BORDER MASK",border_mask);
-//                    waitKey(0);
-
                     // Get contour
                     vector<Point> new_contour = get_biggest_contour(border_mask);
                     vector<vector<Point>> temp_new_contour = {new_contour};
 
+                    if(temp_new_contour.at(0).size() == 0){
+                        continue;
+                    }
+
+
                     // Draw contour
                     Mat new_contour_mask = Mat::zeros(mask.size(),CV_8U);
-                    drawContours(new_contour_mask,{temp_new_contour},0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
+                    drawContours(new_contour_mask,temp_new_contour,0,WHITE,DRAW_WIDTH_INFILL,LINE_8);
 
-//                    imshow("new mask",new_contour_mask);
-//                    waitKey(0);
-
-//                    // Test stuff
-//                    Mat work_in_progress = new_contour_mask.clone();
-//                    dilate(new_contour_mask,work_in_progress,border_kernel);
-//                    work_in_progress = work_in_progress-new_contour_mask;
-//                    int edge_len = countNonZero(work_in_progress);
-//                    work_in_progress = work_in_progress & mask;
-//                    int new_length = countNonZero(work_in_progress);
-//                    cout << edge_len << " -> " << new_length << endl;
-//                    imshow("mask",new_contour_mask);
-//                    waitKey(0);
+//                    imshow("Shape",new_contour_mask);
 
                     Mat new_bounding_box = get_bounding_rectangle(new_contour,mask.size());
 
-//                    imshow("org",new_contour_mask);
-//                    imshow("new bound", new_bounding_box);
-//                    waitKey(0);
+//                    imshow("box",new_bounding_box);
+
 
                     // Check for error margin
                     int new_error_count = get_symmetric_difference(new_contour_mask,new_bounding_box,true);
 
                     int new_contour_size = countNonZero(new_contour_mask);
                     int new_max_error = int(new_contour_size*accept_rectangle_threshold);
+
+//                    imshow("the thang",new_contour_mask);
+
+//                    cout << new_error_count << " <= " << new_max_error << endl;
+//                    waitKey(0);
 
                     // Keep mask if rectangular and not wholly within another mask
                     if(new_error_count <= new_max_error){
@@ -1767,10 +2002,8 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                             mask_sum = mask_sum | temp_obstacles.at(k).mask;
 
                             int overlap_count = countNonZero(overlap);
-
                             // If complete overlap dont accept
                             if(overlap_count == countNonZero(new_contour_mask)){
-//                                cout << "mask " << i << " removed due to being within another mask" << endl;
                                 accept = false;
                                 break;
                             }
@@ -1822,16 +2055,11 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 //                        cout << "Mask " << i << " removed due to not being rectangular" << endl;
 //                    }
                 }
-
-//                cout << "Obstacles remaining after splitting, rectangular check and within check: " << temp_obstacles.size() << endl;
-
                 // Remove obstacle almost completly within all other obstacles (deemed insignificant)
                 vector<obstacle> to_be_removed = {};
                 vector<int> to_be_removed_index = {};
-
                 for(int i = 0; i < temp_obstacles.size(); i++){
                     Mat current_mask = temp_obstacles.at(i).mask;
-
                     // Create sum mask of all other obstacles
                     Mat sum_mask = Mat::zeros(current_mask.size(),CV_8U);
                     for(int j = 0; j < temp_obstacles.size(); j++){
@@ -1856,11 +2084,7 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     temp_obstacles.erase(temp_obstacles.begin()+to_be_removed_index.at(i));
                 }
 
-//                cout << "Obstacles remaining after within sum check: " << temp_obstacles.size() << endl;
-
                 // Go through removed obstacles to ensure they did not remove eachother (keep the one that is most unique compared to kept obstacles)
-
-                // THis makes no sense. FIX
                 vector<int> best_uniques;
                 vector<int> second_chance_indexes;
                 vector<Mat> second_chance_masks;
@@ -1909,8 +2133,6 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     temp_obstacles.push_back(to_be_removed.at(second_chance_indexes.at(i)));
                 }
 
-//                cout << "Obstacles remaining after second chance: " << temp_obstacles.size() << endl;
-
                 // Remove obstacles similar to eachother (same overall direction and alot of intersection)
                 to_be_removed_index.clear();
                 for(int i = 0; i < temp_obstacles.size(); i++){
@@ -1933,7 +2155,24 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                         if(angle_status == compare_angle_status){ // same direction
                             if(intersection_count >= (int)current_count*0.75 || intersection_count >= (int)compare_count*0.75){ // 75% of one of the obstacles is within the other
                                 // keep biggest
-                                if(compare_count > current_count){
+//                                if(compare_count > current_count){
+//                                    to_be_removed_index.push_back(i);
+//                                    break;
+//                                }
+//                                else{
+//                                    to_be_removed_index.push_back(j);
+//                                }
+
+                                // Keep the most unique
+                                Mat sum_mask = Mat::zeros(current_mask.size(),CV_8U);
+                                for(int k = 0; k < temp_obstacles.size(); k++){
+                                    if(k != i && k != j){
+                                        sum_mask = sum_mask | temp_obstacles.at(j).mask;
+                                    }
+                                }
+                                Mat compare_i = current_mask & sum_mask;
+                                Mat compare_j = compare_mask & sum_mask;
+                                if(countNonZero(compare_i) > countNonZero(compare_j)){
                                     to_be_removed_index.push_back(i);
                                     break;
                                 }
@@ -1951,8 +2190,6 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
                     temp_obstacles.erase(temp_obstacles.begin()+to_be_removed_index.at(i));
                 }
 
-//                cout << "Obstacles that survived similarity test: " << temp_obstacles.size() << endl;
-
                 // Add obstacles to accepted obstacles
                 for(int i = 0; i < temp_obstacles.size(); i++){
 
@@ -1966,216 +2203,6 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 
                     accepted_obstacles.push_back(temp_obstacles.at(i));
                 }
-
-
-
-//                for(int k = 0; k < temp_obstacles.size(); k++){
-//                    string name = to_string(k);
-//                    imshow(name, temp_obstacles.at(k).mask);
-//                    waitKey(0);
-//                }
-
-//                cout << "good obstacle dies here" << endl;
-//                // New idea: Keep the obstacle containing most matches if similar
-//                for(int i = 0; i < temp_obstacles.size(); i++){
-////                    imshow("initial mask",temp_obstacles.at(i).mask);
-//                    vector<int> to_be_removed = {};
-//                    for(int j = i+1; j < temp_obstacles.size(); j++){
-//                        Mat intersection = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
-//                        int intersection_count = countNonZero(intersection);
-
-//                        // If intersection is 75% or more of either obstacle and similar angle, they are similar
-//                        int first_count = countNonZero(temp_obstacles.at(i).mask);
-//                        int second_count =  countNonZero(temp_obstacles.at(j).mask);
-
-//                        if((intersection_count >= (int)first_count*0.75 || intersection_count >= (int)second_count*0.75) && is_angle_vertical(temp_obstacles.at(i).original_angle) == is_angle_vertical(temp_obstacles.at(i).original_angle)){
-//                            to_be_removed.push_back(j);
-//                            // Update initial obstacle based on which has the most matches with disparity map
-//                            if(second_count > first_count){
-////                                if(i == 0){
-////                                    imshow("killed",temp_obstacles.at(i).mask);
-////                                    imshow("killer",temp_obstacles.at(j).mask);
-////                                    waitKey(0);
-////                                }
-//                                temp_obstacles.at(i).mask = temp_obstacles.at(j).mask;
-//                            }
-////                            else{
-////                                imshow("killed",temp_obstacles.at(i).mask);
-////                                imshow("killer",temp_obstacles.at(j).mask);
-////                            }
-////                            waitKey(0);
-//                        }
-//                    }
-////                    imshow("final mask",temp_obstacles.at(i).mask);
-////                    waitKey(0);
-//                    // removed used indexes
-//                    if(to_be_removed.size() > 0){
-//                        for(int j = to_be_removed.size()-1; j >= 0; j--){
-//                            temp_obstacles.erase(temp_obstacles.begin()+to_be_removed.at(j));
-//                        }
-//                    }
-//                    // add current obstacle to accepted obstacles
-//                    temp_obstacles.at(i).contour = get_biggest_contour(temp_obstacles.at(i).mask);
-
-//                    vector<vector<Point>> temp_vec = {temp_obstacles.at(i).contour};
-
-//                    Mat biggest_contour_mask = Mat::zeros(mask.size(),CV_8U);
-
-//                    drawContours(biggest_contour_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
-
-//                    temp_obstacles.at(i).mask = biggest_contour_mask;
-
-//                    accepted_obstacles.push_back(temp_obstacles.at(i));
-//                }
-
-//                cout << "Obstacles that survived similarity test: " << accepted_obstacles.size() << endl;;
-//                for(int k = 0; k < accepted_obstacles.size(); k++){
-//                    string name = to_string(k);
-//                    imshow(name,accepted_obstacles.at(k).mask);
-//                    waitKey(0);
-//                }
-
-                // Play with similarity between obstacles (keep only similar elements) (wird stuff in here maybe just remove)
-//                for(int i = 0; i < temp_obstacles.size(); i++){
-
-//                    Mat new_version = temp_obstacles.at(i).mask;
-//                    vector<int> remove_these = {};
-
-//                    for(int j = i+1; j < temp_obstacles.size(); j++){
-//                        Mat intersection = temp_obstacles.at(i).mask & temp_obstacles.at(j).mask;
-//                        int intersection_count = countNonZero(intersection);
-//                        if(intersection_count >= (int)countNonZero(temp_obstacles.at(i).mask)*0.95){
-//                            new_version = new_version & temp_obstacles.at(j).mask;
-//                            remove_these.push_back(j);
-//                        }
-//                    }
-//                    if(remove_these.size() > 0){
-//                        for(int j = remove_these.size()-1; j >= 0; j--){
-//                            temp_obstacles.erase(temp_obstacles.begin()+remove_these.at(j));
-//                        }
-//                    }
-//                    // Keep if not almost completely within all other obstacles
-//                    temp_obstacles.at(i).contour = get_biggest_contour(new_version);
-//                    vector<vector<Point>> temp_vec = {temp_obstacles.at(i).contour};
-//                    Mat new_version_contour_mask = Mat::zeros(new_version.size(),CV_8U);
-//                    drawContours(new_version_contour_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
-//                    temp_obstacles.at(i).mask = new_version_contour_mask;
-//                    accepted_obstacles.push_back(temp_obstacles.at(i));
-//                }
-
-//                cout << "obstacles remaining after similarity test: " << accepted_obstacles.size() << endl;
-
-                // Maybe if two are similar but not very similar and have similar angles, use average angle to create new line and use that to create cut (seem to make things worse)
-//                for(int i = 0; i < accepted_obstacles.size(); i++){
-//                    vector<int> to_be_removed = {};
-//                    for(int j = i+1; j < accepted_obstacles.size(); j++){
-//                        Mat intersection = accepted_obstacles.at(i).mask & accepted_obstacles.at(j).mask;
-//                        int intersection_count = countNonZero(intersection);
-//                        if(intersection_count >= countNonZero(accepted_obstacles.at(i).mask)*0.75){
-
-//                            vector<Point> contour, second_contour;
-//                            findNonZero(accepted_obstacles.at(i).mask,contour);
-//                            findNonZero(accepted_obstacles.at(j).mask,second_contour);
-
-//                            // Get best fit lines and angles
-//                            Vec4f fitted_line, second_fitted_line;
-//                            fitLine(contour,fitted_line, DIST_L2, 0, 0.1, 0.1);
-//                            fitLine(second_contour,second_fitted_line, DIST_L2, 0, 0.1, 0.1);
-
-//                            int biggest_distance = int(sqrt(accepted_obstacles.at(i).mask.cols*accepted_obstacles.at(i).mask.cols + accepted_obstacles.at(i).mask.rows * accepted_obstacles.at(i).mask.rows));
-
-//                            Point start = Point(fitted_line[2],fitted_line[3]);
-//                            Point end = Point(fitted_line[2]+fitted_line[0]*biggest_distance,fitted_line[3]+fitted_line[1]*biggest_distance);
-
-//                            Point second_start = Point(second_fitted_line[2],second_fitted_line[3]);
-//                            Point second_end =  Point(second_fitted_line[2]+second_fitted_line[0]*biggest_distance,second_fitted_line[3]+second_fitted_line[1]*biggest_distance);
-
-//                            Mat tempi = Mat::zeros(accepted_obstacles.at(i).mask.size(),CV_8U);
-//                            line(tempi,start,end,WHITE);
-//                            line(tempi,second_start,second_end,WHITE);
-//                            imshow("the lines",tempi);
-//                            waitKey(0);
-
-
-//                            double angle = calculations.calculate_angle(start,end);
-//                            double second_angle = calculations.calculate_angle(second_start,second_end);
-//                            double angle = accepted_obstacles.at(i).original_angle;
-//                            double second_angle = accepted_obstacles.at(j).original_angle;
-
-
-//                            cout << angle*180/M_PI << " | " << second_angle*180/M_PI << endl;
-//                            double diff = abs(angle*180/M_PI - abs(second_angle*180/M_PI));
-//                            cout << "the diff: " << diff << endl;
-//                            if(diff < 10.0){
-//                                double average_angle = (angle+second_angle)/2.0;
-//                                cout << "average angle: " << average_angle*180/M_PI << endl;
-
-//                                Point mask_center = get_contour_center(accepted_obstacles.at(i).mask);
-
-//                                int range = max(accepted_obstacles.at(i).mask.cols,accepted_obstacles.at(i).mask.rows);
-
-//                                Vec4i new_line;
-//                                double a = sin(angle);
-//                                double b = cos(angle);
-
-//                                new_line[0] = (int)cvRound(mask_center.x - range*b);
-//                                new_line[1] = (int)cvRound(mask_center.y - range*a);
-//                                new_line[2] = (int)cvRound(mask_center.x + range*b);
-//                                new_line[3] = (int)cvRound(mask_center.y + range*a);
-
-//                                int direction;
-//                                double dist_to_90 = abs(90*M_PI/180-abs(angle));
-//                                if(abs(angle*180/M_PI) > dist_to_90*180/M_PI){
-//                                    direction = DIRECTION_RIGHT;
-//                                }
-//                                else{
-//                                    direction = DIRECTION_UP;
-//                                }
-
-//                                vector<Vec4i> borders = get_best_fit_borders(direction,new_line,mask);
-
-//                                Mat best_fit_mask = Mat::zeros(accepted_obstacles.at(i).mask.size(),CV_8U);
-
-//                                vector<Point> points = {Point(borders.at(0)[0],borders.at(0)[1]),Point(borders.at(1)[0],borders.at(1)[1]),Point(borders.at(1)[2],borders.at(1)[3]), Point(borders.at(0)[2],borders.at(0)[3])};
-//                                vector<vector<Point>> temp = {points};
-//                                drawContours(best_fit_mask,temp,0,WHITE,DRAW_WIDTH_INFILL);
-
-//                                Mat final_mask = best_fit_mask & mask;
-//                                accepted_obstacles.at(i).mask = final_mask;
-//                                accepted_obstacles.at(i).contour = get_biggest_contour(final_mask);
-
-//                                final_mask = Mat::zeros(best_fit_mask.size(),CV_8U);
-//                                vector<vector<Point>> temp_vec = {accepted_obstacles.at(i).contour};
-
-//                                drawContours(final_mask,temp_vec,0,WHITE,DRAW_WIDTH_INFILL);
-//                                accepted_obstacles.at(i).mask = final_mask;
-
-//                                to_be_removed.push_back(j);
-//                            }
-//                            else{
-//                                // keep the one that contains more mask values (seen as better fit)
-//                                if(countNonZero(accepted_obstacles.at(i).mask) <  countNonZero(accepted_obstacles.at(j).mask)){
-//                                    accepted_obstacles.at(i) = accepted_obstacles.at(j);
-//                                }
-//                                to_be_removed.push_back(j);
-//                                cout << countNonZero(accepted_obstacles.at(i).mask) << " | " << countNonZero(accepted_obstacles.at(j).mask) << endl;
-//                            }
-//                        }
-//                    }
-//                    if(to_be_removed.size() > 0){
-//                        for(int j = to_be_removed.size()-1; j >= 0; j--){
-//                            accepted_obstacles.erase(accepted_obstacles.begin()+to_be_removed.at(j));
-//                        }
-//                    }
-//                }
-//                cout << "obstacles remaining after angle test: " << accepted_obstacles.size() << endl;
-//                for(int be = 0; be < accepted_obstacles.size(); be++){
-//                    string name = to_string(be);
-//                    imshow(name,accepted_obstacles.at(be).mask);
-//                    waitKey(0);
-//                }
-//                waitKey(0);
-
             }
             else{
                 accepted_obstacles.push_back(obstacles.at(obstacle_index));
@@ -2197,27 +2224,30 @@ vector<obstacle> detecting::split_into_all_rectangles(vector<obstacle> obstacles
 vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
     vector<obstacle> final_obstacles;
     try{
-
         if(obstacles.size() == 0){
             throw runtime_error("No obstacles to filter.");
         }
 
         // Step 1: Split current obstacles into rectangles while removing obstacles unable to fit nicely withing
-        //vector<obstacle> remaining_obstacles = split_into_rectangles(obstacles);
-        //vector<obstacle> remaining_obstacles = split_into_rectangles_corner(obstacles);
-        vector<obstacle> remaining_obstacles = split_into_all_rectangles(obstacles);
+        split_start =  chrono::high_resolution_clock::now();
+        vector<obstacle> remaining_obstacles;
+        if(split_mode == LINE_BASED){
+            remaining_obstacles = split_into_all_rectangles(obstacles);
+        }
+        else if(split_mode == CONVEX_BASED){
+            remaining_obstacles = full_convex_split(obstacles);
+        }
+        split_end =  chrono::high_resolution_clock::now();
 
-//        cout << "Number of obstacles left after splitting: " << remaining_obstacles.size() << endl;
-
+//        if(save_split == true){
+//            for(int k = 0; k < remaining_obstacles.size();k++){
+//                string save_path = split_path + to_string(split_index) + "_" + to_string(k)+".png";
+//                imwrite(save_path,remaining_obstacles.at(k).mask);
+//            }
+//        }
         if(remaining_obstacles.size() == 0){
             throw runtime_error("No obstacles survived splitting.");
         }
-
-//        for(int i = 0; i < remaining_obstacles.size(); i++){
-//            string name = to_string(i);
-//            imshow(name,remaining_obstacles.at(i).mask);
-//            waitKey(0);
-//        }
 
         // Clean masks if desired
         if(clean_shapes == true){
@@ -2226,12 +2256,12 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
             }
         }
 
-//        cout << "Number of obstacles left after cleaning: " << remaining_obstacles.size() << endl;
+        //cout << remaining_obstacles.size() << endl;
 
         // Step 2: Remove obstacles that fall bellow the desired ratio of 1.5 and above to indicates obstacles longer than wide like a pillar and pertruding edge.
         remaining_obstacles = filter_rectangle_shape(remaining_obstacles,rectangle_size_ratio);
 
-//        cout << "Number of obstacles left after rectangle check: " << remaining_obstacles.size() << endl;
+        //cout << remaining_obstacles.size() << endl;
 
         if(remaining_obstacles.size() == 0){
             throw runtime_error("No obstacles survived rectangle filter.");
@@ -2240,17 +2270,17 @@ vector<obstacle> detecting::filter_obstacles(vector<obstacle> obstacles){
         // Step 3: Remove obstacles that do not touch any edge.
         remaining_obstacles = filter_border(remaining_obstacles);
 
-//        cout << "Number of obstacles left after edge check: " << remaining_obstacles.size() << endl;
+        //cout << remaining_obstacles.size() << endl;
 
         if(remaining_obstacles.size() == 0){
             throw runtime_error("No obstacles survived edge filter.");
         }
 
         // Step 4: Remove tiny obstacles
-        remaining_obstacles = filter_size(remaining_obstacles, obstacle_size_limit);
+        int temp_thresh = floor(obstacles.at(0).mask.cols*obstacles.at(0).mask.rows*obstacle_size_limit_filter);
+        remaining_obstacles = filter_size(remaining_obstacles, temp_thresh);
 
-//        cout << "Number of obstacles left after size check: " << remaining_obstacles.size() << endl;
-
+        //cout << remaining_obstacles.size() << endl;
         if(remaining_obstacles.size() == 0){
             throw runtime_error("No obstacles survived size filter.");
         }
@@ -2459,6 +2489,28 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
                 new_line[2] = initial_line[2];
                 new_line[3] = initial_line[3]+(step*direction_sign)+1;
             }
+
+            // Look 5 steps behind (test)
+            int old_step = 0;
+            if(step >=3){
+                old_step = step-2;
+            }
+            Vec4i old_line;
+            if(direction == DIRECTION_LEFT || direction == DIRECTION_RIGHT){
+                old_line[0] = initial_line[0]+(old_step*direction_sign)+1;
+                old_line[1] = initial_line[1];
+                old_line[2] = initial_line[2]+(old_step*direction_sign)+1;
+                old_line[3] = initial_line[3];
+            }
+            else if(direction == DIRECTION_UP || direction == DIRECTION_DOWN){
+                old_line[0] = initial_line[0];
+                old_line[1] = initial_line[1]+(old_step*direction_sign)+1;
+                old_line[2] = initial_line[2];
+                old_line[3] = initial_line[3]+(old_step*direction_sign)+1;
+            }
+            Mat old_line_mask =  Mat::zeros(mask.size(),CV_8U);
+            line(old_line_mask,Point(old_line[0],old_line[1]),Point(old_line[2],old_line[3]),WHITE,DRAW_WIDTH_1P,LINE_AA);
+
 //            Mat test_again = Mat::zeros(mask.size(),CV_8U);
 //            line(test_again, Point(new_line[0],new_line[1]),Point(new_line[2],new_line[3]),WHITE);
 //            imshow("test stuff all",test_again);
@@ -2495,7 +2547,9 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
 
             // Count matches
             Mat match_mask = line_mask & mask;
+            Mat lookback_mask = old_line_mask & mask;
             int match_count = countNonZero(match_mask);
+            int lookback_count = countNonZero(lookback_mask);
 
             // Continue until local max is found
             if(match_count > last_matches && max_found == false){
@@ -2509,9 +2563,14 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
 
             // Calculate decrease and increase
             int decrease = 0;
+            int lookback_decrease = 0;
             int increase = 0;
+
             if(last_matches > 0 && match_count < last_matches){
                 decrease = last_matches-match_count;
+            }
+            if(lookback_count > 0 && match_count < lookback_count){
+                lookback_decrease = lookback_count-match_count;
             }
             if(last_matches > 0 && match_count > last_matches){
                 increase = match_count-last_matches;
@@ -2519,10 +2578,11 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
 
             // Weigh decrease and increase based on scale factor
             decrease = floor(decrease * (1+(1-scale_factor)));
+            lookback_decrease = floor(lookback_decrease * (1+(1-scale_factor)));
             increase = floor(increase * (1+(1-scale_factor)));
 
             // Stop if sudden increase
-            if(increase+increase_addon > increase_limit){
+            if(increase > increase_limit){ // +increase_addon
                 if(line_found == false){
                     line_prior_to_decrease = last_line; // Line before big increase
                 }
@@ -2530,8 +2590,9 @@ vector<Vec4i> detecting::get_biggest_drop_borders(int direction, Vec4i initial_l
             }
 
             // Check if biggest decrease and if big enough to call a decrease
-            if(decrease+decrease_addon > biggest_decrease && decrease > 50){ // temp value
-                biggest_decrease = decrease;
+            int the_max_decrease = max(lookback_decrease,decrease);
+            if(the_max_decrease > biggest_decrease && the_max_decrease > 70){ // temp value //+decrease_addon // if(decrease > biggest_decrease && decrease > 70){
+                biggest_decrease = the_max_decrease;
                 line_prior_to_decrease = last_line; // line before decrease is kept
                 line_found = true;
                 steps_since_fall = 0;
@@ -2900,6 +2961,8 @@ int detecting::get_obstacle_direction(double angle, Vec4i initial_line, Mat mask
 
             line(left_mask,Point(initial_line[0]-1,initial_line[1]),Point(initial_line[2]-1,initial_line[3]),WHITE,3,LINE_AA); // Move one pixel left
             line(right_mask,Point(initial_line[0]+1,initial_line[1]),Point(initial_line[2]+1,initial_line[3]),WHITE,3,LINE_AA); // Move one pixel right
+
+
 
             // Count matches with mask for both directions
             Mat left_match_mat = left_mask & mask;
@@ -3384,13 +3447,15 @@ string detecting::rounding_based_type(obstacle obstacle_to_check, Mat depth_map)
 
 
 // -- Convex methods --
-vector<Mat> detecting::convex_split(Mat mask){
-    vector<Mat> split_masks;
+vector<obstacle> detecting::convex_split(obstacle obstacle_i){
+    vector<obstacle> split_obstacles;
     try{
+        Mat mask = obstacle_i.mask;
         // Get contour
         vector<Point> the_contour = get_biggest_contour(mask);
 
         // Get convex hull indexes
+        cout << "in the beginning" << endl;
         vector<int> convex_hull_indexes;
         convexHull(the_contour,convex_hull_indexes);
 
@@ -3401,10 +3466,11 @@ vector<Mat> detecting::convex_split(Mat mask){
         // Find defects
         vector<Vec4i> defects;
         convexityDefects(the_contour,convex_hull_indexes,defects);
+        cout << "no" << endl;
 
         // Find deepest defect
         float largest_depth = 0.0;
-        int largest_index = 0;
+        //int largest_index = 0;
         vector<float> depths = {};
         for(int i = 0; i < defects.size(); i++){
             Vec4i current_defect = defects.at(i);
@@ -3414,102 +3480,45 @@ vector<Mat> detecting::convex_split(Mat mask){
             // Check if largest depth
             if(depth > largest_depth){
                 largest_depth = depth;
-                largest_index = current_defect[2]; // index of farthest point
+                //largest_index = current_defect[2]; // index of farthest point
             }
         }
 
-        // Get point
-        Point largest_defect = the_contour.at(largest_index);
+//        // Get point
+//        Point largest_defect = the_contour.at(largest_index);
 
-        // Drawing for debugging
-        Mat test_image = mask.clone();
-        cvtColor(test_image,test_image,COLOR_GRAY2BGR);
-        vector<vector<Point>> temp_vec = {convex_hull};
-        Scalar color = Scalar(255,0,0);
-        drawContours(test_image,temp_vec,0,color);
+//        // Drawing for debugging
+//        Mat test_image = mask.clone();
+//        cvtColor(test_image,test_image,COLOR_GRAY2BGR);
+//        vector<vector<Point>> temp_vec = {convex_hull};
+//        Scalar color = Scalar(255,0,0);
+//        drawContours(test_image,temp_vec,0,color,3);
 
-        for(int i = 0; i < defects.size(); i++){
-            Vec4i current_defect = defects.at(i);
-            int index = current_defect[2];
-            Point defect = the_contour.at(index);
-            circle(test_image,defect,3,{0,255,0},-1);
+//        for(int i = 0; i < defects.size(); i++){
+//            Vec4i current_defect = defects.at(i);
+//            int index = current_defect[2];
+//            Point defect = the_contour.at(index);
+//            circle(test_image,defect,5,{0,255,0},-1);
 
-            float depth = float(current_defect[3])/256.0;
+//            float depth = float(current_defect[3])/256.0;
 
-            if(index == largest_index){
-                cout << "Accepted depth of: " << depth << endl;
-            }
-            else{
-                cout << "Rejected depth of: " << depth << endl;
-            }
-        }
-
-        circle(test_image,largest_defect,3,{0,0,255},-1);
-
-
-        imshow("the split point",test_image);
-        waitKey(0);
-
-        // Trianglulate polygon
-        //vector<Mat> testo = ear_clipping_triangulation(mask);
-        vector<triangle> testo = delaunay_triangulation(mask);
-
-        // Remove triangles that are a single line
-        cout << "polygons: " << testo.size() << endl;
-        testo = remove_one_pixel_edges(testo);
-        cout << "polygons: " << testo.size() << endl;
-//        testo = filter_self_intersect_polygons(testo);
-//        cout << testo.size() << endl;
-        //testo = size_filter_triangles(testo);
-
-        // Find depth threshold
-        float depth_threshold = 0.0;
-        clustering clusters;
-        if(depths.size() > 1){
-            vector<float> thresholds = clusters.jenks_natural_breaks(depths);
-            depth_threshold = thresholds.at(0);
-        }
-        cout << "Depth threshold: " << depth_threshold << endl;
-
-        // Find area threshold
-//        vector<double> areas = {};
-//        for(int i = 0; i < testo.size(); i++){
-//            areas.push_back(contourArea(testo.at(i).points));
-//        }
-//        cout << "mean: " << mean(areas) << endl;
-//        Mat area_matrix{areas,true};
-//        vector<double> thresholds = calculations.get_canny_thresholds(area_matrix);
-//        double area_threshold = thresholds.at(0);
-//        vector<double> thresholds = clusters.jenks_natural_breaks(areas);
-//        double area_threshold = thresholds.at(0);
-//        cout << "area threshold: " << area_threshold << endl;
-
-        // Filter based on threshold (works)
-        testo = filter_small_edge_polygons(testo,depth_threshold);
-        cout << "polygons: " << testo.size() << endl;
-
-        // Combine polygons based on depth
-        //testo = combine_and_fix(testo);
-        //testo = fully_combine_convex_triangles(testo,depth_threshold); // best one currently
-
-        testo = combine_until_concave(testo,depth_threshold);
-        cout << "polygons: " << testo.size() << endl;
-
-        // Remove uncombined and small polygons
-        //testo = combine_filter_triangles(testo, depth_threshold);
-
-//        // Make remaining polygons convex
-//        for(int i = 0; i < testo.size(); i++){
-//            if(testo.at(i).points.size() > 3){ // No need to do it on triangles since they are allways convex
-//                testo.at(i) = fix_concave_polygon(testo.at(i));
+//            if(index == largest_index){
+//                cout << "Accepted depth of: " << depth << endl;
+//            }
+//            else{
+//                cout << "Rejected depth of: " << depth << endl;
 //            }
 //        }
 
-//        //Combine and clean contours
-//        testo = combine_and_fix_polygons(testo);
+//        circle(test_image,largest_defect,5,{0,0,255},-1);
 
 
-        cout << "EAR CLIPING DONE" << endl;
+//        imshow("the split point",test_image);
+//        waitKey(0);
+//        imwrite("convex_hull.png",test_image);
+
+        // Trianglulate polygon
+        vector<triangle> testo = delaunay_triangulation(mask);
 
         visualization visualizer;
         vector<Scalar> colors = visualizer.get_colors(testo.size());
@@ -3523,17 +3532,118 @@ vector<Mat> detecting::convex_split(Mat mask){
             drawContours(triangles,temp,0,colors.at(i),DRAW_WIDTH_INFILL);
             triangles_white = triangles_white | testo.at(i).mask;
         }
-        imshow("triangles", triangles);
-        Mat no_data = triangles_white == 0;
-        imshow("NO DATA", no_data);
-        waitKey(0);
+
+//        imshow("",triangles);
+//        waitKey(0);
+//        imwrite("all_triangles.png",triangles);
+
+        // Remove triangles that are a single line
+        testo = remove_one_pixel_edges(testo);
+
+        // Find depth threshold
+        float depth_threshold = 0.0;
+        clustering clusters;
+        if(depths.size() > 1){
+            vector<float> thresholds = clusters.jenks_natural_breaks(depths);
+            depth_threshold = thresholds.at(0);
+        }
+        // Filter based on threshold (works)
+        if(testo.size() <= 0){
+            throw runtime_error("No obstacles left after one pixel filter.");
+        }
+        testo = filter_small_edge_polygons(testo,depth_threshold);
+
+        if(testo.size() <= 0){
+            throw runtime_error("No obstacles left after trianlge threshold filter.");
+        }
+
+        // Combine polygons based on depth
+        testo = combine_until_concave(testo,depth_threshold);
+
+        if(testo.size() == 0){
+            throw runtime_error("No obstacles left after attempting combining.");
+        }
+
+        // Convert to obstacles
+        for(int index = 0; index < testo.size(); index++){
+            obstacle new_obstacle;
+            new_obstacle.contour = testo.at(index).points;
+            Mat new_mask = Mat::zeros(mask.size(),CV_8U);
+            vector<vector<Point>> hub = {testo.at(index).points};
+            drawContours(new_mask,hub,0,WHITE,DRAW_WIDTH_INFILL);
+            new_obstacle.mask = new_mask;
+            new_obstacle.original_mask = obstacle_i.original_mask;
+            new_obstacle.type = obstacle_i.type;
+            new_obstacle.original_angle = obstacle_i.original_angle;
+            split_obstacles.push_back(new_obstacle);
+        }
+
+        colors = visualizer.get_colors(testo.size());
+
+        triangles = Mat::zeros(mask.size(), CV_8UC3);
+        triangles_white = Mat::zeros(mask.size(), CV_8U);
+        for(int i = 0; i < testo.size(); i++){
+            vector<Point> triangle = testo.at(i).points;
+            vector<vector<Point>> temp = {triangle};
+            drawContours(triangles,temp,0,colors.at(i),DRAW_WIDTH_INFILL);
+            triangles_white = triangles_white | testo.at(i).mask;
+        }
+
+//        imshow("",triangles);
+//        waitKey(0);
+//        imwrite("final_triangles.png",triangles);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return split_obstacles;
+}
+
+vector<obstacle> detecting::full_convex_split(vector<obstacle> obstacles){
+    vector<obstacle> remaining_obstacles = {};
+    try{
+        // Go through each obstacle candidate
+        for(int obstacle_index = 0; obstacle_index < obstacles.size(); obstacle_index++){
+            // Get current data
+            vector<Point> contour = obstacles.at(obstacle_index).contour;
+            Mat mask = obstacles.at(obstacle_index).mask;
+
+            Mat test = Mat::zeros(mask.size(),CV_8U);
+            //cout << contour.size() << endl;
+            vector<vector<Point>> fuck = {contour};
+            drawContours(test,fuck,0,WHITE,DRAW_WIDTH_INFILL);
+
+            // Draw bounding rectangle
+            Mat bounding_box = get_bounding_rectangle(contour,mask.size());
+
+            // Check if bounding box contains more than threshold percent error (Error being pixel within box that do not belong to mask)
+            int error_count = get_symmetric_difference(mask,bounding_box,true);
+
+            int original_contour_size = countNonZero(mask);
+
+            int max_error = int(original_contour_size*accept_rectangle_threshold);
+
+            // If big error the obstacle should be split
+            if(error_count > max_error){
+                vector<obstacle> splits = convex_split(obstacles.at(obstacle_index));
+                for(int i = 0; i < splits.size(); i++){
+                    remaining_obstacles.push_back(splits.at(i));
+                }
+
+            }
+            else{
+                remaining_obstacles.push_back(obstacles.at(obstacle_index));
+            }
+        }
 
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
     }
-    return split_masks;
+    return remaining_obstacles;
 }
+
+
 
 vector<Mat> detecting::min_cost_poly_triangulation(Mat mask){
     vector<Mat> triangles;
@@ -3606,7 +3716,7 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
 //            cout << poly.at(i) << endl;
             if(current_hull_index != i){
                 reflex_indexes.push_back(i);
-                cout << "REFLEX INDEXES: " << i << endl;
+                //cout << "REFLEX INDEXES: " << i << endl;
             }
             else{
                 if(next_hull_index < convex_hull_indexes.size()-1){
@@ -3637,7 +3747,7 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
         for(int i = 0; i < convex_hull_indexes.size(); i++){
             // get potential ear tip index
             int index = convex_hull_indexes.at(i);
-            cout << "CONVEX INDEX: " <<  index << endl;
+            //cout << "CONVEX INDEX: " <<  index << endl;
 
             bool status = check_eartip(reflex_indexes,poly,index,mask);
 
@@ -3648,7 +3758,7 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
 
         // Perform n-3 steps
 //        vector<Point> temp_poly = poly;
-        cout << "INITIAL SIZES: " << poly.size() << ", " << reflex_indexes.size() << ", " << convex_hull_indexes.size() << ", " <<  ear_indexes.size() << endl;
+        //cout << "INITIAL SIZES: " << poly.size() << ", " << reflex_indexes.size() << ", " << convex_hull_indexes.size() << ", " <<  ear_indexes.size() << endl;
 
         for(int i = 0; i < poly.size()-3; i++){
             if(ear_indexes.empty()){
@@ -3736,7 +3846,7 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
 
             // Calculate angle in the triangle left prior -> prior -> next
             double angle = atan2(poly.at(next_index).y-poly.at(left_prior_index).y, poly.at(next_index).x-poly.at(left_prior_index).x) - atan2(poly.at(prior_index).y-poly.at(left_prior_index).y, poly.at(prior_index).x-poly.at(left_prior_index).x);
-            cout << "ANGLE LEFT: " << angle*180/M_PI << endl;
+            //cout << "ANGLE LEFT: " << angle*180/M_PI << endl;
 //            cout << poly.at(left_prior_index) << ", " << poly.at(prior_index) << ", " << poly.at(next_index) << endl;
 //            double dist_left_to_prior = calculations.calculate_euclidean_distance(poly.at(left_prior_index),poly.at(prior_index));
 //            double dist_left_to_next = calculations.calculate_euclidean_distance(poly.at(left_prior_index),poly.at(next_index));
@@ -3754,9 +3864,9 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
 
 //            cout << "prior angle: " << angle*180/M_PI << endl;
             if(fabs(angle)*180/M_PI <  180.0){
-                cout << "LEFT IS CONVEX" << endl;
+                //cout << "LEFT IS CONVEX" << endl;
                 reflex_indexes.erase(find(reflex_indexes.begin(),reflex_indexes.end(),prior_index));
-                cout << prior_index << "REMOVED from reflex" << endl;
+                //cout << prior_index << "REMOVED from reflex" << endl;
                 if(count(convex_hull_indexes.begin(),convex_hull_indexes.end(),prior_index) == 0){
                     convex_hull_indexes.push_back(prior_index);
                 }
@@ -3778,7 +3888,7 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
 //            denominator = 2*dist_prior_to_next*dist_prior_to_right;
 //            angle = acos(dist_squared_sum/denominator);
             angle = atan2(poly.at(right_next_index).y-poly.at(prior_index).y, poly.at(right_next_index).x-poly.at(prior_index).x) - atan2(poly.at(next_index).y-poly.at(prior_index).y, poly.at(next_index).x-poly.at(prior_index).x);
-            cout << "ANGLE RIGHT: " << angle*180/M_PI << endl;
+            //cout << "ANGLE RIGHT: " << angle*180/M_PI << endl;
 
             // If smaller than 180 degrees remove prior point from reflex and add it to convex
 //            cout << "next angle: " << angle*180/M_PI << endl;
@@ -3798,7 +3908,7 @@ vector<Mat> detecting::ear_clipping_triangulation(Mat mask){
                     ear_indexes.push_back(next_index);
                 }
             }
-            cout << "SIZES IN THE END OF LOOP: " << poly.size() << ", " << reflex_indexes.size() << ", " << convex_hull_indexes.size() << ", " <<  ear_indexes.size() << endl;
+            //cout << "SIZES IN THE END OF LOOP: " << poly.size() << ", " << reflex_indexes.size() << ", " << convex_hull_indexes.size() << ", " <<  ear_indexes.size() << endl;
         }
     }
     catch(const exception& error){
@@ -4375,7 +4485,7 @@ vector<triangle> detecting::fully_combine_convex_triangles(vector<triangle> tria
         int last_size = 0;
         while(last_size != combined_triangles.size()){
             last_size = combined_triangles.size();
-            cout << "last size: " << last_size << endl;
+            //cout << "last size: " << last_size << endl;
             combined_triangles = combine_convex_triangles(combined_triangles, concave_threshold);
             // Reverse vector to ensure all combinations are tested
             reverse(combined_triangles.begin(),combined_triangles.end());
@@ -4418,11 +4528,11 @@ vector<triangle> detecting::combine_and_fix(vector<triangle> triangles){
                         // Find defects
                         vector<Vec4i> defects;
                         convexityDefects(new_polygon,convex_hull_indexes,defects);
-                        cout << "Defects in the begining: " << defects.size() << endl;
+                        //cout << "Defects in the begining: " << defects.size() << endl;
 
                         // Conntinue removing defects
                         while(true){
-                            cout << "current number of points: " << new_polygon.size() << endl;
+                            //cout << "current number of points: " << new_polygon.size() << endl;
                             vector<int> defect_indexes;
                             // Go through all defects
                             for(int i = 0; i < defects.size(); i++){
@@ -5169,7 +5279,7 @@ vector<triangle> detecting::combine_and_fix_polygons(vector<triangle> polygons){
 vector<triangle> detecting::combine_until_concave(vector<triangle> polygons, float concave_threshold){
     vector<triangle> combined_polygons = polygons;
     try{
-        auto start = chrono::high_resolution_clock::now();
+        //auto start = chrono::high_resolution_clock::now();
         // Sort combined_polygons from biggest to smallest
         sort(combined_polygons.begin(), combined_polygons.end(),[](triangle a, triangle b){return contourArea(a.points) > contourArea(b.points);});
 
@@ -5227,7 +5337,6 @@ vector<triangle> detecting::combine_until_concave(vector<triangle> polygons, flo
                     // Check for intersection
                     Mat intersection = temp_mask & uncombined_polygons.at(i).mask;
 
-
                     if(countNonZero(intersection) > 1){
 
                         // combine
@@ -5238,11 +5347,28 @@ vector<triangle> detecting::combine_until_concave(vector<triangle> polygons, flo
                             continue;
                         }
 
+                        // Fix selv intersections in combined
+                        erode(combined,combined,Mat());
+                        dilate(combined,combined,Mat());
+                        //morphologyEx(combined,combined,MORPH_CLOSE,border_kernel);
+
                         // find points
                         vector<Point> points = get_biggest_contour(combined);
 
+                        // If no points continue
+                        if(points.size() <= 0){
+                            continue;
+                        }
+
+                        vector<vector<Point>> temp_points = {points};
+                        combined = Mat::zeros(combined.size(),CV_8U);
+                        drawContours(combined,temp_points,0,WHITE,DRAW_WIDTH_INFILL);
+
                         // check for convexity
+                        //imshow("combi",combined);
                         bool valid = check_convexity(points,concave_threshold);
+                        //cout << valid << endl;
+                        //waitKey(0);
 
                         // If valid finalize combination
                         if(valid == true){
@@ -5268,15 +5394,13 @@ vector<triangle> detecting::combine_until_concave(vector<triangle> polygons, flo
             if(unused_polygons.at(index).combined == true){
                 final_polygons.push_back(unused_polygons.at(index));
             }
-            cout << used_indexes.size() << endl;
+            //cout << used_indexes.size() << endl;
 //            imshow("the final poly",unused_polygons.at(index).mask);
 //            waitKey(0);
         }
-        auto stop = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << "Big bad split in " << duration.count() << " ms." << endl;
-
-
+//        auto stop = chrono::high_resolution_clock::now();
+//        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+        //cout << "Big bad split in " << duration.count() << " ms." << endl;
         for(int i = 0; i < final_polygons.size(); i++){
             vector<int> eaten = {};
             for(int j = i+1; j < final_polygons.size(); j++){
@@ -5341,6 +5465,10 @@ vector<triangle> detecting::combine_until_concave(vector<triangle> polygons, flo
 //        }
 
         combined_polygons = final_polygons;
+//        for(int i = 0; i < final_polygons.size(); i++){
+//            imshow("",final_polygons.at(i).mask);
+//            waitKey(0);
+//        }
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -5553,9 +5681,14 @@ vector<triangle> detecting::filter_small_edge_polygons(vector<triangle> polygons
 }
 
 
+long long detecting::get_split_time(){
+    auto time = chrono::duration_cast<chrono::milliseconds>(split_end-split_start);
+    return time.count();
+}
 
-
-
+void detecting::set_index(int index){
+    split_index = index;
+}
 
 
 
@@ -6780,6 +6913,10 @@ vector<obstacle> detecting::filter_rectangle_shape(vector<obstacle> obstacles, f
             if(status == true){
                 accepted_obstacles.push_back(obstacles.at(obstacle_index));
             }
+//            else{
+//                string save_path = "../Data/test_results/final_tests/Filtered/" + to_string(split_index) + "_shape_" + to_string(obstacle_index)+".png";
+//                imwrite(save_path,obstacles.at(obstacle_index).mask);
+//            }
         }
     }
     catch(const exception& error){
@@ -6832,6 +6969,15 @@ vector<obstacle> detecting::filter_border(vector<obstacle> obstacles){
             if(status == true){
                 accepted_obstacles.push_back(obstacles.at(obstacle_index));
             }
+//            else{
+//                string save_path = "../Data/test_results/final_tests/Filtered/" + to_string(split_index) + "_border_" + to_string(obstacle_index)+".png";
+//                imwrite(save_path,obstacles.at(obstacle_index).mask);
+//            }
+//            else{
+////                cout << "edge killed" << endl;
+////                imshow("killed",obstacles.at(obstacle_index).mask);
+////                waitKey(0);
+//            }
         }
     }
     catch(const exception& error){
@@ -6847,7 +6993,7 @@ bool detecting::check_border(obstacle obstacle_to_check){
         Mat mask = obstacle_to_check.mask;
         // Draw border
         Mat border = Mat::zeros(mask.size(),CV_8U);
-        rectangle(border,Point(0,0),Point(mask.cols,mask.rows),WHITE,1);
+        rectangle(border,Point(0,0),Point(mask.cols-1,mask.rows-1),WHITE,1);
 
         // Detect intersections
         Mat intersections = border & mask;
@@ -6867,11 +7013,16 @@ bool detecting::check_border(obstacle obstacle_to_check){
 vector<obstacle> detecting::filter_size(vector<obstacle> obstacles, int threshold){
     vector<obstacle> accepted_obstacles;
     try{
+
         for(int obstacle_index = 0; obstacle_index < obstacles.size(); obstacle_index++){
             int count = countNonZero(obstacles.at(obstacle_index).mask);
             if(count >= threshold){
                 accepted_obstacles.push_back(obstacles.at(obstacle_index));
             }
+//            else{
+//                string save_path = "../Data/test_results/final_tests/Filtered/" + to_string(split_index) + "_shape_" + to_string(obstacle_index)+".png";
+//                imwrite(save_path,obstacles.at(obstacle_index).mask);
+//            }
         }
     }
     catch(const exception& error){
@@ -6892,7 +7043,6 @@ vector<obstacle> detecting::patch_detection_gap(vector<obstacle> last_obstacles,
             // Go through points and add movement of points within obstacle to vector
             vector<float> x_movements;
             vector<float> y_movements;
-
             for(int point_index = 0; point_index < points.size(); point_index++){
                 // Draw point on empty frame
                 Mat point_mask = Mat::zeros(current_obstacle.mask.size(),CV_8U);
@@ -6910,22 +7060,29 @@ vector<obstacle> detecting::patch_detection_gap(vector<obstacle> last_obstacles,
 
             // Filter movements with IPR
             filters filter;
-            vector<float> filtered_x_movements = filter.filter_ipr(x_movements,0.25,0.75);
-            vector<float> filtered_y_movements = filter.filter_ipr(y_movements,0.25,0.75);
+            float y_mean = 0.0;
+            float x_mean = 0.0;
+            if(x_movements.size() > 0){
+                vector<float> filtered_x_movements = filter.filter_ipr(x_movements,0.25,0.75);
+                // Calculate average movements
+                float x_sum = accumulate(filtered_x_movements.begin(), filtered_x_movements.end(), 0);
+                x_mean = -(x_sum/filtered_x_movements.size());
+            }
+            if(y_movements.size() > 0){
+                vector<float> filtered_y_movements = filter.filter_ipr(y_movements,0.25,0.75);
+                float y_sum = accumulate(filtered_y_movements.begin(), filtered_y_movements.end(), 0);
+                y_mean = -(y_sum/filtered_y_movements.size()); // - is due to counteracting the movement
+            }
 
-            // Calculate average movements
-            float x_sum = accumulate(filtered_x_movements.begin(), filtered_x_movements.end(), 0);
-            float y_sum = accumulate(filtered_y_movements.begin(), filtered_y_movements.end(), 0);
-
-            float x_mean = -(x_sum/filtered_x_movements.size());
-            float y_mean = -(y_sum/filtered_y_movements.size()); // - is due to counteracting the movement
 
             // Move obstacle with average movement
             vector<Point> contour = current_obstacle.contour;
+
             for(int point_index = 0; point_index < contour.size(); point_index++){
                 contour.at(point_index).x += x_mean;
                 contour.at(point_index).y += y_mean;
             }
+
             Mat_<double> temp_matrix(2,3);
             temp_matrix << 1,0,x_mean,0,1,y_mean;
 

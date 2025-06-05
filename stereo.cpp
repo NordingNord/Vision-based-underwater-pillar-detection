@@ -412,10 +412,11 @@ void stereo::set_disparity_settings(disparity_parameters settings){
     }
 }
 
-void stereo::set_wsl_filter_settings(double new_lamda, double new_sigma){
+void stereo::set_wsl_filter_settings(double new_lamda, double new_sigma, int new_lrc){
     try{
         lamda = new_lamda;
         sigma = new_sigma;
+        lrc = new_lrc;
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -513,6 +514,44 @@ Mat stereo::filter_disparity(Mat disparity_map, Mat first_frame, Mat second_disp
 
         // Run filter
         wls_filter->filter(disparity_map,first_gray_frame,filtered_disparity,second_disparity_map,Rect(),second_gray_frame);
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filtered_disparity;
+}
+
+Mat stereo::filter_wls(Mat disparity_map, Mat first_frame, Mat second_frame, bool return_confidence){
+    Mat filtered_disparity;
+    try{
+        // Create filter
+        //Ptr<ximgproc::DisparityWLSFilter> wls_filter = ximgproc::createDisparityWLSFilter(sgbm);
+        Ptr<ximgproc::DisparityWLSFilter> wls_filter = ximgproc::createDisparityWLSFilter(sgbm);
+
+
+        // Set parameters
+        wls_filter->setLambda(lamda);
+        wls_filter->setLRCthresh(lrc);
+        wls_filter->setSigmaColor(sigma);
+
+        // Convert frame to grayscale
+        Mat first_gray_frame;
+        Mat second_gray_frame;
+        cvtColor(first_frame,first_gray_frame,COLOR_BGR2GRAY);
+        cvtColor(second_frame,second_gray_frame,COLOR_BGR2GRAY);
+
+        // Create right matcher
+        Ptr<StereoMatcher> right_matcher = ximgproc::createRightMatcher(sgbm);
+        Mat right_disparity;
+        right_matcher->compute(second_gray_frame,first_gray_frame,right_disparity);
+
+        // Run filter
+        wls_filter->filter(disparity_map,first_gray_frame,filtered_disparity,right_disparity,Rect(),second_gray_frame);
+
+        // temp test thing
+        if(return_confidence == true){
+            filtered_disparity = wls_filter->getConfidenceMap();
+        }
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;
@@ -703,6 +742,112 @@ Mat stereo::fill_disparity_holes(Mat disparity_map){
 //            filled_disparity_map.setTo(min_val,mask);
 //        }
 
+    }
+    catch(const exception& error){
+        cout << "Error: " << error.what() << endl;
+    }
+    return filled_disparity_map;
+}
+
+
+Mat stereo::fill_disparity_holes_new(Mat disparity_map, int gap_limit){
+    Mat filled_disparity_map = disparity_map.clone();
+    try{
+        // Get all invalid pixels
+        Mat invalid = disparity_map == -16;
+        Mat valid;
+        bitwise_not(invalid,valid);
+
+        vector<Point> needs_filling;
+        findNonZero(invalid,needs_filling);
+
+        for(int i = 0; i < needs_filling.size(); i++){
+            Point start_point = needs_filling.at(i);
+
+            // Check that it is valid  to fix
+//            Point left = start_point;
+//            left.x = left.x-gap_limit;
+//            Point right = start_point;
+//            right.x = right.x + gap_limit;
+//            Point top = start_point;
+//            top.y = top.y - gap_limit;
+//            Point bottom = start_point;
+//            bottom.y = bottom.y+gap_limit;
+
+//            Mat mask = Mat::zeros(invalid.size(),CV_8U);
+//            line(mask,left,start_point,255,1);
+//            Mat overlap = mask & valid;
+//            if(hasNonZero(overlap) == false && left.x >= 0){
+//                continue;
+//            }
+
+//            mask = Mat::zeros(invalid.size(),CV_8U);
+//            line(mask,start_point,right,255,1);
+//            overlap = mask & valid;
+//            if(hasNonZero(overlap) == false && right.x < disparity_map.cols){
+//                continue;
+//            }
+
+//            mask = Mat::zeros(invalid.size(),CV_8U);
+//            line(mask,start_point,bottom,255,1);
+//            overlap = mask & valid;
+//            if(hasNonZero(overlap) == false && bottom.y < disparity_map.rows){
+//                continue;
+//            }
+
+//            mask = Mat::zeros(invalid.size(),CV_8U);
+//            line(mask,top,start_point,255,1);
+//            overlap = mask & valid;
+//            if(hasNonZero(overlap) == false && top.y >= 0){
+//                continue;
+//            }
+
+
+            for(int j = 0; j < gap_limit; j++){
+                Point left = start_point;
+                Point right = start_point;
+                Point up = start_point;
+                Point down = start_point;
+
+                if(start_point.x-j >= 0){
+                    left.x = left.x -j;
+                }
+                if(start_point.x+j < disparity_map.cols){
+                    right.x = right.x+j;
+                }
+                if(start_point.y-j >= 0){
+                    up.y = start_point.y-j;
+                }
+                if(start_point.y+j < disparity_map.rows){
+                    down.y = start_point.y+j;
+                }
+
+                if(disparity_map.at<short>(left) > 0 && disparity_map.at<short>(right) > 0){
+                    filled_disparity_map.at<short>(start_point) = min(disparity_map.at<short>(left),disparity_map.at<short>(right));
+                    break;
+                }
+                else if(disparity_map.at<short>(up) > 0 && disparity_map.at<short>(down) > 0){
+                    filled_disparity_map.at<short>(start_point) = min(disparity_map.at<short>(up),disparity_map.at<short>(down));
+                    break;
+                }
+                else if(disparity_map.at<short>(left) > 0){
+                    filled_disparity_map.at<short>(start_point) = disparity_map.at<short>(left);
+                    break;
+                }
+                else if(disparity_map.at<short>(right) > 0){
+                   filled_disparity_map.at<short>(start_point) = disparity_map.at<short>(right);
+                   break;
+                }
+                else if(disparity_map.at<short>(up) > 0){
+                   filled_disparity_map.at<short>(start_point) = disparity_map.at<short>(up);
+                   break;
+                }
+                else if(disparity_map.at<short>(down) > 0){
+                   filled_disparity_map.at<short>(start_point) = disparity_map.at<short>(down);
+                   break;
+                }
+            }
+        }
     }
     catch(const exception& error){
         cout << "Error: " << error.what() << endl;

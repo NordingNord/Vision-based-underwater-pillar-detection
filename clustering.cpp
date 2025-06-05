@@ -136,7 +136,7 @@ vector<float> clustering::jenks_natural_breaks(vector<float> one_dimensional_dat
 
         // Calculate sum of squared deviations for range means and deviations
         vector<float> sum_of_squared_results = {};
-        cout << kept_results.size() << endl;
+        //cout << kept_results.size() << endl;
         for(int i = 0; i < kept_results.size(); i++){
             float sum_of_squared = 0;
             for(int j = 0; j < kept_results.at(i).size(); j++){
@@ -276,7 +276,7 @@ vector<double> clustering::jenks_natural_breaks(vector<double> one_dimensional_d
 
         // Calculate goodness of variance fit on the ranges
         vector<double> goodness_of_fits = {};
-        cout << sum_of_squared_results.size() << endl;
+        //cout << sum_of_squared_results.size() << endl;
         for(int i = 0; i < sum_of_squared_results.size(); i++){
             double goodness_of_fit = (sum_of_squares-sum_of_squared_results.at(i));
             goodness_of_fits.push_back(goodness_of_fit);

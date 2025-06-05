@@ -44,6 +44,9 @@ static const int CLEAN_METHOD_MORPH = 0;
 static const int CLEAN_METHOD_MEDIAN = 1;
 static const int CLEAN_METHOD_CONVEX = 2;
 
+static const int LINE_BASED = 0;
+static const int CONVEX_BASED = 1;
+
 
 // -- Class --
 class detecting
@@ -149,7 +152,9 @@ public:
     std::string rounding_based_type(obstacle obstacle_to_check, cv::Mat depth_map);
 
     // -- Convex methods --
-    std::vector<cv::Mat> convex_split(cv::Mat mask);
+    std::vector<obstacle> convex_split(obstacle obstacle_i);
+
+    std::vector<obstacle> full_convex_split(std::vector<obstacle> obstacles);
 
     std::vector<cv::Mat> min_cost_poly_triangulation(cv::Mat mask);
 
@@ -196,6 +201,10 @@ public:
     std::vector<triangle> filter_self_intersect_polygons(std::vector<triangle> polygons);
 
     std::vector<triangle> filter_small_edge_polygons(std::vector<triangle> polygons, float concave_threshold);
+
+    long long get_split_time();
+
+    void set_index(int index);
 
 
 
@@ -299,7 +308,7 @@ private:
 
     double increase_stopper = 0.3;
 
-    int max_steps_since_fall = 100;
+    int max_steps_since_fall = 10; // 100
 
     bool remove_border = true;
 
@@ -352,6 +361,19 @@ private:
     bool get_threshold = true; // desired true
 
     int clean_median_size = 31;
+
+    float obstacle_size_limit_filter = 0.01;
+
+
+    cv::Mat test_img;
+
+    // Test parameters
+    int split_index = 0;
+    bool save_split = false;
+    int split_mode = LINE_BASED;
+    std::string split_path = "../Data/test_results/final_tests/split/";
+    std::chrono::high_resolution_clock::time_point split_start;
+    std::chrono::high_resolution_clock::time_point split_end;
 
 
 };

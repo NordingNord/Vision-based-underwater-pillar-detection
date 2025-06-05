@@ -193,11 +193,11 @@ int main(){
     float ratio = 0.5;
 
     // -- preprocessing pipeline --
-    bool color_match = true;
+    bool color_match = true; // true
     bool luminosity_match = false;
-    bool homomorphic_filter = true;
-    bool clahe = false;
-    bool pre_rectify = false;
+    bool homomorphic_filter = true; // true
+    bool clahe = false; // false
+    bool pre_rectify = false; // false
 
     // -- Disparity and depth pipeline --
     float speckle_percentage = 0.04;
@@ -230,23 +230,33 @@ int main(){
     detection_triangulation.set_parameter_paths(bottom_paramter_path, top_parameter_path); // Setup camera data
     detection_triangulation.set_stereo_parameters(VALID,true); // Setup stereo parameters // VALID usually
     detection_triangulation.set_feature_parameters(settings); // Setup feature settings
+
     detection_triangulation.set_match_parameters(match_type,n_best,flann_ratio);
     detection_triangulation.set_match_filter_parameters(match_filter_type,ransac_min,ransac_threshold);
+
     detection_triangulation.set_disparity_parameters(min_disparity,num_disparities,block_size,p1,p2,disp_12_max_diff,pre_filter_cap,uniqueness_ratio,speckle_window_size,speckle_range,mode);
+
     detection_triangulation.set_wsl_parameters(lamda,sigma);
     detection_triangulation.set_bilateral_parameters(diameter,sigma_color,sigma_space);
+
     detection_triangulation.set_optical_flow_paramters(window_size,max_pyramid_layers,termination_criteria);
+
     detection_triangulation.set_obstacle_candidate_settings(blur_size,low_thresh,high_thresh,sobel_size,l2_status,size_thresh,line_kernel,contour_kernel,border_kernel,border_threshold);
+
     detection_triangulation.set_obstacle_filter_settings(rectangle_acceptance_threshold, size_limit, hough_thresh, min_length, max_gap, step_limit, decline_thresh, rectangle_ratio, obstacle_cutoff);
+
     detection_triangulation.set_slic_settings(slic_method,region_size,ruler,slic_iterations);
+
     detection_triangulation.set_preprocessing_steps(color_match,luminosity_match,homomorphic_filter,clahe,pre_rectify);
+
     detection_triangulation.set_disparity_and_depth_steps(speckle_percentage,max_speckle_diff,track,fill,speckle_filter,use_processed,consistensy_check,horizontal_fill);
+
     detection_triangulation.set_obstacle_finding_steps(edge_detection,blur,equalize,equalize_alg,close,thin,morph_initial,clean_final,dilate_validation,expansions,estimate,dilation_size,max_background,max_foreground);
 
     //detection_triangulation.run_triangulation_pipeline(DISPARITY_FILTER_NONE);
     //detection_triangulation.run_triangulation_pipeline_test(DISPARITY_FILTER_NONE);
 
-    //    detection_triangulation.run_disparity_pipeline_test(ratio);
+    detection_triangulation.run_disparity_pipeline_test(ratio);
 
     // Run tests
     tests test_runner;
@@ -257,7 +267,10 @@ int main(){
     //test_runner.test_best_sift();
     //test_runner.test_disparity_map_alone();
     //test_runner.test_best_disparity_map();
+    //test_runner.test_postprocessing();
+    //test_runner.test_more_postprocessing();
+    test_runner.test_final_implementation();
 
-    test_runner.replace_in_file("../Data/test_results/disparity_settings_test/best.csv", "../Data/test_results/disparity_settings_test/best_new.csv", "?", "0", 5, 50, "1");
-    //test_runner.replace_in_file_from_to("../Data/test_results/disparity_settings_test/speckleRange.csv", "../Data/test_results/disparity_settings_test/speckleRange_new.csv","?","1",0,51);
+    //test_runner.replace_first_in_file("../Data/test_results/postprocessing_test/Weighted_median_speckle.csv", "../Data/test_results/postprocessing_test/Weighted_median_speckle_new.csv", "?", "100", 5, 50, "0");
+    //test_runner.replace_first_in_file_from_to("../Data/test_results/postprocessing_test/Speckle.csv", "../Data/test_results/postprocessing_test/Speckle_new.csv","?","70",0,60);
 }

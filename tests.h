@@ -37,7 +37,11 @@ public:
     // -- Methods for inserting data into file --
     void replace_in_file(std::string path, std::string new_path, std::string to_replace, std::string replacement, int interval, int segment, std::string interval_replacement);
 
+    void replace_first_in_file(std::string path, std::string new_path, std::string to_replace, std::string replacement, int interval, int segment, std::string interval_replacement);
+
     void replace_in_file_from_to(std::string path, std::string new_path, std::string to_replace, std::string replacement, int start, int end);
+
+    void replace_first_in_file_from_to(std::string path, std::string new_path, std::string to_replace, std::string replacement, int start, int end);
 
     // -- Method for testing AKAZE feature detection --
     void test_akaze();
@@ -71,19 +75,26 @@ public:
 
     void disparity_quality_test(std::string writer_path, disparity_parameters settings, std::string bottom_path, std::string top_path, std::string bottom_parameters, std::string top_parameters, std::string setting_val, int frame_limit, std::string image_path);
 
-    // -- Method for testing preprocessing methods --
-    void test_preprocessing();
-
-    void preprocess_annotation_test(akaze_settings current_settings, fstream writer, std::string video_path, std::string annotation_path, std::string setting_name, int frame_limit, std::vector<bool> preprocessing_steps);
-
-    void preprocess_matching_test(akaze_settings current_settings, fstream writer, std::string first_video, std::string second_video, std::string setting_name, int frame_limit, std::vector<bool> preprocessing_steps, std::string first_parameters, std::string second_parameters);
-
-    void preprocess_disparity_test(disparity_parameters disparity_settings,akaze_settings current_settings, fstream writer, std::string first_video, std::string second_video, std::string setting_name, int frame_limit, std::vector<bool> preprocessing_steps, std::string first_parameters, std::string second_parameters);
-
     // -- Method for testing postprocessing methods --
     void test_postprocessing();
 
-    void postprocessing_disparity_test(fstream writer, disparity_parameters settings, akaze_settings detector_settings, std::string bottom_path, std::string top_path, std::string bottom_parameters, std::string top_parameters, std::string setting_name, int frame_limit, std::vector<bool> combinations);
+    void postprocessing_disparity_test(std::string writer_path, disparity_parameters settings, akaze_settings detector_settings, std::string bottom_path, std::string top_path, std::string bottom_parameters, std::string top_parameters, std::string setting_name, int frame_limit, std::vector<bool> combinations, std::string image_path);
+
+    void test_more_postprocessing();
+
+    void more_post_disparity_test(std::string writer_path, disparity_parameters disp_settings, akaze_settings detector_settings, std::string bottom_path, std::string top_path, std::string bottom_parameters, std::string top_parameters, std::string setting_name, int frame_limit, std::string image_path, test_variables settings);
+
+    // -- Methods for testing the final implementation --
+    void test_final_implementation();
+
+    // -- Method for testing preprocessing methods --
+    void test_preprocessing();
+
+    void preprocess_annotation_test(akaze_settings current_settings, std::string writer_path, std::string video_path, std::string annotation_path, std::string setting_name, int frame_limit, std::vector<bool> preprocessing_steps);
+
+    void preprocess_matching_test(akaze_settings current_settings, std::string writer_path, std::string first_video, std::string second_video, std::string setting_name, int frame_limit, std::vector<bool> preprocessing_steps, std::string first_parameters, std::string second_parameters);
+
+    void preprocess_disparity_test(disparity_parameters disparity_settings,akaze_settings current_settings, std::string writer_path, std::string image_path, std::string first_video, std::string second_video, std::string setting_name, int frame_limit, std::vector<bool> preprocessing_steps, std::string first_parameters, std::string second_parameters);
 
 private:
     cv::Vec3b annotation_colour = {0,0,254};

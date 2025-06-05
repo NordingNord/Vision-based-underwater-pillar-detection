@@ -35,6 +35,9 @@ static const int DISPARITY_FILTER_BILATERAL = 2;
 static const double INVALID = -16;
 static const int DISPARITY_STEP = 16;
 
+static const int MEDIAN = 0;
+static const int WEIGHTED_MEDIAN = 1;
+
 // -- Class --
 class pipeline
 {
@@ -62,7 +65,7 @@ public:
 
     void set_disparity_parameters(int min_disp, int num_disp, int block_size, int p1, int p2, int disp_12_max_diff, int prefilter_cap, int uniqueness_ratio, int speckle_window_size, int speckle_range, int mode);
 
-    void set_wsl_parameters(double lamda, double sigma);
+    void set_wsl_parameters(double lamda, double sigma, int lrc = 24);
 
     void set_bilateral_parameters(int diameter, double sigma_color, double sigma_space);
 
@@ -76,7 +79,7 @@ public:
 
     void set_preprocessing_steps(bool color_match = false, bool luminosity_match = false, bool homomorphic_filter = false, bool clahe = false, bool pre_rectify = false);
 
-    void set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track = false, bool fill = false, bool speckle_filter = false, bool use_processed = false, bool consistensy_check = false, bool horizontal_fill = false);
+    void set_disparity_and_depth_steps(float speckle_percentage, double max_speckle_diff, bool track = false, bool fill = false, bool speckle_filter = false, bool use_processed = false, bool consistensy_check = false, bool horizontal_fill = false, int smoothing_mode = WEIGHTED_MEDIAN);
 
     void set_obstacle_finding_steps(int edge_detection = LINE_MODE_MORPH, bool blur = true, bool equalize = false, int equalize_alg = EQUALIZE_CLAHE, bool close = true, bool thin = true, bool morph_initial = true, bool clean_final = true, bool dilate_validation = true,int expansions = 5, bool estimate = true, cv::Size dilation_size = cv::Size(5,5), int max_background = 100, int max_foreground = 255);
 
@@ -89,6 +92,9 @@ public:
     void run_disparity_pipeline(int disparity_filter);
 
     void run_disparity_pipeline_test(float resize_ratio);
+
+    // -- Final pipeline --
+    void proposed_pipeline(float resize_ratio, bool get_test_data, std::string save_path, int limit);
 
     // -- Assist methods --
     bool check_rectification_inconsistensy(cv::Mat first_frame, cv::Mat second_frame);
@@ -151,7 +157,7 @@ private:
 
     // Values to detect inconsistensies
     int median_horizontal_diff;
-    double angle_limit = 2.0;
+    double angle_limit = 5.0;
 
     // Parameter files
     std::string first_param;
@@ -179,10 +185,17 @@ private:
     double speckle_diff = 0.0;
     bool use_processed_disparity = false;
     bool apply_horizontal_fill = false;
-    bool patch_gaps = true;
+    bool patch_gaps = false;
 
     bool mask_mode = true;
-    bool set_background = true;
+    bool set_background = false;
+    int smooth_mode;
+
+    int rectify_fixed = 0;
+
+    cv::Mat org_rectify_left;
+    cv::Mat org_rectify_right;
+
 };
 
 #endif // PIPELINE_H

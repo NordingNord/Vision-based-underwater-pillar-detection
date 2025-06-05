@@ -56,6 +56,39 @@ void tests::replace_in_file(string path, string new_path, string to_replace, str
     file.close();
 }
 
+void tests::replace_first_in_file(string path, string new_path, string to_replace, string replacement, int interval, int segment, string interval_replacement){
+    ifstream file(path);
+    string line;
+
+    fstream file_writer;
+    cout << new_path << endl;
+    file_writer.open(new_path,ios::out | ios::app);
+
+    if(file.is_open()){
+        int count = -1;
+        while(getline(file,line)){
+            string replacer = replacement;
+            if(count == interval){
+                replacer = interval_replacement;
+            }
+            int position = line.find(to_replace,0);
+            if(position != string::npos){
+                line.replace(position,to_replace.size(),replacer);
+            }
+            file_writer << line << "\n";
+            count++;
+            if(count == segment){
+                count = 0;
+            }
+        }
+    }
+    else{
+        cout << "Bad path" << endl;
+    }
+    file_writer.close();
+    file.close();
+}
+
 void tests::replace_in_file_from_to(string path, string new_path, string to_replace, string replacement, int start, int end){
     ifstream file(path);
     string line;
@@ -83,6 +116,32 @@ void tests::replace_in_file_from_to(string path, string new_path, string to_repl
     file.close();
 }
 
+void tests::replace_first_in_file_from_to(string path, string new_path, string to_replace, string replacement, int start, int end){
+    ifstream file(path);
+    string line;
+
+    fstream file_writer;
+    file_writer.open(new_path,ios::out | ios::app);
+
+    if(file.is_open()){
+        int count = 1;
+        while(getline(file,line)){
+            if(count >= start && count <= end){
+                int position = line.find(to_replace,0);
+                if(position != string::npos){
+                    line.replace(position,to_replace.size(),replacement);
+                }
+            }
+            file_writer << line << "\n";
+            count++;
+        }
+    }
+    else{
+        cout << "Bad path" << endl;
+    }
+    file_writer.close();
+    file.close();
+}
 
 // -- Method for testing AKAZE feature detection --
 void tests::test_akaze(){
@@ -469,7 +528,6 @@ void tests::akaze_matching_test(akaze_settings current_settings, string file_nam
     writer.close();
 }
 
-
 // -- Method for testing ORB feature detection --
 void tests::test_orb(){
 
@@ -724,7 +782,6 @@ void tests::orb_matching_test(orb_settings current_settings, string file_name, s
 }
 
 // SIFT tests
-
 void tests::test_best_sift(){
     // Prepare path data
     vector<string> video_category = {"clear1", "clear2", "clear3", "tank1", "tank2", "tank3", "crowded1", "crowded2"};
@@ -914,6 +971,7 @@ void tests::sift_matching_test(sift_settings current_settings, string file_name,
     writer.close();
 }
 
+
 // -- Method for testing disparity settings --
 void tests::test_disparity_map_alone(){
 
@@ -1031,7 +1089,7 @@ void tests::test_best_disparity_map(){
     vector<string> top_parameter_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Top.yml"};
 
     // Initialize settings
-    disparity_parameters best_settings = {0,48,11,968,3872,15,5,15,200,4,StereoSGBM::MODE_SGBM_3WAY};
+    disparity_parameters best_settings = {0,48,11,968,3872,15,0,15,200,4,StereoSGBM::MODE_SGBM_3WAY};
 
     // Begin test
     // Go through all videos
@@ -1230,6 +1288,665 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 }
 
 
+// -- Method for testing postprocessing methods --
+void tests::test_postprocessing(){
+    // Prepare video paths
+    vector<string> bottom_camera_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv"};
+    vector<string> top_camera_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv"};
+
+    // Prepare camera parameter paths
+    vector<string> bottom_parameter_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Bottom.yml"};
+    vector<string> top_parameter_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Top.yml"};
+
+    // Prepare frame limits (limit of how many frames are analyzed)
+    int frame_limit = 50;
+
+    // Initialize best settings
+    disparity_parameters disparity_settings = {0,48,11,968,3872,15,0,15,200,4,StereoSGBM::MODE_SGBM_3WAY};
+
+    akaze_settings detector_settings = {AKAZE::DESCRIPTOR_MLDB,0,3,0.0001f,2,2,KAZE::DIFF_PM_G2};
+
+    // Initialize possible post processing methods (consistensy check, weighted_median, Speckle filter)
+    vector<vector<bool>> combinations = {{false,false,false}, {true,false,false}, {false,true,false}, {false,false,true}, {true,true,false}, {false,true,true},{true,false,true}, {true,true,true}};
+    vector<string> combination_names = {"None", "Consistensy", "Weighted_median", "Speckle", "Consistensy_weighted_median", "Weighted_median_speckle","Consistensy_speckle","All"};
+
+    // Begin test
+
+    // Go through each video
+    for(int i = 0; i < bottom_camera_paths.size(); i++){
+        // Go through all postprocessing methods
+        for(int j = 0; j < combinations.size(); j++){
+            // Prepare title
+            string file_name = "../Data/test_results/postprocessing_test/"+combination_names.at(j)+".csv";
+            string image_path = "../Data/test_results/postprocessing_test/"+combination_names.at(j)+"/";
+            // Prepare file writer
+            fstream file_writer;
+            file_writer.open(file_name);
+            // If file does not exist write parameter line
+            string first_line = "";
+            bool first_line_exists = true;
+            getline(file_writer,first_line);
+            if(first_line == ""){
+                first_line_exists = false;
+            }
+            file_writer.close();
+            file_writer.open(file_name,ios::out | ios::app);
+            if(first_line_exists == false){
+                file_writer << "Video, Frame ID, hole count, invalid_percentage, incomplete, consitensy_level, time_spent_ms,  " << combination_names.at(j) << "\n"; // No speckle since speckle filter is used to analyze that and here the speckle filter is used
+            }
+            file_writer.close();
+
+            // Run test
+            postprocessing_disparity_test(file_name,disparity_settings,detector_settings,bottom_camera_paths.at(i),top_camera_paths.at(i),bottom_parameter_paths.at(i), top_parameter_paths.at(i),combination_names.at(j),frame_limit,combinations.at(j), image_path);
+        }
+    }
+}
+
+void tests::postprocessing_disparity_test(string writer_path, disparity_parameters settings, akaze_settings detector_settings, string bottom_path, string top_path, string bottom_parameters, string top_parameters, string setting_name, int frame_limit, vector<bool> combinations, string image_path){
+
+    // Prepare writer
+    fstream writer;
+    writer.open(writer_path,ios::out | ios::app);
+
+    // Prepare cameras
+    camera first_camera(bottom_path);
+    camera second_camera(top_path);
+
+    first_camera.set_camera_paramters(bottom_parameters);
+    second_camera.set_camera_paramters(top_parameters);
+
+    // Initialize stereo class
+    vector<int> org_dimensions = first_camera.get_camera_dimensions();
+    Size frame_size = {org_dimensions.at(0),org_dimensions.at(1)};
+
+    // Convert size since frames rotated
+    frame_size = {frame_size.width, frame_size.height};
+
+    // Initialize stereo with desired paramters
+    stereo stereo_system(VALID,frame_size);
+    stereo_system.set_disparity_settings(settings);
+
+    // Resize intrinsics to half
+    float ratio = 0.5;
+
+    first_camera.resize_intrensic(ratio);
+    second_camera.resize_intrensic(ratio);
+
+    // Get new dimensions
+    float new_width = org_dimensions.at(0)*ratio;
+    float new_height = org_dimensions.at(1)*ratio;
+
+    // Update callibration size
+    stereo_system.set_callibration_size(Size(static_cast<int>(new_width), static_cast<int>(new_height)));
+
+    // Prepare rectification
+    stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
+
+    // Initialize some variables
+    int frames_analyzed = 0;
+    Mat first_frame, second_frame;
+
+    // Prepare pipeline
+    pipeline pipeline_methods(bottom_path,top_path);
+    pipeline_methods.set_feature_parameters(detector_settings);
+    pipeline_methods.set_match_parameters(MATCH_BRUTE_CROSS,1,0.7);
+    pipeline_methods.set_match_filter_parameters(MATCH_FILTER_RANSAC,10,2.5);
+
+    // go through video
+    while(true){
+
+        // Read frames
+        first_frame = first_camera.get_next_frame();
+        second_frame = second_camera.get_next_frame();
+
+        // Break if no more frames any of the videos
+        if(first_frame.empty() || second_frame.empty()){
+            frames_analyzed++;
+            break;
+        }
+
+        // Rotate frames
+        rotate(first_frame, first_frame, ROTATE_90_CLOCKWISE);
+        rotate(second_frame, second_frame, ROTATE_90_CLOCKWISE);
+
+        // Resize frames
+        resize(first_frame,first_frame,Size(),ratio,ratio,INTER_LINEAR);
+        resize(second_frame,second_frame,Size(),ratio,ratio,INTER_LINEAR);
+
+        // Rectify frames
+        vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
+        first_frame = rectified_frames.at(0);
+        second_frame = rectified_frames.at(1);
+
+        // Check if rectified correctly
+        bool inconsistent = pipeline_methods.check_rectification_inconsistensy(first_frame,second_frame);
+
+        // Only continue if rectification is correct
+        if(inconsistent == true){
+            continue;
+        }
+
+        // some settings for postprocessing
+        int frame_area = first_frame.cols * first_frame.rows;
+        double speckle_diff = 10.0;
+        double max_diff = speckle_diff*DISPARITY_STEP;
+        float speckle_area_percentage = 0.04;
+
+        // Get disparity map
+        Mat disparity_map_org = stereo_system.get_disparity(first_frame,second_frame);
+
+        // Post process disparity map
+        auto start = chrono::high_resolution_clock::now();
+
+        // Compute left right consistensy check
+        if(combinations.at(0) == true){
+            disparity_map_org = stereo_system.validate_disparity(disparity_map_org,first_frame,second_frame);
+        }
+
+        // Remove invalid border
+        disparity_map_org = stereo_system.remove_invalid_edge(disparity_map_org);
+
+        if(combinations.at(1) == true){
+            disparity_map_org = stereo_system.apply_weighted_median_filter(first_frame,disparity_map_org);
+        }
+
+        if(combinations.at(2) == true){
+            // Method requires orginal signed
+            filterSpeckles(disparity_map_org,INVALID,frame_area*speckle_area_percentage,max_diff);
+        }
+
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+
+        if(disparity_map_org.type() != CV_8UC1){
+            disparity_map_org = stereo_system.process_disparity(disparity_map_org);
+        }
+
+        // Save image
+        string image_name = image_path + to_string(frames_analyzed)+".png";
+        imwrite(image_name,disparity_map_org);
+
+        // Now evaluate
+
+        // Get hole count
+        int hole_count = 0;
+        Mat valid_data = disparity_map_org > 0;
+        Mat invalid_data;
+        bitwise_not(valid_data,invalid_data);
+
+        vector<vector<Point>> contours = {};
+        vector<Vec4i> hierarchy = {};
+        findContours(invalid_data,contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+        for(int i = 0; i < contours.size(); i++){
+            Mat drawing = Mat::zeros(valid_data.size(),CV_8U);
+            drawContours(drawing,contours,i,WHITE,DRAW_WIDTH_INFILL);
+
+            // Dilate image
+            Mat kernel = getStructuringElement(MORPH_ELLIPSE,Size(3,3),Point(-1,-1));
+            Mat dilated_drawing;
+            morphologyEx(drawing,dilated_drawing, MORPH_DILATE,kernel);
+
+            // Get absolute differece between dilated and non dilated
+            Mat diff_frame;
+            absdiff(dilated_drawing,drawing,diff_frame);
+
+            Mat intersection = diff_frame & valid_data;
+
+            if(countNonZero(intersection) == countNonZero(diff_frame)){
+                hole_count++;
+            }
+
+        }
+
+        // Get invalid percentage
+        Mat invalid = disparity_map_org == 0;
+
+        double percentage = double(countNonZero(invalid))/double(disparity_map_org.cols*disparity_map_org.rows)*100.0;
+
+        // Write
+        cout << frames_analyzed << endl;
+        writer << bottom_path << "," << frames_analyzed << ", " << hole_count << ", " << percentage << ", " << "?" << ", " << "?" << "," <<  duration.count() << ", " << setting_name << "\n";
+        frames_analyzed++;
+        if(frames_analyzed >= frame_limit){
+            break;
+        }
+    }
+    writer.close();
+}
+
+void tests::test_more_postprocessing(){
+    // Prepare video paths
+    vector<string> bottom_camera_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv"};
+    vector<string> top_camera_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv"};
+
+    // Prepare camera parameter paths
+    vector<string> bottom_parameter_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Bottom.yml"};
+    vector<string> top_parameter_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Top.yml"};
+
+    // Prepare frame limits (limit of how many frames are analyzed)
+    int frame_limit = 50;
+
+    // Initialize best settings
+    disparity_parameters disparity_settings = {0,48,11,968,3872,15,0,15,200,4,StereoSGBM::MODE_SGBM_3WAY};
+
+    akaze_settings detector_settings = {AKAZE::DESCRIPTOR_MLDB,0,3,0.0001f,2,2,KAZE::DIFF_PM_G2};
+
+    // initialize wls values
+    wls_settings wls_data;
+    wls_data.lambda = 70000; // Higher values -> more adhesion to edges
+    wls_data.lrc_thresh = 24; // Threshold for disparity difference
+    wls_data.sigma = 2.0; // Large -> leakage, small -> sensitive to noise
+
+    // Initialize fill variables
+    fill_settings fill_data;
+    fill_data.border = 30;
+
+    // Initialize median variables
+    median_settings median_data;
+    median_data.median_kernel = 41;
+
+    // Inpaint variables
+    inpaint_settings inpaint_data;
+    inpaint_data.kernel_size = 20;
+    inpaint_data.mode = INPAINT_TELEA;
+
+    // Billateral filter
+    billateral_settings billateral_data;
+    billateral_data.distance = 20;
+    billateral_data.sigma_color = 200;
+    billateral_data.sigma_space = 200;
+
+    // Fast bilateral solver
+    fast_billateral_settings fast_billateral_data;
+    fast_billateral_data.sigma_spacial = 16;
+    fast_billateral_data.sigma_luma = 8;
+    fast_billateral_data.sigma_chroma = 3;
+    fast_billateral_data.lambda = 4;
+    fast_billateral_data.iterations = 15;
+    fast_billateral_data.maximum_tolerance = 1e-8;
+
+    test_variables settings;
+    settings.wls = wls_data;
+    settings.median = median_data;
+    settings.inpaint = inpaint_data;
+    settings.fill = fill_data;
+    settings.fast_billateral = fast_billateral_data;
+    settings.billateral = billateral_data;
+
+    vector<string> test_names = {"wls","fill_hoz","median","inpaint","billateral","fast_billateral"};
+
+    // Begin test
+
+    // go through each test
+    for(int j = 0; j < test_names.size(); j++){
+        // Go through each video
+        for(int i = 0; i < bottom_camera_paths.size(); i++){
+            if(j == 1){
+                // Prepare title
+                string file_name = "../Data/test_results/postprocessing_test/"+test_names.at(j) +".csv";
+                string image_path = "../Data/test_results/postprocessing_test/"+test_names.at(j)+"/";
+
+                // Prepare file writer
+                fstream file_writer;
+                file_writer.open(file_name);
+                // If file does not exist write parameter line
+                string first_line = "";
+                bool first_line_exists = true;
+                getline(file_writer,first_line);
+                if(first_line == ""){
+                    first_line_exists = false;
+                }
+                file_writer.close();
+                file_writer.open(file_name,ios::out | ios::app);
+                if(first_line_exists == false){
+                    file_writer << "Video, Frame ID, hole count, invalid_percentage, incomplete, consitensy_level, time_spent_ms, wls\n";
+                }
+                file_writer.close();
+
+                more_post_disparity_test(file_name,disparity_settings,detector_settings,bottom_camera_paths.at(i),top_camera_paths.at(i),bottom_parameter_paths.at(i), top_parameter_paths.at(i),test_names.at(j),frame_limit, image_path, settings);
+            }
+        }
+    }
+}
+
+
+void tests::more_post_disparity_test(string writer_path, disparity_parameters disp_settings, akaze_settings detector_settings, string bottom_path, string top_path, string bottom_parameters, string top_parameters, string setting_name, int frame_limit, string image_path, test_variables settings){
+
+    // Prepare writer
+    fstream writer;
+    writer.open(writer_path,ios::out | ios::app);
+
+    // Prepare cameras
+    camera first_camera(bottom_path);
+    camera second_camera(top_path);
+
+    first_camera.set_camera_paramters(bottom_parameters);
+    second_camera.set_camera_paramters(top_parameters);
+
+    // Initialize stereo class
+    vector<int> org_dimensions = first_camera.get_camera_dimensions();
+    Size frame_size = {org_dimensions.at(0),org_dimensions.at(1)};
+
+    // Convert size since frames rotated
+    frame_size = {frame_size.width, frame_size.height};
+
+    // Initialize stereo with desired paramters
+    stereo stereo_system(VALID,frame_size);
+    stereo_system.set_disparity_settings(disp_settings);
+
+    if(setting_name == "wls" || setting_name == "fast_billateral"){
+        stereo_system.set_wsl_filter_settings(settings.wls.lambda,settings.wls.sigma,settings.wls.lrc_thresh);
+    }
+
+    // Resize intrinsics to half
+    float ratio = 0.5;
+
+    first_camera.resize_intrensic(ratio);
+    second_camera.resize_intrensic(ratio);
+
+    // Get new dimensions
+    float new_width = org_dimensions.at(0)*ratio;
+    float new_height = org_dimensions.at(1)*ratio;
+
+    // Update callibration size
+    stereo_system.set_callibration_size(Size(static_cast<int>(new_width), static_cast<int>(new_height)));
+
+    // Prepare rectification
+    stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
+
+    // Initialize some variables
+    int frames_analyzed = 0;
+    Mat first_frame, second_frame;
+
+    // Prepare pipeline
+    pipeline pipeline_methods(bottom_path,top_path);
+    pipeline_methods.set_feature_parameters(detector_settings);
+    pipeline_methods.set_match_parameters(MATCH_BRUTE_CROSS,1,0.7);
+    pipeline_methods.set_match_filter_parameters(MATCH_FILTER_RANSAC,10,2.5);
+
+    // go through video
+    while(true){
+
+        // Read frames
+        first_frame = first_camera.get_next_frame();
+        second_frame = second_camera.get_next_frame();
+
+        // Break if no more frames any of the videos
+        if(first_frame.empty() || second_frame.empty()){
+            frames_analyzed++;
+            break;
+        }
+
+        // Rotate frames
+        rotate(first_frame, first_frame, ROTATE_90_CLOCKWISE);
+        rotate(second_frame, second_frame, ROTATE_90_CLOCKWISE);
+
+        // Resize frames
+        resize(first_frame,first_frame,Size(),ratio,ratio,INTER_LINEAR);
+        resize(second_frame,second_frame,Size(),ratio,ratio,INTER_LINEAR);
+
+        // Rectify frames
+        vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
+        first_frame = rectified_frames.at(0);
+        second_frame = rectified_frames.at(1);
+
+        // Check if rectified correctly
+        bool inconsistent = pipeline_methods.check_rectification_inconsistensy(first_frame,second_frame); // Not enough matches suddently?
+
+        // Only continue if rectification is correct
+        if(inconsistent == true){
+            continue;
+        }
+
+        // Get disparity map
+        Mat disparity_map_org = stereo_system.get_disparity(first_frame,second_frame);
+
+        // some settings for postprocessing
+        int frame_area = first_frame.cols * first_frame.rows;
+        double speckle_diff = 10.0;
+        double max_diff = speckle_diff*DISPARITY_STEP;
+        float speckle_area_percentage = 0.04;
+
+        filterSpeckles(disparity_map_org,INVALID,frame_area*speckle_area_percentage,max_diff);
+
+        // Post process disparity map
+        auto start = chrono::high_resolution_clock::now();
+
+        if(setting_name == "wls"){
+            // Bad results but maybe worth showing:
+            disparity_map_org = stereo_system.filter_wls(disparity_map_org,first_frame,second_frame);
+        }
+        else if(setting_name == "fill"){
+            //Okay results but thickens obstacles:
+            disparity_map_org = stereo_system.fill_disparity_holes_new(disparity_map_org,settings.fill.border);
+        }
+        else if(setting_name == "fill_hoz"){
+            disparity_map_org = stereo_system.fill_disparity_holes(disparity_map_org);
+        }
+        else if(setting_name == "median"){
+            // Good results:
+            if(disparity_map_org.type() != CV_8UC1){
+                disparity_map_org = stereo_system.process_disparity(disparity_map_org);
+            }
+            medianBlur(disparity_map_org,disparity_map_org,settings.median.median_kernel);
+        }
+        else if(setting_name == "inpaint"){
+            // Bad and very slow: Will only work if better mask of areas that must be filled is created first
+            if(disparity_map_org.type() != CV_8UC1){
+                disparity_map_org = stereo_system.process_disparity(disparity_map_org);
+            }
+            Mat test_invalid = disparity_map_org == 0;
+            inpaint(disparity_map_org,test_invalid,disparity_map_org,settings.inpaint.kernel_size, settings.inpaint.mode);
+        }
+        else if(setting_name == "billateral"){
+            // Bad: just blurs
+            if(disparity_map_org.type() != CV_8UC1){
+                disparity_map_org = stereo_system.process_disparity(disparity_map_org);
+            }
+            Mat test;
+            bilateralFilter(disparity_map_org,test,settings.billateral.distance,settings.billateral.sigma_color,settings.billateral.sigma_space);
+            disparity_map_org = test.clone();
+        }
+        else if(setting_name == "fast_billateral"){
+            Mat confidence = stereo_system.filter_wls(disparity_map_org,first_frame,second_frame,true);
+            Ptr<ximgproc::FastBilateralSolverFilter> filter = ximgproc::createFastBilateralSolverFilter(first_frame,settings.fast_billateral.sigma_spacial,settings.fast_billateral.sigma_luma,settings.fast_billateral.sigma_chroma,settings.fast_billateral.lambda,settings.fast_billateral.iterations,settings.fast_billateral.maximum_tolerance);
+            filter->filter(disparity_map_org,confidence, disparity_map_org);
+
+            if(disparity_map_org.type() != CV_8UC1){
+                disparity_map_org = stereo_system.process_disparity(disparity_map_org);
+            }
+            ximgproc::dtFilter(first_frame,disparity_map_org,disparity_map_org,settings.fast_billateral.sigma_spacial,settings.fast_billateral.sigma_chroma,ximgproc::DTF_NC);
+        }
+
+
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+
+        if(disparity_map_org.type() != CV_8UC1){
+            disparity_map_org = stereo_system.process_disparity(disparity_map_org);
+        }
+        disparity_map_org = stereo_system.remove_invalid_edge(disparity_map_org);
+
+        // Save image
+        string image_name = image_path + to_string(frames_analyzed)+".png";
+        imwrite(image_name,disparity_map_org);
+
+        // Now evaluate
+
+        // Get hole count
+        int hole_count = 0;
+        Mat valid_data = disparity_map_org > 0;
+        Mat invalid_data;
+        bitwise_not(valid_data,invalid_data);
+
+        vector<vector<Point>> contours = {};
+        vector<Vec4i> hierarchy = {};
+        findContours(invalid_data,contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
+
+        for(int i = 0; i < contours.size(); i++){
+            Mat drawing = Mat::zeros(valid_data.size(),CV_8U);
+            drawContours(drawing,contours,i,WHITE,DRAW_WIDTH_INFILL);
+
+            // Dilate image
+            Mat kernel = getStructuringElement(MORPH_ELLIPSE,Size(3,3),Point(-1,-1));
+            Mat dilated_drawing;
+            morphologyEx(drawing,dilated_drawing, MORPH_DILATE,kernel);
+
+            // Get absolute differece between dilated and non dilated
+            Mat diff_frame;
+            absdiff(dilated_drawing,drawing,diff_frame);
+
+            Mat intersection = diff_frame & valid_data;
+
+            if(countNonZero(intersection) == countNonZero(diff_frame)){
+                hole_count++;
+            }
+        }
+
+        // Get invalid percentage
+        Mat invalid = disparity_map_org == 0;
+
+        double percentage = double(countNonZero(invalid))/double(disparity_map_org.cols*disparity_map_org.rows)*100.0;
+
+        // Write
+        cout << frames_analyzed << endl;
+        writer << bottom_path << "," << frames_analyzed << ", " << hole_count << ", " << percentage << ", " << "?" << ", " << "?" << "," <<  duration.count() << ", " << setting_name << "\n";
+        frames_analyzed++;
+        if(frames_analyzed >= frame_limit){
+            break;
+        }
+    }
+    writer.close();
+}
+
+// -- Methods for testing the final implementation --
+void tests::test_final_implementation(){
+    // Prepare video paths
+    string bottom_camera_path = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv";
+    string top_camera_path = "/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv";
+
+    // Prepare camera parameter paths
+    string bottom_parameter_path = "/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Bottom.yml";
+    string top_parameter_path = "/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Top.yml";
+
+    // Prepare frame limits (limit of how many frames are analyzed)
+    int frame_limit = 100;
+
+    // Initialize best settings
+    disparity_parameters disparity_settings = {0,48,11,968,3872,15,0,15,200,4,StereoSGBM::MODE_SGBM_3WAY};
+    akaze_settings detector_settings = {AKAZE::DESCRIPTOR_MLDB,0,3,0.0001f,2,2,KAZE::DIFF_PM_G2};
+
+    // rectification parameters
+    bool rotated_frame = true; // Frame is rotated compared to callibration
+    double alpha = VALID; // Determines if only want pixels present in both images, which we do.
+
+    // Matching parameters
+    int match_type = MATCH_BRUTE_CROSS; // We use brute force matcher
+    int n_best = 1; // We only keep the singular best match
+    float flann_ratio = 0.7; // We dont use FLANN matching so this does not matter
+
+    int match_filter_type = MATCH_FILTER_RANSAC; // We use ransact to filter matches
+    int ransac_min = 10; // Minimum matches required to perform filtering
+    double ransac_threshold = 2.5; // The ransac reprojection threshold used
+
+    // Optical flow parameters
+    Size window_size = cv::Size(15,15); // search window at each level
+    int max_pyramid_layers = 2;  // 2 -> 3 layers max, since 1 -> 2 layers and 0 -> 1 layers = no pyramid
+    TermCriteria termination_criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03); //  count is the maximum number of iterations while eps is epsilon is a limit for how little the window is allowed to be moved before stopping the proecess
+
+    // Obstacle candidate Settings
+    int blur_size = 0; //(Not used)
+    double low_thresh = 0; //(Not used)
+    double high_thresh = 0; //(Not used)
+    int sobel_size = 3; // Extended sobel kernel size: Lower value -> more edges more noise. Bigger value -> less edges more smooth less noise.
+    bool l2_status = true; // More accurate formular used for image gradients in Canny
+    int size_thresh = 4; // Currently a number of points threshold
+    cv::Mat line_kernel = getStructuringElement(MORPH_RECT,Size(11,11),Point(-1,-1)); // Kernel used for closing of lines, before contour detection
+    cv::Mat contour_kernel; //(Not used)
+    cv::Mat border_kernel = getStructuringElement(MORPH_ELLIPSE,Size(3,3),Point(-1,-1)); // Single pixel expansion
+    float border_threshold = 0.75; // Percentage of border that must be deeper than the current contour
+
+    // Obstacle filter settings
+    float rectangle_acceptance_threshold = 0.10; // The percentage of a bounding rectangle that is allowed to contain out of obstacle pixels. If exceeded, the obstacle must either not be rectangular or contain more than one rectangle.
+    float size_limit = 0.1; // Percentage of original obstacle size needed to continue splitting. If below splitting is stopped.
+    int hough_thresh = 20; // Minimum votes needed to be seen as a line
+    double min_length = 10.0; // Minimum length of a line to be set as a line segment
+    double max_gap = 0.0; // Max allowed gap between points that constitues a line segment.
+    int step_limit = 5; // Number of steps taken without change, before start edge is concluded upon.
+    float decline_thresh = 0.90; // Percentage of decrease in valid pixels before end line is concluded upon
+    float rectangle_ratio = 1.5; // Size ratio that the bounding rectangle must have to be deemed a pillar or pertruding edge. Basically the rectangle must be taller than wide or wider than tall to be accpeted.
+    int obstacle_cutoff = 1920; //  Used to be  max(frame.cols,frame.rows). Basically just a hard size cutoff
+
+    // Preprocessing settings
+    bool color_match = false;
+    bool luminosity_match = false;
+    bool homomorphic_filter = false;
+    bool clahe = false;
+    bool pre_rectify = false;
+
+    // Disparity pipeline settings
+    float speckle_percentage = 0; //(Not used)
+    double max_speckle_diff = 0; //(Not used)
+    bool track = false;
+    bool fill = true; // set to true
+    bool speckle_filter = false;
+    bool use_processed = false;
+    bool consistensy_check = false;
+    bool horizontal_fill = false;
+    int smoothing_mode = MEDIAN;
+
+
+
+
+    // Remaining pipeline settings
+    int edge_detection = LINE_MODE_CANNY; // Method used for creating an edge image
+    bool blur = false; // If blur should be applied before edge detection
+    bool equalize = false; // If histogram equalization should be conducted before edge detection
+    int equalize_alg = EQUALIZE_CLAHE; // Algorithm used for histogram equalization
+    bool close = true; // If edges should be closed
+    bool thin = true; // If edges should be thinned
+    bool morph_initial = false; // Should holes and pertruding elements be removed from the initial obstacles
+    bool clean_final = true; // Should holes and pertruding elements be removed from the final obstacles
+    bool dilate_validation = false; // Dilate masks slightly before validation
+    int expansions = 8; // Number of dilation performed during validation
+    bool estimate = true; // Estimate max background instead of setting a hard cap
+    cv::Size dilation_size; //(Not used)
+    int max_background; //(Not used)
+    int max_foreground; //(Not used)
+
+
+    // Prepare pipeline
+    pipeline proposed(bottom_camera_path,top_camera_path); // Setup mode and video feeds
+    proposed.set_parameter_paths(bottom_parameter_path, top_parameter_path); // Setup camera data
+
+    proposed.set_stereo_parameters(alpha,rotated_frame); // Setup stereo parameters: Valid -> tight fit and no black space after rectification, true -> Images rotated
+    proposed.set_feature_parameters(detector_settings); // Setup feature settings
+
+    proposed.set_match_parameters(match_type,n_best,flann_ratio); // Setup matching mode
+
+    proposed.set_match_filter_parameters(match_filter_type,ransac_min,ransac_threshold); // Setup match filtering
+
+    proposed.set_disparity_parameters(disparity_settings.min_disparity, disparity_settings.num_disparities, disparity_settings.block_size, disparity_settings.p1, disparity_settings.p2, disparity_settings.disp_12_max_diff, disparity_settings.pre_filter_cap, disparity_settings.uniqueness_ratio, disparity_settings.speckle_window_size, disparity_settings.speckle_range, disparity_settings.mode);
+
+    proposed.set_optical_flow_paramters(window_size,max_pyramid_layers,termination_criteria); // Setup optical flow related parameters
+
+    proposed.set_obstacle_candidate_settings(blur_size,low_thresh,high_thresh,sobel_size,l2_status,size_thresh,line_kernel,contour_kernel,border_kernel,border_threshold);
+
+    proposed.set_obstacle_filter_settings(rectangle_acceptance_threshold, size_limit, hough_thresh, min_length, max_gap, step_limit, decline_thresh, rectangle_ratio, obstacle_cutoff);
+
+    proposed.set_preprocessing_steps(color_match,luminosity_match,homomorphic_filter,clahe,pre_rectify);
+
+    proposed.set_disparity_and_depth_steps(speckle_percentage,max_speckle_diff,track,fill,speckle_filter,use_processed,consistensy_check,horizontal_fill,smoothing_mode);
+
+    proposed.set_obstacle_finding_steps(edge_detection,blur,equalize,equalize_alg,close,thin,morph_initial,clean_final,dilate_validation,expansions,estimate,dilation_size,max_background,max_foreground);
+
+    // Run test
+    std::string path = "../Data/test_results/final_tests/";
+    proposed.proposed_pipeline(0.5,true,path,frame_limit);
+}
+
+
 
 
 //// -- Method for testing preprocessing methods --
@@ -1241,13 +1958,14 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //    // Test how good the disparity map looks
 
 //    // Initialize the earlier found optimal settings for feature detection and disparity map
-//    akaze_settings detector_settings = {AKAZE::DESCRIPTOR_MLDB,0,3,0.00f,4,4,KAZE::DIFF_PM_G2}; // (Should be best AKAZE from earlier tests)
-//    disparity_parameters disparity_settings = {0,64,11,968,3872,-1,0,5,200,2,StereoSGBM::MODE_SGBM}; // Should be based on earlier tests
+//    disparity_parameters disparity_settings = {0,48,11,968,3872,15,0,15,200,4,StereoSGBM::MODE_SGBM_3WAY};
+
+//    akaze_settings detector_settings = {AKAZE::DESCRIPTOR_MLDB,0,3,0.0001f,2,2,KAZE::DIFF_PM_G2};
 
 //    // Initialize video vectors for each test
-//    vector<string> test_1_video_category = {"clear1", "clear2", "clear3", "tank1", "tank2", "tank3", "crowded1", "crowded2", "crowded3","crowded4"};
-//    vector<string> test_1_video_paths = {"../Data/Sole_Pillar_Images/Sole_Pillar_Images_Video.avi","../Data/New_Pillar_Top_Images/New_Pillar_Top_Images_Video.avi","../Data/New_Pillar_Bottom_Images/New_Pillar_Bottom_Images_Video.avi","../Data/Water_Tank_2_Images/Water_Tank_2_Images_Video.avi","../Data/Tank_With_Pipe_Images/Tank_With_Pipe_Images_Video.avi","../Data/Tank_With_Pipe_2_Images/Tank_With_Pipe_2_Images_Video.avi","../Data/Wall_Indents_Top_Images/Wall_Indents_Top_Images_Video.avi","../Data/Wall_Indents_Bottom_Images/Wall_Indents_Bottom_Images_Video.avi","../Data/Ground_Beams_Images/Ground_Beams_Images_Video.avi", "../Data/Crowded_Sea_Floor_Images/Crowded_Sea_Floor_Images_Video.avi"};
-//    vector<string> test_1_annotation_paths = {"../Data/Sole_Pillar_Annotated/Sole_Pillar_Annotation_Video.avi","../Data/New_Pillar_Top_Annotated/New_Pillar_Top_Annotated_Video.avi","../Data/New_Pillar_Bottom_Annotated/New_Pillar_Bottom_Annotated_Video.avi","../Data/Water_Tank_2_Annotated/Water_Tank_2_Annotated_Video.avi","../Data/Tank_With_Pipe_Annotated/Tank_With_Pipe_Annotated_Video.avi","../Data/Tank_With_Pipe_2_Annotated/Tank_With_Pipe_2_Annotated_Video.avi","../Data/Wall_Indents_Top_Annotated/Wall_Indents_Top_Annotated_Video.avi","../Data/Wall_Indents_Bottom_Annotated/Wall_Indents_Bottom_Annotated_Video.avi","../Data/Ground_Beams_Annotated/Ground_Beams_Annotated_Video.avi","../Data/Crowded_Sea_Floor_Annotated/Crowded_Sea_Floor_Annotated_Video.avi"};
+//    vector<string> test_1_video_category = {"clear1", "clear2", "clear3", "tank1", "tank2", "tank3", "crowded1", "crowded2"};
+//    vector<string> test_1_video_paths = {"../Data/Sole_Pillar_Images/Sole_Pillar_Images_Video.avi","../Data/New_Pillar_Top_Images/New_Pillar_Top_Images_Video.avi","../Data/New_Pillar_Bottom_Images/New_Pillar_Bottom_Images_Video.avi","../Data/Water_Tank_2_Images/Water_Tank_2_Images_Video.avi","../Data/Tank_With_Pipe_Images/Tank_With_Pipe_Images_Video.avi","../Data/Tank_With_Pipe_2_Images/Tank_With_Pipe_2_Images_Video.avi","../Data/Wall_Indents_Top_Images/Wall_Indents_Top_Images_Video.avi","../Data/Wall_Indents_Bottom_Images/Wall_Indents_Bottom_Images_Video.avi"};
+//    vector<string> test_1_annotation_paths = {"../Data/Sole_Pillar_Annotated/Sole_Pillar_Annotation_Video.avi","../Data/New_Pillar_Top_Annotated/New_Pillar_Top_Annotated_Video.avi","../Data/New_Pillar_Bottom_Annotated/New_Pillar_Bottom_Annotated_Video.avi","../Data/Water_Tank_2_Annotated/Water_Tank_2_Annotated_Video.avi","../Data/Tank_With_Pipe_Annotated/Tank_With_Pipe_Annotated_Video.avi","../Data/Tank_With_Pipe_2_Annotated/Tank_With_Pipe_2_Annotated_Video.avi","../Data/Wall_Indents_Top_Annotated/Wall_Indents_Top_Annotated_Video.avi","../Data/Wall_Indents_Bottom_Annotated/Wall_Indents_Bottom_Annotated_Video.avi"};
 
 //    // Prepare video paths
 //    vector<string> test_2_bottom_camera_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv"};
@@ -1268,7 +1986,7 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //    vector<string> combination_names = {"None", "Homomorphic", "Color_match","CLAHE","Snow_removal"};
 
 //    // Set frame limit
-//    int frame_limit = 200;
+//    int frame_limit = 50;
 
 //    // -- TEST 1 --
 //    vector<int> valid_combinations = {0,1,3,4};
@@ -1295,11 +2013,10 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //            if(first_line_exists == false){
 //                file_writer << "Video, Frame ID, Features Found, features_in_obstacle, percentage match, time taken to preprocess(ms), " << combination_names.at(index) << "\n";
 //            }
+//            file_writer.close();
 
 //            // Run test
-//            preprocess_annotation_test(detector_settings,file_writer,test_1_video_paths.at(i),test_1_annotation_paths,combination_names.at(index),frame_limit,combinations.at(index));
-
-//            file_writer.close();
+//            preprocess_annotation_test(detector_settings,file_name,test_1_video_paths.at(i),test_1_annotation_paths,combination_names.at(index),frame_limit,combinations.at(index));
 //        }
 //    }
 
@@ -1325,11 +2042,10 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //            if(first_line_exists == false){
 //                file_writer << "Video, Frame ID, Features Found, matches_found, percentage match, time taken to preprocess(ms), " << combination_names.at(j) << "\n";
 //            }
+//            file_writer.close();
 
 //            // Run test
-//            preprocess_matching_test(detector_settings,file_writer,test_2_bottom_camera_paths.at(i),test_2_top_camera_paths,combination_names.at(j),frame_limit,combinations.at(j), test_2_bottom_parameter_paths, test_2_top_parameter_paths);
-
-//            file_writer.close();
+//            preprocess_matching_test(detector_settings,file_name,test_2_bottom_camera_paths.at(i),test_2_top_camera_paths,combination_names.at(j),frame_limit,combinations.at(j), test_2_bottom_parameter_paths, test_2_top_parameter_paths);
 //        }
 //    }
 
@@ -1339,6 +2055,7 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //        // Go through each preprocessing setup
 //        for(int j = 0; j < valid_combinations.size(); j++){
 //            // Prepare title
+//            string image_path = "../Data/test_results/preprocessing_test/disparity_test/"+combination_names.at(index)+"/";
 //            string file_name = "../Data/test_results/preprocessing_test/disparity_test/"+combination_names.at(index)+".csv";
 //            // Prepare file writer
 //            fstream file_writer;
@@ -1355,16 +2072,19 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //            if(first_line_exists == false){
 //                file_writer << "Video, Frame ID, hole count, invalid_percentage, speckle_percentage, incomplete, time_spent_ms  " << combination_names.at(j) << "\n";
 //            }
+//            file_writer.close();
 
 //            // Run test
-//            preprocess_disparity_test(disparity_settings,detector_settings,file_writer,test_3_bottom_camera_paths.at(i),test_3_top_camera_paths,combination_names.at(j),frame_limit,combinations.at(j), test_3_bottom_parameter_paths, test_3_top_parameter_paths);
-
-//            file_writer.close();
+//            preprocess_disparity_test(disparity_settings,detector_settings,file_name,image_path,test_3_bottom_camera_paths.at(i),test_3_top_camera_paths,combination_names.at(j),frame_limit,combinations.at(j), test_3_bottom_parameter_paths, test_3_top_parameter_paths);
 //        }
 //    }
 //}
 
-//void tests::preprocess_annotation_test(akaze_settings current_settings, fstream writer, string video_path, string annotation_path, string setting_name, int frame_limit, vector<bool> preprocessing_steps,){
+//void tests::preprocess_annotation_test(akaze_settings current_settings, string writer_path, string video_path, string annotation_path, string setting_name, int frame_limit, vector<bool> preprocessing_steps,){
+//    // Prepare writer
+//    fstream writer;
+//    writer.open(writer_path,ios::out | ios::app);
+
 //    // Initialise detector
 //    feature_handling feature_handler(current_settings);
 
@@ -1460,9 +2180,14 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //            break;
 //        }
 //    }
+//    writer.close();
 //}
 
-//void tests::preprocess_matching_test(akaze_settings current_settings, fstream writer, string first_video, string second_video, string setting_name, int frame_limit, vector<bool> preprocessing_steps, string first_parameters, string second_parameters){
+//void tests::preprocess_matching_test(akaze_settings current_settings, string writer_path, string first_video, string second_video, string setting_name, int frame_limit, vector<bool> preprocessing_steps, string first_parameters, string second_parameters){
+
+//    // Prepare writer
+//    fstream writer;
+//    writer.open(writer_path,ios::out | ios::app);
 
 //    // Initialise detector
 //    feature_handling feature_handler(current_settings);
@@ -1611,9 +2336,13 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //            break;
 //        }
 //    }
+//    writer.close();
 //}
 
-//void tests::preprocess_disparity_test(disparity_parameters disparity_settings, akaze_settings current_settings, fstream writer, string first_video, string second_video, string setting_name, int frame_limit, vector<bool> preprocessing_steps, string first_parameters, string second_parameters){
+//void tests::preprocess_disparity_test(disparity_parameters disparity_settings, akaze_settings current_settings, string writer_path, string image_path, string first_video, string second_video, string setting_name, int frame_limit, vector<bool> preprocessing_steps, string first_parameters, string second_parameters){
+//    // Prepare writer
+//    fstream writer;
+//    writer.open(writer_path,ios::out | ios::app);
 
 //    // Initialise detector
 //    feature_handling feature_handler(current_settings);
@@ -1828,224 +2557,6 @@ void tests::disparity_quality_test(string writer_path,disparity_parameters setti
 //            break;
 //        }
 //    }
-//}
-
-
-//// -- Method for testing postprocessing methods --
-//void tests::test_postprocessing(){
-//    // Prepare video paths
-//    vector<string> bottom_camera_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv"};
-//    vector<string> top_camera_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv"};
-
-//    // Prepare camera parameter paths
-//    vector<string> bottom_parameter_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Bottom.yml"};
-//    vector<string> top_parameter_paths = {"/home/benjamin/Master_Thesis_Workspace/Data/Parameters/March_Top.yml"};
-
-//    // Prepare frame limits (limit of how many frames are analyzed)
-//    vector<int> frame_limit = 200;
-
-//    // Initialize best settings found earlier
-//    disparity_parameters disparity_settings = {0,64,11,968,3872,-1,0,5,200,2,StereoSGBM::MODE_SGBM}; // Should be based on earlier tests
-//    akaze_settings detector_settings = {AKAZE::DESCRIPTOR_MLDB,0,3,0.00f,4,4,KAZE::DIFF_PM_G2}; // (Should be best AKAZE from earlier tests)
-
-//    // Initialize possible post processing methods (consistensy check, weighted_median, Speckle filter)
-//    vector<vector<bool>> combinations = {{false,false,false}, {true,false,false}, {false,true,false}, {false,false,true}, {true,true,false}, {false,true,true},{true,false,true}, {true,true,true}};
-//    vector<string> combination_names = {"None", "Consistensy", "Weighted_median", "Speckle", "Consistensy_weighted_median", "Weighted_median_speckle","Consistensy_speckle","All"};
-
-
-
-//    // Begin test
-
-//    // Go through each video
-//    for(int i = 0; i < bottom_camera_paths.size(); i++){
-//        // Go through all postprocessing methods
-//        for(int j = 0; j < combinations.size(); j++){
-//            // Prepare title
-//            string file_name = "../Data/test_results/postprocessing_test/"+combination_names.at(j)+".csv";
-//            // Prepare file writer
-//            fstream file_writer;
-//            file_writer.open(file_name);
-//            // If file does not exist write parameter line
-//            string first_line = "";
-//            bool first_line_exists = true;
-//            getline(file_writer,first_line);
-//            if(first_line == ""){
-//                first_line_exists = false;
-//            }
-//            file_writer.close();
-//            file_writer.open(file_name,ios::out | ios::app);
-//            if(first_line_exists == false){
-//                file_writer << "Video, Frame ID, hole count, invalid_percentage, incomplete, time_spent_ms  " << setting_name.at(i) << "\n"; // No speckle since speckle filter is used to analyze that and here the speckle filter is used
-//            }
-
-//            // Run test
-//            postprocessing_disparity_test(file_writer,disparity_settings,detector_settings,bottom_camera_paths.at(i),top_camera_paths.at(i),bottom_parameter_paths.at(i), top_parameter_paths.at(i),combination_names.at(j),frame_limit,combinations);
-
-//            file_writer.close();
-//        }
-//    }
-//}
-
-//void tests::postprocessing_disparity_test(fstream writer, disparity_parameters settings, akaze_settings detector_settings, string bottom_path, string top_path, string bottom_parameters, string top_parameters, string setting_name, int frame_limit, vector<bool> combinations){
-//    // Prepare cameras
-//    camera first_camera(bottom_path);
-//    camera second_camera(top_path);
-
-//    first_camera.set_camera_paramters(bottom_parameters);
-//    second_camera.set_camera_paramters(top_parameters);
-
-//    // Initialize stereo class
-//    vector<int> org_dimensions = first_camera.get_camera_dimensions();
-//    Size frame_size = {frame_dimension.at(0),frame_dimension.at(1)};
-
-//    // Convert size since frames rotated
-//    frame_size = {frame_size.width, frame_size.height};
-
-//    // Initialize stereo with desired paramters
-//    stereo stereo_system(VALID,frame_size);
-//    stereo_system.set_disparity_settings(settings);
-
-//    // Resize intrinsics to half
-//    float ratio = 0.5;
-
-//    first_camera.resize_intrensic(ratio);
-//    second_camera.resize_intrensic(ratio);
-
-//    // Get new dimensions
-//    float new_width = org_dimensions.at(0)*ratio;
-//    float new_height = org_dimensions.at(1)*ratio;
-
-//    // Update callibration size
-//    stereo_system.set_callibration_size(Size(static_cast<int>(new_width), static_cast<int>(new_height)));
-
-//    // Prepare rectification
-//    stereo_system.prepare_rectify(first_camera.get_camera_intrinsics().matrix, second_camera.get_camera_intrinsics().matrix, first_camera.get_camera_distortion(), second_camera.get_camera_distortion(),second_camera.get_camera_extrinsics().rotation,second_camera.get_camera_extrinsics().translation);
-
-//    // Initialize some variables
-//    int frames_analyzed = 0;
-//    Mat first_frame, second_frame;
-
-//    // Prepare pipeline
-//    pipeline pipeline_methods(bottom_path,top_path);
-//    pipeline_methods.set_feature_parameters(detector_settings);
-//    pipeline_methods.set_match_parameters(MATCH_BRUTE_CROSS,1,0.7);
-//    pipeline_methods.set_match_filter_parameters(MATCH_FILTER_RANSAC,10,2.5);
-
-//    // go through video
-//    while(true){
-
-//        // Read frames
-//        first_frame = first_camera.get_next_frame();
-//        second_frame = second_camera.get_next_frame();
-
-//        // Break if no more frames any of the videos
-//        if(first_frame.empty() || second_frame.empty()){
-//            frames_analyzed++;
-//            break;
-//        }
-
-//        // Rotate frames
-//        rotate(first_frame, first_frame, ROTATE_90_CLOCKWISE);
-//        rotate(second_frame, second_frame, ROTATE_90_CLOCKWISE);
-
-//        // Resize frames
-//        resize(first_frame,first_frame,Size(),ratio,ratio,INTER_LINEAR);
-//        resize(second_frame,second_frame,Size(),ratio,ratio,INTER_LINEAR);
-
-//        // Rectify frames
-//        vector<Mat> rectified_frames = stereo_system.rectify(first_frame,second_frame);
-//        first_frame = rectified_frames.at(0);
-//        second_frame = rectified_frames.at(1);
-
-//        // Check if rectified correctly
-//        bool inconsistent = pipeline_methods.check_rectification_inconsistensy(first_frame,second_frame);
-
-//        // Only continue if rectification is correct
-//        if(inconsistent == true){
-//            continue;
-//        }
-
-//        // some settings for postprocessing
-//        int frame_area = first_frame.cols * first_frame.rows;
-//        double speckle_diff = 10.0;
-//        double max_diff = speckle_diff*DISPARITY_STEP;
-//        float speckle_area_percentage = 0.04;
-
-//        // Get disparity map
-//        Mat disparity_map_org = stereo_system.get_disparity(first_frame,second_frame);
-
-//        // Post process disparity map
-//        auto start = chrono::high_resolution_clock::now();
-
-//        // Compute left right consistensy check
-//        if(combinations.at(0) == true){
-//            disparity_map_org = stereo_system.validate_disparity(disparity_map_org,first_frame,second_frame);
-//        }
-
-//        // Remove invalid border
-//        disparity_map_org = stereo_system.remove_invalid_edge(disparity_map_org);
-
-//        if(combinations.at(1) == true){
-//            disparity_map = stereo_system.apply_weighted_median_filter(first_frame,disparity_map_org);
-//        }
-
-//        if(combinations.at(2) == true){
-//            // Method requires orginal signed
-//            filterSpeckles(disparity_map,INVALID,frame_area*speckle_area_percentage,max_diff);
-//        }
-
-//        auto stop = chrono::high_resolution_clock::now();
-//        auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-
-//        Mat disparity_map = disparity_map_org.clone();
-
-//        if(disparity_map.type() != CV_8UC1){
-//            disparity_map = stereo_system.process_disparity(disparity_map);
-//        }
-//        // Now evaluate
-
-//        // Get hole count
-//        int hole_count = 0;
-//        Mat valid_data = disparity_map > 0;
-//        Mat invalid_data = Mat::empty();
-//        bitwise_not(valid_data,invalid_data);
-
-//        vector<vector<Point>> contours = {};
-//        vector<Vec4i> hierarchy = {};
-//        findContours(invalid_data,contours,hierarchy,RETR_TREE,CHAIN_APPROX_SIMPLE);
-
-//        for(int i = 0; i < contours.size(); i++){
-//            Mat drawing = Mat::zeros(valid_data.size(),CV_8U);
-//            drawContours(drawing,contours,i,WHITE,DRAW_WIDTH_INFILL);
-
-//            // Dilate image
-//            Mat kernel = getStructuringElement(MORPH_ELLIPSE,Size(3,3),Point(-1,-1));
-//            Mat dilated_drawing = Mat::empty();
-//            morphologyEx(drawing,dilated_drawing, MORPH_DILATE,kernel);
-
-//            // Get absolute differece between dilated and non dilated
-//            Mat diff_frame = Mat::empty();
-//            absdiff(dilated_drawing,drawing,diff_frame);
-
-//            Mat intersection = diff_frame & valid_data;
-
-//            if(countNonZero(intersection) == countNonZero(diff_frame)){
-//                hole_count++;
-//            }
-
-//        }
-
-//        // Get invalid percentage
-//        Mat invalid = disparity_map == 0;
-
-//        double percentage = double(countNonZero(invalid))/double(disparity_map.cols*disparity_map.rows)*100.0;
-
-//        // Write
-//        writer << bottom_path << "," << frames_analyzed << ", " << hole_count << ", " << percentage << ", " << "?" << ", " << duration.count() << ", " << setting_name << "\n";
-//        frames_analyzed++;
-//        if(frames_analyzed >= frame_limit){
-//            break;
-//        }
-//    }
+//    writer.close();
 //}
 

@@ -188,6 +188,61 @@ struct prepared_contour{
     int end_row;
 };
 
+// WLS settings
+struct wls_settings{
+    double lambda;
+    int lrc_thresh;
+    double sigma;
+};
+
+// Manual fill settings
+struct fill_settings{
+    int border;
+};
+
+// Median filter settings
+struct median_settings{
+    int median_kernel;
+};
+
+// Inpaint settings
+struct inpaint_settings{
+    int kernel_size;
+    int mode;
+};
+
+// Bilateral settings
+struct billateral_settings{
+    int distance;
+    double sigma_color;
+    double sigma_space;
+};
+
+// Fast bilateral settings
+struct fast_billateral_settings{
+    double sigma_spacial;
+    double sigma_luma;
+    double sigma_chroma;
+    double lambda;
+    int iterations;
+    double maximum_tolerance;
+};
+
+// a bunch of test variables
+struct test_variables{
+    wls_settings wls;
+
+    fill_settings fill;
+
+    median_settings median;
+
+    inpaint_settings inpaint;
+
+    billateral_settings billateral;
+
+    fast_billateral_settings fast_billateral;
+};
+
 //// Keypoints and descriptors
 //struct feature_data{
 //    cv::Mat descriptors;
