@@ -1015,6 +1015,11 @@ class preprocessing:
 
 # make videos
 preprocessor = preprocessing()
+frame = cv.imread("Marine_snow_to_remove.png")
+new_frame = preprocessor.snow_blur(frame,0.6,51,False)
+cv.imshow("no snow", new_frame)
+cv.waitKey(0)
+
 #preprocessor.blur_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Low_Blur_New_Pillar_Top.mkv',30,"low",150)
 #preprocessor.blur_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Medium_Blur_New_Pillar_Top.mkv',30,"medium",150)
 #preprocessor.blur_create('../../Data/Video_Data/New_Pillar_Top.mkv','../../Data/Video_Data/Heavy_Blur_New_Pillar_Top.mkv',30,"heavy",150)
@@ -1268,12 +1273,12 @@ preprocessor = preprocessing()
 # save_bottom = '../../Data/Video_Data/New_Pillar_Videos/Order_5_full_combined_tog/combined_bottom_video.mkv'
 # preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,-1,0.5,2.5,1.0,384,0.6,7,True,50,20)
 
-path_top = '/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv'
-path_bottom = '/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv'
+#path_top = '/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_top.mkv'
+#path_bottom = '/home/benjamin/Master_Thesis_Workspace/Data/Video_Data/Short_Objects_bottom.mkv'
 
-save_top = '../../Data/Video_Data/Preprocess_videos/'
-save_bottom = '../../Data/Video_Data/Preprocess_videos/'
-preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,660,0.5,2.5,1.0,360,0.6,7,False,50,20)
+#save_top = '../../Data/Video_Data/Preprocess_videos/'
+#save_bottom = '../../Data/Video_Data/Preprocess_videos/'
+#preprocessor.combined_preprocess(path_top,path_bottom,save_top,save_bottom,30,660,0.5,2.5,1.0,360,0.6,7,False,50,20)
 
 
 # Write all small images to directory
